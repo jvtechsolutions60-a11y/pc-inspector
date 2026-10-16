@@ -1,3 +1,4 @@
+using System.Linq;
 using PcInspector.Models;
 
 namespace PcInspector.Collectors;

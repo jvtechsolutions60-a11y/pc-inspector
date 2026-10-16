@@ -5,7 +5,7 @@ Petit logiciel Windows façon Speccy : il affiche toutes les informations matér
 
 ## Avancement
 
-1. **Cadrage** : projet C# .NET 8 / WPF, publié en un seul `.exe` autonome. ✅
+1. **Cadrage** : projet C# / WPF sur .NET Framework 4.8, un seul `.exe` léger. ✅
 2. **Hardware** : un onglet par composant (CPU, carte mère/BIOS, RAM, GPU, disques + SMART, réseau, températures).
 3. **Export** : rapport HTML et TXT.
 4. **Software** : OS, logiciels installés, pilotes, services, démarrage.
@@ -14,13 +14,14 @@ Petit logiciel Windows façon Speccy : il affiche toutes les informations matér
 
 - **Sans rien installer** : chaque push sur GitHub lance l'action *Build*, qui produit `PcInspector.exe`
   dans les artefacts du run (onglet *Actions* du dépôt).
-- **Sur un PC Windows avec le SDK .NET 8** :
+- **Sur un PC Windows avec le SDK .NET** (ou Visual Studio) :
 
   ```
-  dotnet publish src/PcInspector/PcInspector.csproj -c Release -o publish
+  dotnet build src/PcInspector/PcInspector.csproj -c Release -o publish
   ```
 
-  L'exécutable est dans `publish/PcInspector.exe`. Il ne demande aucune installation sur le PC cible.
+  L'exécutable est dans `publish/PcInspector.exe`. Il utilise le .NET Framework 4.8, déjà présent sur
+  Windows 10 et 11 : rien à installer sur le PC cible.
 
 Le logiciel demande les droits administrateur au lancement, nécessaires pour lire l'état SMART des disques
 et certaines sondes de température.

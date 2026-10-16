@@ -2,29 +2,21 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- .NET Framework 4.8 est fourni avec Windows 10 et 11 : exe de quelques centaines de Ko, rien à installer -->
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AssemblyName>PcInspector</AssemblyName>
     <RootNamespace>PcInspector</RootNamespace>
     <Product>PC Inspector</Product>
     <Company>JVTECH Solutions</Company>
     <Version>0.1.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-
-    <!-- Publication : un seul .exe autonome, rien à installer sur le PC cible -->
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <SelfContained>true</SelfContained>
-    <PublishSingleFile>true</PublishSingleFile>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Management" Version="8.0.0" />
+    <Reference Include="System.Management" />
   </ItemGroup>
 
 </Project>

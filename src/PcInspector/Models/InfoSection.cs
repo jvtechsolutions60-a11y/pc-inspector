@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace PcInspector.Models;
 
 /// <summary>Une ligne "libellé : valeur" affichée dans un onglet et dans le rapport.</summary>
@@ -13,7 +15,7 @@ public sealed class InfoGroup
 
     public InfoGroup Add(string label, string? value)
     {
-        Items.Add(new InfoItem(label, string.IsNullOrWhiteSpace(value) ? "—" : value.Trim()));
+        Items.Add(new InfoItem(label, string.IsNullOrWhiteSpace(value) ? "—" : value!.Trim()));
         return this;
     }
 }
