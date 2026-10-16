@@ -25,7 +25,8 @@ public static class SecurityReport
         {
             results.Add(check.Name, $"{check.Symbol} {check.Detail}");
             if (check.NeedsAction && check.Advice is not null)
-                (check.Kind == CheckKind.Fix ? toFix : toChange).Add(check.Name, $"{check.Symbol} {check.Advice}");
+                (check.Kind == CheckKind.Fix ? toFix : toChange).Add(check.Name, $"{check.Symbol} {check.Advice}"
+                    + (check.Tutorial is null ? "" : "\nComment faire :\n" + string.Join("\n", check.Tutorial.Numbered())));
         }
         if (toFix.Items.Count > 0) section.Groups.Add(toFix);
         if (toChange.Items.Count > 0) section.Groups.Add(toChange);

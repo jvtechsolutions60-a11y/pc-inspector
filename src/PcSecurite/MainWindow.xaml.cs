@@ -50,6 +50,7 @@ public partial class MainWindow : Window
             ProgressText.Text = $"Contrôle {i + 1} sur {all.Count} : {name}…";
             var check = await Task.Run(() => SecurityChecks.RunSafely(name, run));
             check.Order = i;
+            if (check.NeedsAction) check.Tutorial = Tutorials.For(check);
             _checks.Add(check);
         }
 
@@ -68,6 +69,20 @@ public partial class MainWindow : Window
     }
 
     private async void RescanButton_Click(object sender, RoutedEventArgs e) => await RunAsync();
+
+    /// <summary>Ouvre le réglage de Windows indiqué par le tutoriel.</summary>
+    private void OpenSetting_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not Tutorial { OpenFile: { } file } tutorial) return;
+        try
+        {
+            Process.Start(new ProcessStartInfo(file) { Arguments = tutorial.OpenArgs ?? "", UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            MessageBox.Show(this, "Impossible d'ouvrir ce réglage : " + ex.Message, "PC Sécurité", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
 
     private void ExportButton_Click(object sender, RoutedEventArgs e)
     {

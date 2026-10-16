@@ -42,6 +42,9 @@ public sealed class SecurityCheck
     /// <summary>Position dans la liste des contrôles, pour garder un ordre stable à l'intérieur d'un groupe.</summary>
     public int Order { get; set; }
 
+    /// <summary>Le pas à pas pour corriger ce point, seulement s'il est rouge ou orange.</summary>
+    public Tutorial? Tutorial { get; set; }
+
     public bool NeedsAction => Status is CheckStatus.Danger or CheckStatus.Warning;
 
     /// <summary>Corrections d'abord, puis ce qu'il faut changer, puis le reste.</summary>
