@@ -29,6 +29,11 @@ public partial class MainWindow : Window
         new Windows11Collector(),
         new SecurityCollector(),
         new AdviceCollector(),
+        new SystemCollector(),
+        new SoftwareCollector(),
+        new DriversCollector(),
+        new ServicesCollector(),
+        new StartupCollector(),
     };
 
     // Chaque onglet n'est collecté qu'une fois : WMI peut prendre plusieurs secondes.
