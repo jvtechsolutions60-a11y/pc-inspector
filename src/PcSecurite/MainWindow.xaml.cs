@@ -1,9 +1,11 @@
 using System;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Media;
 using PcInspector;
 using PcInspector.Report;
@@ -19,7 +21,13 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        CheckList.ItemsSource = _checks;
+        // Corrections d'abord, puis ce qu'il faut changer, puis ce qui est en ordre ; les plus graves en haut.
+        var view = (ListCollectionView)CollectionViewSource.GetDefaultView(_checks);
+        view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(SecurityCheck.Group)));
+        view.SortDescriptions.Add(new SortDescription(nameof(SecurityCheck.GroupOrder), ListSortDirection.Ascending));
+        view.SortDescriptions.Add(new SortDescription(nameof(SecurityCheck.Severity), ListSortDirection.Ascending));
+        view.SortDescriptions.Add(new SortDescription(nameof(SecurityCheck.Order), ListSortDirection.Ascending));
+        CheckList.ItemsSource = view;
         Loaded += async (_, _) => await RunAsync();
     }
 
@@ -34,20 +42,26 @@ public partial class MainWindow : Window
         ScoreCircle.Background = (Brush)FindResource("InfoBrush");
         VerdictText.Text = "Analyse en cours…";
 
+        SecurityChecks.ResetCache();
         var all = SecurityChecks.All;
         for (int i = 0; i < all.Count; i++)
         {
             var (name, run) = all[i];
             ProgressText.Text = $"Contrôle {i + 1} sur {all.Count} : {name}…";
-            _checks.Add(await Task.Run(() => SecurityChecks.RunSafely(name, run)));
+            var check = await Task.Run(() => SecurityChecks.RunSafely(name, run));
+            check.Order = i;
+            _checks.Add(check);
         }
 
         var score = SecurityScore.Compute(_checks);
         ScoreText.Text = score.ToString();
         ScoreCircle.Background = (Brush)FindResource(score >= 90 ? "OkBrush" : score >= 70 ? "WarningBrush" : "DangerBrush");
         VerdictText.Text = SecurityScore.Verdict(score);
-        var toFix = _checks.Count(c => c.Status is CheckStatus.Danger or CheckStatus.Warning);
-        ProgressText.Text = toFix == 0 ? "Aucun point à corriger." : $"{toFix} point(s) à corriger.";
+        var toFix = _checks.Count(c => c.GroupOrder == 0);
+        var toChange = _checks.Count(c => c.GroupOrder == 1);
+        ProgressText.Text = toFix + toChange == 0
+            ? "Aucun point à corriger."
+            : $"{toFix} correction(s) à faire, {toChange} chose(s) à changer.";
 
         RescanButton.IsEnabled = ExportButton.IsEnabled = true;
         _running = false;

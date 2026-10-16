@@ -8,24 +8,38 @@ using PcInspector.Collectors;
 namespace PcSecurite.Checks;
 
 /// <summary>La liste des contrôles, dans l'ordre d'affichage. Chacun est indépendant et ne modifie rien sur le PC.</summary>
-public static class SecurityChecks
+public static partial class SecurityChecks
 {
     public static IReadOnlyList<(string Name, Func<SecurityCheck> Run)> All { get; } = new List<(string, Func<SecurityCheck>)>
     {
         ("Version de Windows", WindowsSupport),
         ("Antivirus", Antivirus),
+        ("Microsoft Defender", Defender),
         ("Pare-feu", Firewall),
         ("Dernière mise à jour", LastUpdate),
         ("Activation de Windows", Activation),
         ("Contrôle de compte (UAC)", Uac),
         ("SmartScreen", SmartScreen),
+        ("Intégrité de la mémoire", MemoryIntegrity),
+        ("Protection LSA", LsaProtection),
+        ("Blocage des pilotes vulnérables", DriverBlocklist),
+        ("Mots de passe en mémoire (WDigest)", WDigest),
         ("Chiffrement BitLocker", BitLocker),
         ("Secure Boot", SecureBoot),
+        ("Certificats Secure Boot 2023", SecureBootCertificates),
         ("Puce TPM", Tpm),
+        ("BIOS", Bios),
         ("Protocole SMB1", Smb1),
+        ("PowerShell 2.0", PowerShell2),
         ("Bureau à distance", RemoteDesktop),
+        ("Logiciels de prise en main à distance", RemoteAccessTools),
+        ("Redirections réseau (hosts, proxy)", NetworkRedirects),
+        ("Réseaux Wi-Fi enregistrés", WifiProfiles),
         ("Comptes utilisateurs", Accounts),
         ("Connexion automatique", AutoLogon),
+        ("Navigateurs internet", Browsers),
+        ("Logiciels avec failles connues", VulnerableSoftware),
+        ("Logiciels abandonnés", ObsoleteSoftware),
         // En dernier : peut prendre jusqu'à 90 secondes.
         ("Mises à jour en attente", PendingUpdates),
     };
@@ -68,7 +82,8 @@ public static class SecurityChecks
             return SecurityCheck.Info(name, detail + " : édition LTSC, support étendu propre à chaque version");
         if (DateTime.Today > end)
             return SecurityCheck.Danger(name, $"{detail} : plus de mises à jour de sécurité depuis le {end:dd/MM/yyyy}",
-                build >= 22000 ? "Installer la dernière version de Windows 11 via Windows Update." : "Passer à Windows 11 (voir PC Inspector, onglet Windows 11) ou souscrire aux mises à jour étendues (ESU).");
+                build >= 22000 ? "Installer la dernière version de Windows 11 via Windows Update." : "Passer à Windows 11 (voir PC Inspector, onglet Windows 11), ou changer de PC s'il n'est pas compatible. Les mises à jour étendues (ESU) pour les particuliers ont pris fin le 13/10/2026.",
+                build >= 22000 ? CheckKind.Fix : CheckKind.Change);
         if (DateTime.Today > end.AddDays(-90))
             return SecurityCheck.Warning(name, $"{detail} : fin du support le {end:dd/MM/yyyy}", "Prévoir la mise à niveau vers la version suivante.");
         return SecurityCheck.Ok(name, $"{detail} : supporté jusqu'au {end:dd/MM/yyyy}");
@@ -215,7 +230,7 @@ public static class SecurityChecks
         if (tpm is null) return SecurityCheck.Warning(name, "Aucun TPM détecté", "Activer le TPM dans le BIOS (fTPM chez AMD, PTT chez Intel) s'il existe.");
         var version = tpm.Str("SpecVersion")?.Split(',').FirstOrDefault()?.Trim() ?? "?";
         if (tpm.Bool("IsEnabled_InitialValue") != true) return SecurityCheck.Warning(name, $"TPM {version} désactivé", "Activer le TPM dans le BIOS.");
-        return version == "2.0" ? SecurityCheck.Ok(name, "TPM 2.0 activé") : SecurityCheck.Warning(name, $"TPM {version} (ancienne version)", "Le TPM 2.0 est requis par Windows 11.");
+        return version == "2.0" ? SecurityCheck.Ok(name, "TPM 2.0 activé") : SecurityCheck.Warning(name, $"TPM {version} (ancienne version)", "Le TPM 2.0 est requis par Windows 11 : PC à remplacer à terme.", CheckKind.Change);
     }
 
     private static SecurityCheck Smb1()

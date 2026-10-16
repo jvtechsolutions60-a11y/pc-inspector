@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using PcInspector.Models;
 
 namespace PcSecurite.Checks;
@@ -14,15 +15,19 @@ public static class SecurityReport
             .Add("Note", $"{score} / 100")
             .Add("Verdict", SecurityScore.Verdict(score)));
 
-        var toFix = new InfoGroup("À corriger");
+        // Même ordre qu'à l'écran : corrections, puis ce qu'il faut changer, les plus graves en premier.
+        var sorted = checks.OrderBy(c => c.GroupOrder).ThenBy(c => c.Severity).ThenBy(c => c.Order).ToList();
+        var toFix = new InfoGroup(SecurityCheck.CorrectionsTitle);
+        var toChange = new InfoGroup(SecurityCheck.ChangesTitle);
         var results = new InfoGroup("Détail des contrôles");
-        foreach (var check in checks)
+        foreach (var check in sorted)
         {
             results.Add(check.Name, $"{check.Symbol} {check.Detail}");
-            if (check.Advice is not null && check.Status is CheckStatus.Danger or CheckStatus.Warning)
-                toFix.Add(check.Name, $"{check.Symbol} {check.Advice}");
+            if (check.NeedsAction && check.Advice is not null)
+                (check.Kind == CheckKind.Fix ? toFix : toChange).Add(check.Name, $"{check.Symbol} {check.Advice}");
         }
         if (toFix.Items.Count > 0) section.Groups.Add(toFix);
+        if (toChange.Items.Count > 0) section.Groups.Add(toChange);
         section.Groups.Add(results);
         return new List<InfoSection> { section };
     }

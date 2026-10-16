@@ -17,6 +17,16 @@ Deuxième petit logiciel, dans `src/PcSecurite` : un seul écran qui contrôle l
 vert, orange ou rouge par point et une note sur 100. Il vérifie la version de Windows (fin de support),
 l'antivirus, le pare-feu, les mises à jour, l'activation, l'UAC, SmartScreen, BitLocker, Secure Boot, le TPM,
 SMB1, le Bureau à distance, les comptes (Invité, sans mot de passe) et la connexion automatique.
+
+Veille d'octobre 2026, ajoutée ensuite : protections de Microsoft Defender (temps réel, falsification,
+exclusions suspectes), intégrité de la mémoire, protection LSA, blocage des pilotes vulnérables, WDigest,
+certificats Secure Boot 2023 (ceux de 2011 ont expiré en juin 2026), âge du BIOS, PowerShell 2.0, logiciels de
+prise en main à distance (arnaques au faux support), fichier hosts et proxy, Wi-Fi ouverts enregistrés,
+navigateurs pas à jour, logiciels avec failles exploitées (WinRAR, 7-Zip, Notepad++, PuTTY, VLC) et logiciels
+abandonnés (Flash, Java 6/7, vieux Acrobat, Office 2016, 2019 et 2021…).
+
+Les résultats sont triés : d'abord les **corrections à faire** (réglages, mises à jour), puis ce qu'il faut
+**changer ou remplacer** (Windows plus supporté, logiciel abandonné, vieux TPM), puis les points en ordre.
 Il ne modifie rien sur le PC. Le bouton « Exporter le rapport » produit le même rapport client que PC Inspector.
 
 Il partage le code WMI, le rapport et la fenêtre d'export avec PC Inspector (fichiers liés dans le `.csproj`).

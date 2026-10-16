@@ -11,7 +11,7 @@
     <RootNamespace>PcSecurite</RootNamespace>
     <Product>PC Sécurité</Product>
     <Company>JVTECH Solutions</Company>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <ApplicationManifest>..\PcInspector\app.manifest</ApplicationManifest>
   </PropertyGroup>
 

@@ -33,6 +33,15 @@
         <!-- Un contrôle par ligne -->
         <ScrollViewer VerticalScrollBarVisibility="Auto">
             <ItemsControl x:Name="CheckList">
+                <ItemsControl.GroupStyle>
+                    <GroupStyle>
+                        <GroupStyle.HeaderTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}" FontSize="17" FontWeight="SemiBold" Margin="0,10,0,8"/>
+                            </DataTemplate>
+                        </GroupStyle.HeaderTemplate>
+                    </GroupStyle>
+                </ItemsControl.GroupStyle>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Border Background="White" CornerRadius="6" Padding="14,10" Margin="0,0,0,8"
