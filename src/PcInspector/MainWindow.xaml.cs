@@ -14,13 +14,13 @@ public partial class MainWindow : Window
     private readonly List<ICollector> _collectors = new()
     {
         new SummaryCollector(),
-        new PlaceholderCollector("Processeur", ""),
-        new PlaceholderCollector("Carte mère", ""),
-        new PlaceholderCollector("Mémoire", ""),
-        new PlaceholderCollector("Carte graphique", ""),
-        new PlaceholderCollector("Stockage", ""),
-        new PlaceholderCollector("Réseau", ""),
-        new PlaceholderCollector("Températures", ""),
+        new CpuCollector(),
+        new MotherboardCollector(),
+        new MemoryCollector(),
+        new GpuCollector(),
+        new StorageCollector(),
+        new NetworkCollector(),
+        new TemperatureCollector(),
     };
 
     // Chaque onglet n'est collecté qu'une fois : WMI peut prendre plusieurs secondes.
