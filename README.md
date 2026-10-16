@@ -10,6 +10,7 @@ Petit logiciel Windows façon Speccy : il affiche toutes les informations matér
 3. **Diagnostic métier** : périphériques en erreur, plantages, batterie, compatibilité Windows 11, licence et sécurité, conseils d'upgrade, lien garantie. ✅
 4. **Export** : rapport client HTML et TXT (logo, client, n° d'intervention). ✅
 5. **Logiciel** : système, logiciels installés, pilotes, services, démarrage. ✅
+6. **Bilan en 1 clic** : écran d'accueil avec une note sur 100, les points rouges en tête et l'export du rapport client. ✅
 
 ## Obtenir l'exécutable
 

@@ -8,5 +8,9 @@
         <SolidColorBrush x:Key="AccentBrush" Color="#3D8BFD"/>
         <SolidColorBrush x:Key="ContentBrush" Color="#F5F6F8"/>
         <SolidColorBrush x:Key="MutedTextBrush" Color="#6B7280"/>
+        <!-- Couleurs du bilan : rouge = à traiter, orange = à surveiller, vert = OK -->
+        <SolidColorBrush x:Key="CriticalBrush" Color="#DC2626"/>
+        <SolidColorBrush x:Key="WarningBrush" Color="#D97706"/>
+        <SolidColorBrush x:Key="OkBrush" Color="#16A34A"/>
     </Application.Resources>
 </Application>
