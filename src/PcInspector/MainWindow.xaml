@@ -18,8 +18,7 @@
             <TextBlock DockPanel.Dock="Top" Text="PC Inspector" Foreground="White"
                        FontSize="18" FontWeight="SemiBold" Margin="18,18,18,14"/>
             <Button DockPanel.Dock="Bottom" x:Name="ExportButton" Content="Exporter le rapport"
-                    Margin="14" Padding="8,6" IsEnabled="False"
-                    ToolTip="Disponible à l'étape 3"/>
+                    Margin="14" Padding="8,6" Click="ExportButton_Click"/>
             <ListBox x:Name="SectionList" Background="Transparent" BorderThickness="0"
                      SelectionChanged="SectionList_SelectionChanged"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
