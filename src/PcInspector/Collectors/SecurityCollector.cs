@@ -33,10 +33,7 @@ public sealed class SecurityCollector : ICollector
         var os = Wmi.Query("SELECT Caption FROM Win32_OperatingSystem").FirstOrDefault();
         group.Add("Édition", os?.Str("Caption"));
 
-        var product = Wmi.QueryOptional(
-                "SELECT Description, LicenseStatus, PartialProductKey FROM SoftwareLicensingProduct " +
-                $"WHERE ApplicationID = '{WindowsAppId}' AND PartialProductKey IS NOT NULL")
-            .FirstOrDefault();
+        var product = WindowsProduct("Description, LicenseStatus, PartialProductKey");
         group.Add("Activation", LicenseStatus(product?.ULong("LicenseStatus")))
              .Add("Canal", Channel(product?.Str("Description")))
              .Add("Fin de clé installée", product?.Str("PartialProductKey") is { } partial ? "XXXXX-XXXXX-XXXXX-XXXXX-" + partial : null);
@@ -45,6 +42,16 @@ public sealed class SecurityCollector : ICollector
         group.Add("Clé OEM du BIOS", string.IsNullOrWhiteSpace(oemKey) ? "Aucune" : oemKey);
         return group;
     }
+
+    private static System.Management.ManagementObject? WindowsProduct(string properties) =>
+        Wmi.QueryOptional(
+                $"SELECT {properties} FROM SoftwareLicensingProduct " +
+                $"WHERE ApplicationID = '{WindowsAppId}' AND PartialProductKey IS NOT NULL")
+            .FirstOrDefault();
+
+    /// <summary>Vrai si Windows est activé, null si l'état n'a pas pu être lu.</summary>
+    internal static bool? IsWindowsActivated() =>
+        WindowsProduct("LicenseStatus")?.ULong("LicenseStatus") is { } status ? status == 1 : null;
 
     private static InfoGroup Protection()
     {
@@ -72,6 +79,13 @@ public sealed class SecurityCollector : ICollector
 
     private static string WindowsFirewall()
     {
+        var off = DisabledFirewallProfiles();
+        return off.Count == 0 ? "Activé sur tous les profils" : "Désactivé pour : " + string.Join(", ", off);
+    }
+
+    /// <summary>Profils du pare-feu Windows désactivés (domaine, privé, public).</summary>
+    internal static List<string> DisabledFirewallProfiles()
+    {
         var profiles = new (string Key, string Name)[] { ("DomainProfile", "domaine"), ("StandardProfile", "privé"), ("PublicProfile", "public") };
         var off = new List<string>();
         foreach (var (key, name) in profiles)
@@ -79,7 +93,7 @@ public sealed class SecurityCollector : ICollector
             using var reg = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\{key}");
             if (reg?.GetValue("EnableFirewall") is int enabled && enabled == 0) off.Add(name);
         }
-        return off.Count == 0 ? "Activé sur tous les profils" : "Désactivé pour : " + string.Join(", ", off);
+        return off;
     }
 
     private static string? BitLocker()

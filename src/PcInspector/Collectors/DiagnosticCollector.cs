@@ -43,13 +43,10 @@ public sealed class DiagnosticCollector : ICollector
     private static InfoGroup Crashes()
     {
         var group = new InfoGroup("Plantages récents");
-        const string xpath =
-            "*[System[(Provider[@Name='Microsoft-Windows-WER-SystemErrorReporting'] and EventID=1001)" +
-            " or (Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=41)]]";
 
         try
         {
-            var query = new EventLogQuery("System", PathType.LogName, xpath) { ReverseDirection = true };
+            var query = new EventLogQuery("System", PathType.LogName, CrashXPath()) { ReverseDirection = true };
             using var reader = new EventLogReader(query);
             int count = 0;
             for (var record = reader.ReadEvent(); record is not null && count < MaxCrashes; record = reader.ReadEvent(), count++)
@@ -82,6 +79,34 @@ public sealed class DiagnosticCollector : ICollector
         catch (UnauthorizedAccessException) { }
 
         return group;
+    }
+
+    private static string CrashXPath(TimeSpan? within = null)
+    {
+        var crashes =
+            "(Provider[@Name='Microsoft-Windows-WER-SystemErrorReporting'] and EventID=1001)" +
+            " or (Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=41)";
+        return within is { } span
+            ? $"*[System[({crashes}) and TimeCreated[timediff(@SystemTime) <= {(long)span.TotalMilliseconds}]]]"
+            : $"*[System[{crashes}]]";
+    }
+
+    /// <summary>Nombre d'écrans bleus et d'arrêts brutaux sur la période, null si le journal est illisible.</summary>
+    internal static int? RecentCrashCount(TimeSpan within)
+    {
+        try
+        {
+            using var reader = new EventLogReader(new EventLogQuery("System", PathType.LogName, CrashXPath(within)));
+            int count = 0;
+            for (var record = reader.ReadEvent(); record is not null; record = reader.ReadEvent())
+            {
+                record.Dispose();
+                count++;
+            }
+            return count;
+        }
+        catch (EventLogException) { return null; }
+        catch (UnauthorizedAccessException) { return null; }
     }
 
     private static string BugCheckCode(EventRecord record)

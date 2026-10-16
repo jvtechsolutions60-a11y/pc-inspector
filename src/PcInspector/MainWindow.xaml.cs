@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Navigation;
 using PcInspector.Collectors;
 using PcInspector.Models;
@@ -13,8 +15,24 @@ namespace PcInspector;
 
 public partial class MainWindow : Window
 {
+    private readonly HealthCollector _health = new();
+    private readonly List<ICollector> _collectors;
+
+    // Chaque onglet n'est collecté qu'une fois : WMI peut prendre plusieurs secondes.
+    private readonly Dictionary<ICollector, InfoSection> _cache = new();
+
+    public MainWindow()
+    {
+        InitializeComponent();
+        _collectors = new List<ICollector> { _health };
+        _collectors.AddRange(DetailCollectors());
+        SectionList.ItemsSource = _collectors;
+        // Le PC est analysé dès l'ouverture : le bilan est l'écran d'accueil.
+        SectionList.SelectedIndex = 0;
+    }
+
     // Les icônes viennent de la police Segoe MDL2 Assets, présente sur Windows 10 et 11.
-    private readonly List<ICollector> _collectors = new()
+    private static IEnumerable<ICollector> DetailCollectors() => new ICollector[]
     {
         new SummaryCollector(),
         new CpuCollector(),
@@ -36,19 +54,18 @@ public partial class MainWindow : Window
         new StartupCollector(),
     };
 
-    // Chaque onglet n'est collecté qu'une fois : WMI peut prendre plusieurs secondes.
-    private readonly Dictionary<ICollector, InfoSection> _cache = new();
-
-    public MainWindow()
-    {
-        InitializeComponent();
-        SectionList.ItemsSource = _collectors;
-        SectionList.SelectedIndex = 0;
-    }
-
     private async void SectionList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (SectionList.SelectedItem is not ICollector collector) return;
+
+        var isHealth = collector == _health;
+        HealthPanel.Visibility = isHealth ? Visibility.Visible : Visibility.Collapsed;
+        DetailPanel.Visibility = isHealth ? Visibility.Collapsed : Visibility.Visible;
+        if (isHealth)
+        {
+            await ShowHealth();
+            return;
+        }
 
         SectionTitle.Text = collector.Title;
         GroupList.ItemsSource = null;
@@ -65,12 +82,62 @@ public partial class MainWindow : Window
         GroupList.ItemsSource = section.Groups;
     }
 
+    private async Task ShowHealth()
+    {
+        if (!_cache.TryGetValue(_health, out var section))
+        {
+            ScoreText.Text = "…";
+            ScoreBadge.Background = (Brush)FindResource("MutedTextBrush");
+            VerdictText.Text = "Bilan en cours…";
+            CountsText.Text = "Vérification des disques, de la mémoire, de la batterie, des plantages et de la sécurité.";
+            FindingList.ItemsSource = null;
+            RefreshButton.IsEnabled = false;
+            section = await Task.Run(() => CollectSafely(_health));
+            _cache[_health] = section;
+            RefreshButton.IsEnabled = true;
+            if (SectionList.SelectedItem != _health) return;
+        }
+
+        if (_health.Report is not { } report)
+        {
+            VerdictText.Text = "Bilan impossible";
+            CountsText.Text = section.Error;
+            return;
+        }
+
+        ScoreText.Text = report.Score.ToString();
+        ScoreBadge.Background = (Brush)FindResource(report.Level switch
+        {
+            Severity.Critical => "CriticalBrush",
+            Severity.Warning => "WarningBrush",
+            _ => "OkBrush",
+        });
+        VerdictText.Text = report.Verdict;
+        CountsText.Text = report.Counts;
+        FindingList.ItemsSource = report.Findings;
+    }
+
+    private async void RefreshButton_Click(object sender, RoutedEventArgs e)
+    {
+        // Après une intervention, tous les onglets sont relus, pas seulement le bilan.
+        _cache.Clear();
+        await ShowHealth();
+    }
+
+    private void FindingDetail_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not string tab) return;
+        var target = _collectors.FirstOrDefault(c => c.Title == tab);
+        if (target is not null) SectionList.SelectedItem = target;
+    }
+
     private async void ExportButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new ExportWindow { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Info is null || dialog.FilePath is null) return;
 
         ExportButton.IsEnabled = false;
+        HealthExportButton.IsEnabled = false;
         ShowStatus("Analyse complète du PC pour le rapport…");
         try
         {
@@ -101,6 +168,7 @@ public partial class MainWindow : Window
         finally
         {
             ExportButton.IsEnabled = true;
+            HealthExportButton.IsEnabled = true;
         }
     }
 
@@ -124,7 +192,8 @@ public partial class MainWindow : Window
 
     private void ShowStatus(string? message)
     {
-        StatusText.Text = message ?? string.Empty;
-        StatusText.Visibility = string.IsNullOrEmpty(message) ? Visibility.Collapsed : Visibility.Visible;
+        var visibility = string.IsNullOrEmpty(message) ? Visibility.Collapsed : Visibility.Visible;
+        StatusText.Text = HealthStatus.Text = message ?? string.Empty;
+        StatusText.Visibility = HealthStatus.Visibility = visibility;
     }
 }
