@@ -17,6 +17,16 @@ public static class SecurityScore
         return scored.Any(c => c.Status == CheckStatus.Danger) ? Math.Min(score, 69) : score;
     }
 
+    /// <summary>Classe de A à E, façon Nutri-Score, pour un affichage lisible par le client (annonces, rapport).</summary>
+    public static char Letter(int score) => score switch
+    {
+        >= 90 => 'A',
+        >= 75 => 'B',
+        >= 60 => 'C',
+        >= 40 => 'D',
+        _ => 'E',
+    };
+
     public static string Verdict(int score) => score switch
     {
         >= 90 => "Bien protégé",

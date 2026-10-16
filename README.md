@@ -26,7 +26,7 @@ navigateurs pas à jour, logiciels avec failles exploitées (WinRAR, 7-Zip, Note
 abandonnés (Flash, Java 6/7, vieux Acrobat, Office 2016, 2019 et 2021…).
 
 Les résultats sont triés : d'abord les **corrections à faire** (réglages, mises à jour), puis ce qu'il faut
-**changer ou remplacer** (Windows plus supporté, logiciel abandonné, vieux TPM), puis les points en ordre.
+**changer ou remplacer** (Windows plus supporté, logiciel abandonné, vieux TPM), puis les points en ordre. La note est aussi donnée en classe de A à E, façon Nutri-Score.
 Il ne modifie rien sur le PC. Le bouton « Exporter le rapport » produit le même rapport client que PC Inspector.
 
 Il partage le code WMI, le rapport et la fenêtre d'export avec PC Inspector (fichiers liés dans le `.csproj`).

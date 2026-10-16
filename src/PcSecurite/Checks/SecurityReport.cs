@@ -12,6 +12,7 @@ public static class SecurityReport
         var score = SecurityScore.Compute(checks);
         var section = new InfoSection("Bilan de sécurité");
         section.Groups.Add(new InfoGroup("Note globale")
+            .Add("Classe", $"{SecurityScore.Letter(score)} (de A, très bien protégé, à E, exposé)")
             .Add("Note", $"{score} / 100")
             .Add("Verdict", SecurityScore.Verdict(score)));
 

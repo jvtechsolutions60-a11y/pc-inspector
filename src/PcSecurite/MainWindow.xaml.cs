@@ -54,9 +54,9 @@ public partial class MainWindow : Window
         }
 
         var score = SecurityScore.Compute(_checks);
-        ScoreText.Text = score.ToString();
+        ScoreText.Text = SecurityScore.Letter(score).ToString();
         ScoreCircle.Background = (Brush)FindResource(score >= 90 ? "OkBrush" : score >= 70 ? "WarningBrush" : "DangerBrush");
-        VerdictText.Text = SecurityScore.Verdict(score);
+        VerdictText.Text = $"{SecurityScore.Verdict(score)} · {score} / 100";
         var toFix = _checks.Count(c => c.GroupOrder == 0);
         var toChange = _checks.Count(c => c.GroupOrder == 1);
         ProgressText.Text = toFix + toChange == 0
