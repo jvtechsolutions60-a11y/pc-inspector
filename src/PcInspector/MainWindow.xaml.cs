@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Navigation;
 using PcInspector.Collectors;
 using PcInspector.Models;
+using PcInspector.Report;
 
 namespace PcInspector;
 
@@ -57,6 +58,45 @@ public partial class MainWindow : Window
 
         ShowStatus(section.Error);
         GroupList.ItemsSource = section.Groups;
+    }
+
+    private async void ExportButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ExportWindow { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.Info is null || dialog.FilePath is null) return;
+
+        ExportButton.IsEnabled = false;
+        ShowStatus("Analyse complète du PC pour le rapport…");
+        try
+        {
+            // Le rapport contient tous les onglets, y compris ceux pas encore ouverts.
+            var sections = new List<InfoSection>();
+            foreach (var collector in _collectors)
+            {
+                if (!_cache.TryGetValue(collector, out var section))
+                {
+                    section = await Task.Run(() => CollectSafely(collector));
+                    _cache[collector] = section;
+                }
+                sections.Add(section);
+            }
+
+            var info = dialog.Info;
+            var path = dialog.FilePath;
+            await Task.Run(() => ReportWriter.Write(path, info, sections));
+            ShowStatus(null);
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            ShowStatus(null);
+            MessageBox.Show(this, "Impossible d'enregistrer le rapport : " + ex.Message, "Exporter le rapport",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            ExportButton.IsEnabled = true;
+        }
     }
 
     private static InfoSection CollectSafely(ICollector collector)
