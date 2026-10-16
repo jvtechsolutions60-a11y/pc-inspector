@@ -1,5 +1,4 @@
 using System.Linq;
-using Microsoft.Win32;
 using PcInspector.Models;
 
 namespace PcInspector.Collectors;
@@ -30,40 +29,26 @@ public sealed class MotherboardCollector : ICollector
                 .Add("Fabricant", bios.Str("Manufacturer"))
                 .Add("Version", bios.Str("SMBIOSBIOSVersion"))
                 .Add("Date", bios.Date("ReleaseDate"))
-                .Add("Mode", FirmwareMode())
-                .Add("Secure Boot", SecureBoot()));
+                .Add("Mode", Firmware.IsUefi() ? "UEFI" : "Legacy (BIOS)")
+                .Add("Secure Boot", Firmware.SecureBootText()));
         }
 
         var system = Wmi.Query("SELECT * FROM Win32_ComputerSystem").FirstOrDefault();
         if (system is not null)
         {
             var product = Wmi.Query("SELECT IdentifyingNumber FROM Win32_ComputerSystemProduct").FirstOrDefault();
-            section.Groups.Add(new InfoGroup("Ordinateur")
+            var serial = product?.Str("IdentifyingNumber") ?? bios?.Str("SerialNumber");
+            var group = new InfoGroup("Ordinateur")
                 .Add("Fabricant", system.Str("Manufacturer"))
                 .Add("Modèle", system.Str("Model"))
-                .Add("Numéro de série", product?.Str("IdentifyingNumber") ?? bios?.Str("SerialNumber"))
+                .Add("Numéro de série", serial)
                 .Add("Nom du PC", system.Str("Name"))
-                .Add("Type", system.Str("SystemType")));
+                .Add("Type", system.Str("SystemType"));
+            if (Warranty.Url(system.Str("Manufacturer"), serial) is { } url)
+                group.AddLink("Garantie", "Vérifier sur le site du fabricant", url);
+            section.Groups.Add(group);
         }
 
         return section;
-    }
-
-    private static string FirmwareMode()
-    {
-        // Cette clé n'existe que sur les PC démarrés en UEFI.
-        using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\SecureBoot\State");
-        return key is null ? "Legacy (BIOS)" : "UEFI";
-    }
-
-    private static string SecureBoot()
-    {
-        using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\SecureBoot\State");
-        return key?.GetValue("UEFISecureBootEnabled") switch
-        {
-            1 => "Activé",
-            0 => "Désactivé",
-            _ => "Non pris en charge",
-        };
     }
 }

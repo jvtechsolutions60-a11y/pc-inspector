@@ -7,8 +7,9 @@ Petit logiciel Windows façon Speccy : il affiche toutes les informations matér
 
 1. **Cadrage** : projet C# / WPF sur .NET Framework 4.8, un seul `.exe` léger. ✅
 2. **Hardware** : un onglet par composant (CPU, carte mère/BIOS, RAM, GPU + écrans, disques + SMART, réseau, températures). ✅
-3. **Export** : rapport HTML et TXT.
-4. **Software** : OS, logiciels installés, pilotes, services, démarrage.
+3. **Diagnostic métier** : périphériques en erreur, plantages, batterie, compatibilité Windows 11, licence et sécurité, conseils d'upgrade, lien garantie. ✅
+4. **Export** : rapport client HTML et TXT (logo, client, n° d'intervention).
+5. **Software** : OS, logiciels installés, pilotes, services, démarrage.
 
 ## Obtenir l'exécutable
 

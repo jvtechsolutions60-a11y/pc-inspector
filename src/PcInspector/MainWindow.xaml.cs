@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Navigation;
 using PcInspector.Collectors;
 using PcInspector.Models;
 
@@ -21,6 +23,11 @@ public partial class MainWindow : Window
         new StorageCollector(),
         new NetworkCollector(),
         new TemperatureCollector(),
+        new DiagnosticCollector(),
+        new BatteryCollector(),
+        new Windows11Collector(),
+        new SecurityCollector(),
+        new AdviceCollector(),
     };
 
     // Chaque onglet n'est collecté qu'une fois : WMI peut prendre plusieurs secondes.
@@ -62,6 +69,12 @@ public partial class MainWindow : Window
         {
             return new InfoSection(collector.Title) { Error = $"Impossible de lire ces informations : {ex.Message}" };
         }
+    }
+
+    private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
+    {
+        Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
+        e.Handled = true;
     }
 
     private void ShowStatus(string? message)
