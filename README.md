@@ -11,9 +11,19 @@ Petit logiciel Windows façon Speccy : il affiche toutes les informations matér
 4. **Export** : rapport client HTML et TXT (logo, client, n° d'intervention). ✅
 5. **Logiciel** : système, logiciels installés, pilotes, services, démarrage. ✅
 
+## PC Sécurité
+
+Deuxième petit logiciel, dans `src/PcSecurite` : un seul écran qui contrôle la sécurité du PC avec un feu
+vert, orange ou rouge par point et une note sur 100. Il vérifie la version de Windows (fin de support),
+l'antivirus, le pare-feu, les mises à jour, l'activation, l'UAC, SmartScreen, BitLocker, Secure Boot, le TPM,
+SMB1, le Bureau à distance, les comptes (Invité, sans mot de passe) et la connexion automatique.
+Il ne modifie rien sur le PC. Le bouton « Exporter le rapport » produit le même rapport client que PC Inspector.
+
+Il partage le code WMI, le rapport et la fenêtre d'export avec PC Inspector (fichiers liés dans le `.csproj`).
+
 ## Obtenir l'exécutable
 
-- **Sans rien installer** : chaque push sur GitHub lance l'action *Build*, qui produit `PcInspector.exe`
+- **Sans rien installer** : chaque push sur GitHub lance l'action *Build*, qui produit `PcInspector.exe` et `PcSecurite.exe`
   dans les artefacts du run (onglet *Actions* du dépôt).
 - **Sur un PC Windows avec le SDK .NET** (ou Visual Studio) :
 

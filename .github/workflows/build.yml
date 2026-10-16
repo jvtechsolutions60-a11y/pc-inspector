@@ -12,10 +12,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compiler l'exécutable
-        run: dotnet build src/PcInspector/PcInspector.csproj -c Release -o publish
+      - name: Compiler PC Inspector
+        run: dotnet build src/PcInspector/PcInspector.csproj -c Release -o publish/inspector
+
+      - name: Compiler PC Sécurité
+        run: dotnet build src/PcSecurite/PcSecurite.csproj -c Release -o publish/securite
 
       - uses: actions/upload-artifact@v4
         with:
           name: PcInspector
-          path: publish/PcInspector.exe
+          path: publish/inspector/PcInspector.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PcSecurite
+          path: publish/securite/PcSecurite.exe

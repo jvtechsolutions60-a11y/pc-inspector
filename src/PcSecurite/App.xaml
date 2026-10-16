@@ -1,0 +1,14 @@
+<Application x:Class="PcSecurite.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <SolidColorBrush x:Key="AccentBrush" Color="#3D8BFD"/>
+        <SolidColorBrush x:Key="ContentBrush" Color="#F5F6F8"/>
+        <SolidColorBrush x:Key="MutedTextBrush" Color="#6B7280"/>
+        <SolidColorBrush x:Key="OkBrush" Color="#16A34A"/>
+        <SolidColorBrush x:Key="WarningBrush" Color="#F59E0B"/>
+        <SolidColorBrush x:Key="DangerBrush" Color="#DC2626"/>
+        <SolidColorBrush x:Key="InfoBrush" Color="#9CA3AF"/>
+    </Application.Resources>
+</Application>
