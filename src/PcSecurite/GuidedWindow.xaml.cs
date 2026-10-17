@@ -30,7 +30,7 @@ public partial class GuidedWindow : Window
     private void ShowPoint(int index)
     {
         _index = index;
-        ResultText.Text = "";
+        ResultBorder.Visibility = Visibility.Collapsed;
         Refresh();
     }
 
@@ -42,16 +42,11 @@ public partial class GuidedWindow : Window
         PositionText.Text = $"Point {_index + 1} sur {_names.Count} · {done} corrigé(s)";
         Progress.Value = done;
 
-        StatusDot.Fill = (Brush)FindResource(check.Status switch
-        {
-            CheckStatus.Ok => "OkBrush",
-            CheckStatus.Warning => "WarningBrush",
-            CheckStatus.Danger => "DangerBrush",
-            _ => "InfoBrush",
-        });
+        StatusStripe.Background = StatusChip.Background = StatusBrushConverter.For(check.Status);
+        StatusLabel.Text = StatusTextConverter.For(check.Status);
         NameText.Text = check.Name;
         DetailText.Text = check.Detail;
-        AdviceText.Text = check.Advice ?? "";
+        AdviceText.Text = "💡 " + check.Advice;
         AdviceText.Visibility = check.Advice is null ? Visibility.Collapsed : Visibility.Visible;
 
         // Une fois corrigé, le contrôle n'a plus de tutoriel : on garde celui du point d'origine à l'écran.
@@ -73,12 +68,14 @@ public partial class GuidedWindow : Window
     private async void CheckButton_Click(object sender, RoutedEventArgs e)
     {
         CheckButton.IsEnabled = false;
+        ResultBorder.Background = StatusBrushConverter.For(CheckStatus.Info);
+        ResultBorder.Visibility = Visibility.Visible;
         ResultText.Text = "Vérification en cours…";
         var fresh = await _main.RecheckAsync(_names[_index]);
         CheckButton.IsEnabled = true;
         if (fresh is null) return;
         Refresh();
-        ResultText.Foreground = (Brush)FindResource(fresh.NeedsAction ? "DangerBrush" : "OkBrush");
+        ResultBorder.Background = StatusBrushConverter.For(fresh.NeedsAction ? CheckStatus.Danger : CheckStatus.Ok);
         ResultText.Text = fresh.NeedsAction
             ? "Toujours à corriger. Certains réglages demandent un redémarrage avant d'être pris en compte."
             : "✓ Corrigé : ce point est maintenant en ordre.";

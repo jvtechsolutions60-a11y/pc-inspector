@@ -1,47 +1,66 @@
 <Window x:Class="PcSecurite.GuidedWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Mode guidé" Height="600" Width="680" MinHeight="420" MinWidth="520"
-        WindowStartupLocation="CenterOwner" Background="{StaticResource ContentBrush}">
-    <DockPanel Margin="24,20">
+        Title="Mode guidé" Height="640" Width="720" MinHeight="440" MinWidth="540"
+        WindowStartupLocation="CenterOwner" Background="{StaticResource ContentBrush}" FontFamily="Segoe UI">
+    <DockPanel>
         <!-- Position dans la liste -->
-        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-            <TextBlock x:Name="PositionText" Foreground="{StaticResource MutedTextBrush}"/>
-            <ProgressBar x:Name="Progress" Height="6" Margin="0,6,0,0" Foreground="{StaticResource AccentBrush}"/>
-        </StackPanel>
+        <Border DockPanel.Dock="Top" Background="{StaticResource HeaderBrush}" Padding="24,16">
+            <StackPanel>
+                <TextBlock Text="MODE GUIDÉ" Foreground="#93C5FD" FontSize="12" FontWeight="SemiBold"/>
+                <TextBlock x:Name="PositionText" Foreground="White" FontSize="16" FontWeight="SemiBold" Margin="0,2,0,0"/>
+                <ProgressBar x:Name="Progress" Height="6" Margin="0,10,0,0" Background="#334155" BorderThickness="0"
+                             Foreground="{StaticResource OkBrush}"/>
+            </StackPanel>
+        </Border>
 
         <!-- Navigation -->
-        <Grid DockPanel.Dock="Bottom" Margin="0,12,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <Button x:Name="PreviousButton" Content="◀ Précédent" Padding="12,6" Click="PreviousButton_Click"/>
-            <Button x:Name="NextButton" Grid.Column="2" Content="Suivant ▶" Padding="12,6" Click="NextButton_Click"/>
-        </Grid>
+        <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="24,10">
+            <DockPanel>
+                <Button x:Name="NextButton" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Suivant ▶" Click="NextButton_Click"/>
+                <Button x:Name="PreviousButton" Content="◀ Précédent" HorizontalAlignment="Left" Click="PreviousButton_Click"/>
+            </DockPanel>
+        </Border>
 
         <!-- Le point en cours -->
-        <Border Background="White" CornerRadius="6" Padding="18,14" BorderBrush="#E5E7EB" BorderThickness="1">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <Ellipse x:Name="StatusDot" Width="16" Height="16" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="NameText" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"/>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24,16">
+            <Border Background="White" CornerRadius="8" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="6"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border x:Name="StatusStripe" CornerRadius="8,0,0,8"/>
+                    <StackPanel Grid.Column="1" Margin="20,16">
+                        <DockPanel>
+                            <Border x:Name="StatusChip" DockPanel.Dock="Right" CornerRadius="10" Padding="8,2" VerticalAlignment="Top">
+                                <TextBlock x:Name="StatusLabel" Foreground="White" FontSize="10.5" FontWeight="Bold"/>
+                            </Border>
+                            <TextBlock x:Name="NameText" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"
+                                       Foreground="{StaticResource TextBrush}" Margin="0,0,10,0"/>
+                        </DockPanel>
+                        <TextBlock x:Name="DetailText" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="#334155"/>
+                        <TextBlock x:Name="AdviceText" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{StaticResource MutedTextBrush}"/>
+
+                        <Border Background="#F8FAFC" CornerRadius="6" Padding="16,12" Margin="0,16,0,0">
+                            <StackPanel>
+                                <TextBlock Text="Comment faire" FontWeight="SemiBold" FontSize="15" Foreground="{StaticResource TextBrush}"/>
+                                <TextBlock x:Name="StepsText" TextWrapping="Wrap" LineHeight="23" Margin="0,6,0,0"
+                                           Foreground="{StaticResource TextBrush}"/>
+                                <WrapPanel Margin="0,14,0,0">
+                                    <Button x:Name="OpenButton" Style="{StaticResource LinkButton}" Margin="0,0,8,0" Click="OpenButton_Click"/>
+                                    <Button x:Name="CheckButton" Style="{StaticResource PrimaryButton}" Content="✓  Vérifier" Click="CheckButton_Click"
+                                            ToolTip="Refait ce contrôle (lecture seule) une fois la correction faite"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border x:Name="ResultBorder" CornerRadius="6" Padding="14,10" Margin="0,14,0,0" Visibility="Collapsed">
+                            <TextBlock x:Name="ResultText" TextWrapping="Wrap" FontWeight="SemiBold" Foreground="White"/>
+                        </Border>
                     </StackPanel>
-                    <TextBlock x:Name="DetailText" TextWrapping="Wrap" Margin="0,10,0,0"/>
-                    <TextBlock x:Name="AdviceText" TextWrapping="Wrap" Margin="0,8,0,0" FontStyle="Italic"
-                               Foreground="{StaticResource MutedTextBrush}"/>
-                    <TextBlock Text="Comment faire" FontWeight="SemiBold" FontSize="15" Margin="0,16,0,6"/>
-                    <TextBlock x:Name="StepsText" TextWrapping="Wrap" LineHeight="22"/>
-                    <WrapPanel Margin="0,14,0,0">
-                        <Button x:Name="OpenButton" Padding="12,6" Margin="0,0,8,0" Click="OpenButton_Click"/>
-                        <Button x:Name="CheckButton" Content="Vérifier" Padding="12,6" Click="CheckButton_Click"
-                                ToolTip="Refait ce contrôle (lecture seule) une fois la correction faite"/>
-                    </WrapPanel>
-                    <TextBlock x:Name="ResultText" TextWrapping="Wrap" Margin="0,12,0,0" FontWeight="SemiBold"/>
-                </StackPanel>
-            </ScrollViewer>
-        </Border>
+                </Grid>
+            </Border>
+        </ScrollViewer>
     </DockPanel>
 </Window>

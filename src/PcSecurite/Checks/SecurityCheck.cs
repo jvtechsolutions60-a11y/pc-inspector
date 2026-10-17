@@ -54,13 +54,14 @@ public sealed class SecurityCheck
     {
         0 => CorrectionsTitle,
         1 => ChangesTitle,
-        _ => "Points vérifiés",
+        _ => VerifiedTitle,
     };
 
     public int Severity => Status switch { CheckStatus.Danger => 0, CheckStatus.Warning => 1, CheckStatus.Ok => 2, _ => 3 };
 
     public const string CorrectionsTitle = "Corrections à faire";
     public const string ChangesTitle = "À changer ou remplacer";
+    public const string VerifiedTitle = "Points en ordre";
 
     public string Symbol => Status switch
     {

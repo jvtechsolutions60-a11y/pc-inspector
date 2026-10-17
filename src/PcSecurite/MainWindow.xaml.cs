@@ -49,7 +49,10 @@ public partial class MainWindow : Window
         _checks.Clear();
         ScoreText.Text = "…";
         ScoreCircle.Background = (Brush)FindResource("InfoBrush");
+        ScoreBar.Foreground = (Brush)FindResource("AccentBrush");
+        ScoreBar.Value = 0;
         VerdictText.Text = "Analyse en cours…";
+        UpdateCounters();
 
         SecurityChecks.ResetCache();
         var all = SecurityChecks.All;
@@ -57,6 +60,8 @@ public partial class MainWindow : Window
         {
             ProgressText.Text = $"Contrôle {i + 1} sur {all.Count} : {all[i].Name}…";
             _checks.Add(await RunCheckAsync(i));
+            ScoreBar.Value = (i + 1) * 100.0 / all.Count;
+            UpdateCounters();
         }
 
         if (_initialScore is null)
@@ -100,8 +105,11 @@ public partial class MainWindow : Window
     private void UpdateSummary()
     {
         var score = SecurityScore.Compute(_checks);
-        ScoreText.Text = SecurityScore.Letter(score).ToString();
-        ScoreCircle.Background = (Brush)FindResource(score >= 90 ? "OkBrush" : score >= 70 ? "WarningBrush" : "DangerBrush");
+        var letter = SecurityScore.Letter(score);
+        ScoreText.Text = letter.ToString();
+        ScoreCircle.Background = ScoreBar.Foreground = GradeBrushes.For(letter);
+        ScoreBar.Value = score;
+        UpdateCounters();
         VerdictText.Text = _initialScore is { } before && before != score
             ? $"{SecurityScore.Verdict(score)} · {before} → {score} / 100"
             : $"{SecurityScore.Verdict(score)} · {score} / 100";
@@ -114,6 +122,22 @@ public partial class MainWindow : Window
             : $"{toFix} correction(s) à faire, {toChange} chose(s) à changer.")
             + (corrected > 0 ? $" {corrected} point(s) corrigé(s) pendant l'intervention." : "");
         GuidedButton.IsEnabled = !_running && toFix + toChange > 0;
+    }
+
+    private void UpdateCounters()
+    {
+        DangerCount.Text = $" {_checks.Count(c => c.Status == CheckStatus.Danger)} urgent(s)";
+        WarningCount.Text = $" {_checks.Count(c => c.Status == CheckStatus.Warning)} à améliorer";
+        OkCount.Text = $" {_checks.Count(c => c.Status == CheckStatus.Ok)} en ordre";
+    }
+
+    private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.F5 && RescanButton.IsEnabled)
+        {
+            e.Handled = true;
+            RescanButton_Click(sender, e);
+        }
     }
 
     private void SetButtons(bool enabled)
