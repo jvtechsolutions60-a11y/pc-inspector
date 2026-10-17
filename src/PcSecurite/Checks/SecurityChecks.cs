@@ -24,6 +24,7 @@ public static partial class SecurityChecks
         ("Protection LSA", LsaProtection),
         ("Blocage des pilotes vulnérables", DriverBlocklist),
         ("Mots de passe en mémoire (WDigest)", WDigest),
+        ("Sauvegarde des données", Backup),
         ("Chiffrement BitLocker", BitLocker),
         ("Secure Boot", SecureBoot),
         ("Certificats Secure Boot 2023", SecureBootCertificates),

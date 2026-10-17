@@ -135,6 +135,14 @@ public static class Tutorials
             "Redémarrer, lancer une analyse antivirus complète et faire changer les mots de passe du client : ce réglage est souvent posé par un pirate.",
         }, "Ouvrir le Registre", "regedit.exe", clientCanDo: false),
 
+        "Sauvegarde des données" => new(new[]
+        {
+            "Le plus simple : se connecter à OneDrive, puis Paramètres > Comptes > Sauvegarde Windows > Sauvegarde des dossiers, et cocher Bureau, Documents et Images.",
+            "Sans abonnement : brancher un disque externe, puis Panneau de configuration > Historique des fichiers > Activer.",
+            "Pour les points de restauration : rechercher « Créer un point de restauration », choisir C: > Configurer > Activer la protection du système.",
+            "Garder une copie hors de la maison (cloud ou disque rangé ailleurs) : un rançongiciel chiffre aussi le disque externe branché.",
+        }, "Ouvrir la sauvegarde Windows", "ms-settings:backup"),
+
         "Chiffrement BitLocker" => new(new[]
         {
             "Vérifier que le compte du client est un compte Microsoft (la clé de récupération y sera sauvegardée).",
