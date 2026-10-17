@@ -7,8 +7,9 @@ namespace PcSecurite.Checks;
 /// <summary>Un mode d'emploi pas à pas, et le réglage de Windows à ouvrir pour le faire.</summary>
 public sealed class Tutorial
 {
-    public Tutorial(string[] steps, string? openLabel = null, string? openFile = null, string? openArgs = null)
+    public Tutorial(string[] steps, string? openLabel = null, string? openFile = null, string? openArgs = null, bool clientCanDo = true)
     {
+        ClientCanDo = clientCanDo;
         Steps = steps;
         OpenLabel = openLabel;
         OpenFile = openFile;
@@ -21,6 +22,8 @@ public sealed class Tutorial
     /// <summary>Adresse ms-settings:, windowsdefender: ou programme à lancer.</summary>
     public string? OpenFile { get; }
     public string? OpenArgs { get; }
+    /// <summary>Faux quand l'opération est réservée au technicien (BIOS, registre…) : la fiche client renvoie alors vers lui.</summary>
+    public bool ClientCanDo { get; }
 
     /// <summary>Les étapes numérotées, une par ligne.</summary>
     public string Text => string.Join(Environment.NewLine, Numbered());
@@ -44,7 +47,7 @@ public static class Tutorials
             "S'il est compatible : Paramètres > Windows Update > « Mettre à niveau vers Windows 11 », ou l'Assistant d'installation de Windows 11 sur le site de Microsoft.",
             "Sauvegarder les données du client avant la mise à niveau.",
             "S'il n'est pas compatible (processeur, TPM) : proposer le remplacement du PC.",
-        }, "Ouvrir Windows Update", "ms-settings:windowsupdate"),
+        }, "Ouvrir Windows Update", "ms-settings:windowsupdate", clientCanDo: false),
 
         "Version de Windows" or "Dernière mise à jour" or "Mises à jour en attente" or "Certificats Secure Boot 2023" => new(new[]
         {
@@ -130,7 +133,7 @@ public static class Tutorials
             "Aller dans HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest.",
             "Mettre UseLogonCredential à 0 (ou supprimer la valeur).",
             "Redémarrer, lancer une analyse antivirus complète et faire changer les mots de passe du client : ce réglage est souvent posé par un pirate.",
-        }, "Ouvrir le Registre", "regedit.exe"),
+        }, "Ouvrir le Registre", "regedit.exe", clientCanDo: false),
 
         "Chiffrement BitLocker" => new(new[]
         {
@@ -146,13 +149,13 @@ public static class Tutorials
             "Redémarrer dans le BIOS : Paramètres > Système > Récupération > Démarrage avancé > Paramètres du microprogramme UEFI.",
             "Passer le mode de démarrage en UEFI (désactiver CSM/Legacy).",
             "Activer Secure Boot (parfois après avoir chargé les clés par défaut, « Install default keys »), enregistrer et redémarrer.",
-        }, "Ouvrir le démarrage avancé", "ms-settings:recovery"),
+        }, "Ouvrir le démarrage avancé", "ms-settings:recovery", clientCanDo: false),
 
         "Puce TPM" when check.Kind == CheckKind.Change => new(new[]
         {
             "Chercher dans le BIOS une option TPM 2.0 : certaines cartes mères passent de 1.2 à 2.0 par une mise à jour du micrologiciel TPM du fabricant.",
             "Sinon, Windows 11 ne pourra pas être installé normalement : prévoir le remplacement du PC.",
-        }),
+        }, clientCanDo: false),
 
         "Puce TPM" => new(new[]
         {
@@ -160,7 +163,7 @@ public static class Tutorials
             "Chercher l'option TPM : « Intel PTT » sur Intel, « AMD fTPM » sur AMD, souvent dans Sécurité ou Avancé.",
             "L'activer, enregistrer et redémarrer.",
             "Vérifier ensuite avec tpm.msc.",
-        }, "Ouvrir le démarrage avancé", "ms-settings:recovery"),
+        }, "Ouvrir le démarrage avancé", "ms-settings:recovery", clientCanDo: false),
 
         "BIOS" => new(new[]
         {
@@ -169,7 +172,7 @@ public static class Tutorials
             "Brancher le portable sur secteur, suspendre BitLocker s'il est actif (manage-bde -protectors -disable C:).",
             "Lancer la mise à jour et ne pas couper le PC pendant l'opération.",
             "S'il n'existe aucun BIOS récent, le PC n'est plus suivi par le fabricant : le noter dans le rapport.",
-        }),
+        }, clientCanDo: false),
 
         "Protocole SMB1" => new(new[]
         {
@@ -177,7 +180,7 @@ public static class Tutorials
             "Décocher « Support de partage de fichiers SMB 1.0/CIFS ».",
             "Valider et redémarrer.",
             "Vérifier ensuite que le NAS ou l'imprimante réseau du client fonctionne toujours (sinon, mettre à jour leur micrologiciel).",
-        }, "Ouvrir les fonctionnalités Windows", "optionalfeatures.exe"),
+        }, "Ouvrir les fonctionnalités Windows", "optionalfeatures.exe", clientCanDo: false),
 
         "PowerShell 2.0" => new(new[]
         {
@@ -207,7 +210,7 @@ public static class Tutorials
             "Supprimer les lignes que le client ne connaît pas, puis enregistrer.",
             "Ouvrir Paramètres > Réseau et Internet > Proxy et désactiver le proxy et le script de configuration s'ils ne sont pas voulus.",
             "Lancer une analyse antivirus complète.",
-        }, "Ouvrir le fichier hosts", "notepad.exe", "\"" + Hosts + "\""),
+        }, "Ouvrir le fichier hosts", "notepad.exe", "\"" + Hosts + "\"", clientCanDo: false),
 
         "Réseaux Wi-Fi enregistrés" => new(new[]
         {

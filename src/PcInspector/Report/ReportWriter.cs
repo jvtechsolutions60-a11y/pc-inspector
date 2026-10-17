@@ -100,7 +100,7 @@ public static class ReportWriter
         return sb.ToString();
     }
 
-    private static string? LogoDataUri(string path)
+    internal static string? LogoDataUri(string path)
     {
         try
         {

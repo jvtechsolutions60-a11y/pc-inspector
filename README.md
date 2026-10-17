@@ -29,6 +29,14 @@ Les résultats sont triés : d'abord les **corrections à faire** (réglages, mi
 **changer ou remplacer** (Windows plus supporté, logiciel abandonné, vieux TPM), puis les points en ordre. La note est aussi donnée en classe de A à E, façon Nutri-Score.
 Chaque point rouge ou orange a un tutoriel « Comment faire ? » pas à pas, avec un bouton qui ouvre le bon réglage
 de Windows. Les tutoriels sont aussi repris dans le rapport client.
+
+- **Mode guidé** : passe les points à corriger un par un. Le technicien corrige lui-même, puis « Vérifier » refait
+  seulement ce contrôle. Le rapport indique la note avant/après et ce qui a été corrigé pendant l'intervention.
+- **Fiche conseils client** : un guide simple (HTML ou texte) des points restants, avec le pas à pas quand le client
+  peut le faire, ou « à confier à votre technicien » pour le BIOS, le registre, etc.
+
+PC Sécurité ne fait que lire et conseiller : il ne modifie jamais le PC. Les boutons « Ouvrir… » affichent seulement
+la page de réglages de Windows.
 Il ne modifie rien sur le PC. Le bouton « Exporter le rapport » produit le même rapport client que PC Inspector.
 
 Il partage le code WMI, le rapport et la fenêtre d'export avec PC Inspector (fichiers liés dans le `.csproj`).

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -13,10 +14,18 @@ using PcSecurite.Checks;
 
 namespace PcSecurite;
 
+/// <summary>
+/// L'écran principal. PC Sécurité ne fait que lire et conseiller : aucun bouton ne modifie le PC,
+/// les boutons « Ouvrir… » affichent seulement la page de réglages de Windows.
+/// </summary>
 public partial class MainWindow : Window
 {
     private readonly ObservableCollection<SecurityCheck> _checks = new();
     private bool _running;
+
+    // État de la première analyse, pour montrer ce qui a été corrigé pendant l'intervention.
+    private int? _initialScore;
+    private readonly List<string> _initiallyToDo = new();
 
     public MainWindow()
     {
@@ -36,7 +45,7 @@ public partial class MainWindow : Window
     {
         if (_running) return;
         _running = true;
-        RescanButton.IsEnabled = ExportButton.IsEnabled = false;
+        SetButtons(false);
         _checks.Clear();
         ScoreText.Text = "…";
         ScoreCircle.Background = (Brush)FindResource("InfoBrush");
@@ -46,56 +55,120 @@ public partial class MainWindow : Window
         var all = SecurityChecks.All;
         for (int i = 0; i < all.Count; i++)
         {
-            var (name, run) = all[i];
-            ProgressText.Text = $"Contrôle {i + 1} sur {all.Count} : {name}…";
-            var check = await Task.Run(() => SecurityChecks.RunSafely(name, run));
-            check.Order = i;
-            if (check.NeedsAction) check.Tutorial = Tutorials.For(check);
-            _checks.Add(check);
+            ProgressText.Text = $"Contrôle {i + 1} sur {all.Count} : {all[i].Name}…";
+            _checks.Add(await RunCheckAsync(i));
         }
 
+        if (_initialScore is null)
+        {
+            _initialScore = SecurityScore.Compute(_checks);
+            _initiallyToDo.AddRange(_checks.Where(c => c.NeedsAction).Select(c => c.Name));
+        }
+        UpdateSummary();
+        SetButtons(true);
+        _running = false;
+    }
+
+    private static async Task<SecurityCheck> RunCheckAsync(int index)
+    {
+        var (name, run) = SecurityChecks.All[index];
+        var check = await Task.Run(() => SecurityChecks.RunSafely(name, run));
+        check.Order = index;
+        if (check.NeedsAction) check.Tutorial = Tutorials.For(check);
+        return check;
+    }
+
+    /// <summary>Le point tel qu'il est affiché maintenant (il change après une vérification).</summary>
+    public SecurityCheck? Current(string name) => _checks.FirstOrDefault(c => c.Name == name);
+
+    /// <summary>Refait un seul contrôle, en lecture seule, après que le technicien a corrigé le point.</summary>
+    public async Task<SecurityCheck?> RecheckAsync(string name)
+    {
+        var old = Current(name);
+        if (old is null) return null;
+        SecurityChecks.ResetCache();
+        var fresh = await RunCheckAsync(old.Order);
+        _checks[_checks.IndexOf(old)] = fresh;
+        UpdateSummary();
+        return fresh;
+    }
+
+    /// <summary>Points rouges ou orange à la première analyse, en ordre maintenant.</summary>
+    private List<string> Corrected() =>
+        _initiallyToDo.Where(n => Current(n) is { NeedsAction: false }).ToList();
+
+    private void UpdateSummary()
+    {
         var score = SecurityScore.Compute(_checks);
         ScoreText.Text = SecurityScore.Letter(score).ToString();
         ScoreCircle.Background = (Brush)FindResource(score >= 90 ? "OkBrush" : score >= 70 ? "WarningBrush" : "DangerBrush");
-        VerdictText.Text = $"{SecurityScore.Verdict(score)} · {score} / 100";
+        VerdictText.Text = _initialScore is { } before && before != score
+            ? $"{SecurityScore.Verdict(score)} · {before} → {score} / 100"
+            : $"{SecurityScore.Verdict(score)} · {score} / 100";
+
         var toFix = _checks.Count(c => c.GroupOrder == 0);
         var toChange = _checks.Count(c => c.GroupOrder == 1);
-        ProgressText.Text = toFix + toChange == 0
+        var corrected = Corrected().Count;
+        ProgressText.Text = (toFix + toChange == 0
             ? "Aucun point à corriger."
-            : $"{toFix} correction(s) à faire, {toChange} chose(s) à changer.";
+            : $"{toFix} correction(s) à faire, {toChange} chose(s) à changer.")
+            + (corrected > 0 ? $" {corrected} point(s) corrigé(s) pendant l'intervention." : "");
+        GuidedButton.IsEnabled = !_running && toFix + toChange > 0;
+    }
 
-        RescanButton.IsEnabled = ExportButton.IsEnabled = true;
-        _running = false;
+    private void SetButtons(bool enabled)
+    {
+        RescanButton.IsEnabled = ExportButton.IsEnabled = ClientGuideButton.IsEnabled = enabled;
+        GuidedButton.IsEnabled = enabled && _checks.Any(c => c.NeedsAction);
     }
 
     private async void RescanButton_Click(object sender, RoutedEventArgs e) => await RunAsync();
 
-    /// <summary>Ouvre le réglage de Windows indiqué par le tutoriel.</summary>
-    private void OpenSetting_Click(object sender, RoutedEventArgs e)
+    private void GuidedButton_Click(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.Tag is not Tutorial { OpenFile: { } file } tutorial) return;
+        var names = _checks.Where(c => c.NeedsAction)
+            .OrderBy(c => c.GroupOrder).ThenBy(c => c.Severity).ThenBy(c => c.Order)
+            .Select(c => c.Name).ToList();
+        if (names.Count == 0) return;
+        new GuidedWindow(this, names) { Owner = this }.ShowDialog();
+    }
+
+    /// <summary>Ouvre la page de réglages de Windows indiquée par le tutoriel, sans rien y changer.</summary>
+    private void OpenSetting_Click(object sender, RoutedEventArgs e) =>
+        OpenSetting(this, (sender as FrameworkElement)?.Tag as Tutorial);
+
+    public static void OpenSetting(Window owner, Tutorial? tutorial)
+    {
+        if (tutorial?.OpenFile is not { } file) return;
         try
         {
             Process.Start(new ProcessStartInfo(file) { Arguments = tutorial.OpenArgs ?? "", UseShellExecute = true });
         }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
         {
-            MessageBox.Show(this, "Impossible d'ouvrir ce réglage : " + ex.Message, "PC Sécurité", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(owner, "Impossible d'ouvrir ce réglage : " + ex.Message, "PC Sécurité", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
-    private void ExportButton_Click(object sender, RoutedEventArgs e)
+    private void ExportButton_Click(object sender, RoutedEventArgs e) =>
+        Export("Rapport", (path, info) =>
+            ReportWriter.Write(path, info, SecurityReport.ToSections(_checks.ToList(), _initialScore, Corrected())));
+
+    private void ClientGuideButton_Click(object sender, RoutedEventArgs e) =>
+        Export("Conseils securite", (path, info) => ClientGuide.Write(path, info, _checks.ToList()));
+
+    private void Export(string prefix, Action<string, ReportInfo> write)
     {
-        var dialog = new ExportWindow { Owner = this };
+        var dialog = new ExportWindow { Owner = this, FilePrefix = prefix };
         if (dialog.ShowDialog() != true || dialog.Info is null || dialog.FilePath is null) return;
         try
         {
-            ReportWriter.Write(dialog.FilePath, dialog.Info, SecurityReport.ToSections(_checks.ToList()));
+            write(dialog.FilePath, dialog.Info);
             Process.Start(new ProcessStartInfo(dialog.FilePath) { UseShellExecute = true });
         }
         catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show(this, "Impossible d'enregistrer le rapport : " + ex.Message, "Exporter le rapport",
+            MessageBox.Show(this, "Impossible d'enregistrer le fichier : " + ex.Message, "PC Sécurité",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }

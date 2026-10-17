@@ -24,10 +24,14 @@
                 <TextBlock x:Name="VerdictText" Text="Analyse en cours…" FontSize="15" Margin="0,4,0,0"/>
                 <TextBlock x:Name="ProgressText" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0"/>
             </StackPanel>
-            <StackPanel Grid.Column="2" VerticalAlignment="Center">
+            <UniformGrid Grid.Column="2" Columns="2" VerticalAlignment="Center">
+                <Button x:Name="GuidedButton" Content="Mode guidé" Padding="12,6" Margin="0,0,8,8" Click="GuidedButton_Click"
+                        ToolTip="Passe les corrections une par une, avec le pas à pas et une vérification"/>
                 <Button x:Name="RescanButton" Content="Relancer l'analyse" Padding="12,6" Margin="0,0,0,8" Click="RescanButton_Click"/>
+                <Button x:Name="ClientGuideButton" Content="Fiche conseils client" Padding="12,6" Margin="0,0,8,0" Click="ClientGuideButton_Click"
+                        ToolTip="Guide simple à imprimer ou envoyer au client"/>
                 <Button x:Name="ExportButton" Content="Exporter le rapport" Padding="12,6" Click="ExportButton_Click"/>
-            </StackPanel>
+            </UniformGrid>
         </Grid>
 
         <!-- Un contrôle par ligne -->
