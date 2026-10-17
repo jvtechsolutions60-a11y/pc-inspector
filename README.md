@@ -11,6 +11,9 @@ Petit logiciel Windows façon Speccy : il affiche toutes les informations matér
 4. **Export** : rapport client HTML et TXT (logo, client, n° d'intervention). ✅
 5. **Logiciel** : système, logiciels installés, pilotes, services, démarrage. ✅
 
+Ergonomie : onglets classés Matériel / Diagnostic / Logiciel, recherche dans l'onglet (Ctrl+F), bouton Copier
+(texte prêt à coller dans un devis) et Actualiser (F5).
+
 ## PC Sécurité
 
 Deuxième petit logiciel, dans `src/PcSecurite` : un seul écran qui contrôle la sécurité du PC avec un feu
