@@ -39,7 +39,7 @@ public static class ReportWriter
                 sb.AppendLine().AppendLine("  " + group.Title);
                 var width = group.Items.Count == 0 ? 0 : group.Items.Max(i => i.Label.Length);
                 foreach (var item in group.Items)
-                    sb.AppendLine($"    {item.Label.PadRight(width)}  {item.Value}" + (item.Url is null ? "" : $" ({item.Url})"));
+                    sb.AppendLine($"    {item.Label.PadRight(width)}  {item.Value.Replace("\n", "\n      " + new string(' ', width))}" + (item.Url is null ? "" : $" ({item.Url})"));
             }
         }
         return sb.ToString();
@@ -87,7 +87,7 @@ public static class ReportWriter
                 sb.AppendLine($"<div class=\"group\"><h3>{E(group.Title)}</h3><table>");
                 foreach (var item in group.Items)
                 {
-                    var value = item.Url is null ? E(item.Value) : $"<a href=\"{E(item.Url)}\">{E(item.Value)}</a>";
+                    var value = item.Url is null ? E(item.Value).Replace("\n", "<br>") : $"<a href=\"{E(item.Url)}\">{E(item.Value)}</a>";
                     sb.AppendLine($"<tr><th>{E(item.Label)}</th><td>{value}</td></tr>");
                 }
                 sb.AppendLine("</table></div>");
@@ -100,7 +100,7 @@ public static class ReportWriter
         return sb.ToString();
     }
 
-    private static string? LogoDataUri(string path)
+    internal static string? LogoDataUri(string path)
     {
         try
         {

@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- Comme PC Inspector : .NET Framework 4.8, fourni avec Windows 10 et 11, rien à installer -->
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <AssemblyName>PcSecurite</AssemblyName>
+    <RootNamespace>PcSecurite</RootNamespace>
+    <Product>PC Sécurité</Product>
+    <Company>JVTECH Solutions</Company>
+    <Version>0.2.0</Version>
+    <ApplicationManifest>..\PcInspector\app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Management" />
+  </ItemGroup>
+
+  <!-- Code partagé avec PC Inspector : WMI, firmware, rapport et fenêtre d'export -->
+  <ItemGroup>
+    <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
+    <Compile Include="..\PcInspector\Collectors\Wmi.cs" Link="Shared\Wmi.cs" />
+    <Compile Include="..\PcInspector\Collectors\Firmware.cs" Link="Shared\Firmware.cs" />
+    <Compile Include="..\PcInspector\Models\InfoSection.cs" Link="Shared\InfoSection.cs" />
+    <Compile Include="..\PcInspector\Report\ReportInfo.cs" Link="Shared\ReportInfo.cs" />
+    <Compile Include="..\PcInspector\Report\ReportWriter.cs" Link="Shared\ReportWriter.cs" />
+    <Page Include="..\PcInspector\ExportWindow.xaml" Link="ExportWindow.xaml" />
+    <Compile Include="..\PcInspector\ExportWindow.xaml.cs" Link="ExportWindow.xaml.cs" DependentUpon="ExportWindow.xaml" />
+  </ItemGroup>
+
+</Project>

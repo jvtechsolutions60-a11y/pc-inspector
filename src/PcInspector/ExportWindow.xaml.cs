@@ -21,6 +21,9 @@ public partial class ExportWindow : Window
     }
 
     public ReportInfo? Info { get; private set; }
+
+    /// <summary>Début du nom de fichier proposé (« Rapport » par défaut).</summary>
+    public string FilePrefix { get; set; } = "Rapport";
     public string? FilePath { get; private set; }
 
     private void BrowseLogo_Click(object sender, RoutedEventArgs e)
@@ -61,9 +64,9 @@ public partial class ExportWindow : Window
         DialogResult = true;
     }
 
-    private static string DefaultFileName(ReportInfo info)
+    private string DefaultFileName(ReportInfo info)
     {
-        var parts = new[] { "Rapport", info.JobNumber, info.Client, info.Date.ToString("yyyy-MM-dd") }
+        var parts = new[] { FilePrefix, info.JobNumber, info.Client, info.Date.ToString("yyyy-MM-dd") }
             .Where(p => !string.IsNullOrWhiteSpace(p));
         var name = string.Join("_", parts);
         foreach (var c in Path.GetInvalidFileNameChars()) name = name.Replace(c, '-');

@@ -1,0 +1,169 @@
+<Window x:Class="PcSecurite.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:PcSecurite"
+        Title="PC Sécurité" Height="780" Width="960" MinHeight="500" MinWidth="680"
+        WindowStartupLocation="CenterScreen" Background="{StaticResource ContentBrush}"
+        FontFamily="Segoe UI" PreviewKeyDown="Window_PreviewKeyDown">
+    <Window.Resources>
+        <local:StatusBrushConverter x:Key="StatusBrush"/>
+        <local:StatusTextConverter x:Key="StatusText"/>
+        <local:GroupExpandedConverter x:Key="GroupExpanded"/>
+    </Window.Resources>
+    <DockPanel>
+        <!-- En-tête : classe A à E, note, compteurs -->
+        <Border DockPanel.Dock="Top" Background="{StaticResource HeaderBrush}" Padding="28,22">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border x:Name="ScoreCircle" Width="96" Height="96" CornerRadius="20" Background="{StaticResource InfoBrush}">
+                    <TextBlock x:Name="ScoreText" Text="…" Foreground="White" FontSize="48" FontWeight="Bold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <StackPanel Grid.Column="1" Margin="22,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="PC SÉCURITÉ" Foreground="#93C5FD" FontSize="12" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="VerdictText" Text="Analyse en cours…" Foreground="White" FontSize="22" FontWeight="SemiBold"
+                               Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    <ProgressBar x:Name="ScoreBar" Height="8" Maximum="100" Margin="0,10,0,0" MaxWidth="420" HorizontalAlignment="Stretch"
+                                 Background="#334155" BorderThickness="0" Foreground="{StaticResource AccentBrush}"/>
+                    <TextBlock x:Name="ProgressText" Foreground="#CBD5E1" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                    <WrapPanel Margin="0,10,0,0">
+                        <Border Style="{StaticResource Chip}">
+                            <TextBlock Foreground="White"><Run Text="●" Foreground="#F87171"/><Run x:Name="DangerCount" Text=" 0 urgent"/></TextBlock>
+                        </Border>
+                        <Border Style="{StaticResource Chip}">
+                            <TextBlock Foreground="White"><Run Text="●" Foreground="#FBBF24"/><Run x:Name="WarningCount" Text=" 0 à améliorer"/></TextBlock>
+                        </Border>
+                        <Border Style="{StaticResource Chip}">
+                            <TextBlock Foreground="White"><Run Text="●" Foreground="#4ADE80"/><Run x:Name="OkCount" Text=" 0 en ordre"/></TextBlock>
+                        </Border>
+                    </WrapPanel>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Barre d'actions -->
+        <Border DockPanel.Dock="Top" Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="28,10">
+            <DockPanel>
+                <Button x:Name="RescanButton" DockPanel.Dock="Right" Content="⟳  Relancer (F5)" Click="RescanButton_Click"/>
+                <WrapPanel>
+                    <Button x:Name="GuidedButton" Style="{StaticResource PrimaryButton}" Content="▶  Mode guidé" Margin="0,0,8,0"
+                            Click="GuidedButton_Click" ToolTip="Passe les corrections une par une, avec le pas à pas et une vérification"/>
+                    <Button x:Name="ClientGuideButton" Content="Fiche conseils client" Margin="0,0,8,0" Click="ClientGuideButton_Click"
+                            ToolTip="Guide simple à imprimer ou à envoyer au client"/>
+                    <Button x:Name="ExportButton" Content="Exporter le rapport" Click="ExportButton_Click"
+                            ToolTip="Rapport complet avec l'en-tête de ta société"/>
+                </WrapPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Rappel en bas : rien n'est modifié -->
+        <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="28,6">
+            <TextBlock Foreground="{StaticResource MutedTextBrush}" FontSize="12"
+                       Text="🔒 Lecture seule : PC Sécurité analyse et conseille, il ne modifie aucun réglage. Les boutons « Ouvrir… » affichent seulement la page de Windows."/>
+        </Border>
+
+        <!-- Les contrôles, groupés -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="28,14">
+            <ItemsControl x:Name="CheckList">
+                <ItemsControl.GroupStyle>
+                    <GroupStyle>
+                        <GroupStyle.ContainerStyle>
+                            <Style TargetType="GroupItem">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="GroupItem">
+                                            <Expander IsExpanded="{Binding Name, Mode=OneTime, Converter={StaticResource GroupExpanded}}" Margin="0,6">
+                                                <Expander.Header>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding Name}" FontSize="17" FontWeight="SemiBold"
+                                                                   Foreground="{StaticResource TextBrush}"/>
+                                                        <Border Background="#E2E8F0" CornerRadius="10" Padding="8,1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding ItemCount}" FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                                                        </Border>
+                                                    </StackPanel>
+                                                </Expander.Header>
+                                                <ItemsPresenter Margin="0,10,0,0"/>
+                                            </Expander>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </GroupStyle.ContainerStyle>
+                    </GroupStyle>
+                </ItemsControl.GroupStyle>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="{StaticResource CardBrush}" CornerRadius="8" Margin="0,0,0,10"
+                                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="5"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <!-- Bande de couleur du feu -->
+                                <Border CornerRadius="8,0,0,8" Background="{Binding Status, Converter={StaticResource StatusBrush}}"/>
+                                <StackPanel Grid.Column="1" Margin="16,12">
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Right" CornerRadius="10" Padding="8,2" VerticalAlignment="Top"
+                                                Background="{Binding Status, Converter={StaticResource StatusBrush}}">
+                                            <TextBlock Text="{Binding Status, Converter={StaticResource StatusText}}" Foreground="White"
+                                                       FontSize="10.5" FontWeight="Bold"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="15" Foreground="{StaticResource TextBrush}"
+                                                   TextWrapping="Wrap" Margin="0,0,10,0"/>
+                                    </DockPanel>
+                                    <TextBlock Text="{Binding Detail}" TextWrapping="Wrap" Margin="0,4,0,0" Foreground="#334155"/>
+                                    <TextBlock TextWrapping="Wrap" Margin="0,6,0,0" Foreground="{StaticResource MutedTextBrush}">
+                                        <Run Text="💡 "/><Run Text="{Binding Advice, Mode=OneWay}"/>
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Advice}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <!-- Tutoriel pas à pas, replié par défaut -->
+                                    <Expander Header="Comment faire ?" Margin="0,8,0,0" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold">
+                                        <Expander.Style>
+                                            <Style TargetType="Expander">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Tutorial}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Expander.Style>
+                                        <Border Background="#F8FAFC" CornerRadius="6" Padding="14,10" Margin="0,8,0,0">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Tutorial.Text}" TextWrapping="Wrap" LineHeight="21"
+                                                           Foreground="{StaticResource TextBrush}" FontWeight="Normal"/>
+                                                <Button Content="{Binding Tutorial.OpenLabel}" Tag="{Binding Tutorial}" Click="OpenSetting_Click"
+                                                        HorizontalAlignment="Left" Margin="0,10,0,0" FontWeight="Normal">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource LinkButton}">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Tutorial.OpenLabel}" Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                            </StackPanel>
+                                        </Border>
+                                    </Expander>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</Window>
