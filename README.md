@@ -11,6 +11,10 @@ Petit logiciel Windows façon Speccy : il affiche toutes les informations matér
 4. **Export** : rapport client HTML et TXT (logo, client, n° d'intervention). ✅
 5. **Logiciel** : système, logiciels installés, pilotes, services, démarrage. ✅
 6. **Bilan en 1 clic** : écran d'accueil avec une note sur 100, les points rouges en tête et l'export du rapport client. ✅
+7. **Santé des disques façon Scrutiny** : secteurs réalloués, en attente et irrécupérables, erreurs CRC et alerte SMART
+   des disques SATA ; alerte critique, réserve, vie consommée et erreurs média des SSD NVMe. Chaque compteur est
+   noté vert, orange ou rouge avec des seuils inspirés des statistiques de pannes Backblaze, et les problèmes
+   remontent dans le bilan et le rapport client. Lecture seule. ✅
 
 ## Obtenir l'exécutable
 

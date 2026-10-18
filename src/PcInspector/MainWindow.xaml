@@ -6,6 +6,7 @@
         WindowStartupLocation="CenterScreen" Background="{StaticResource ContentBrush}">
     <Window.Resources>
         <local:HasValueConverter x:Key="HasValue"/>
+        <local:StatusBrushConverter x:Key="StatusBrush"/>
     </Window.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
@@ -155,6 +156,7 @@
                                                     </Grid.ColumnDefinitions>
                                                     <TextBlock Text="{Binding Label}" Foreground="{StaticResource MutedTextBrush}"/>
                                                     <TextBox Grid.Column="1" Text="{Binding Value, Mode=OneWay}" IsReadOnly="True"
+                                                             Foreground="{Binding Value, Converter={StaticResource StatusBrush}}"
                                                              BorderThickness="0" Background="Transparent" TextWrapping="Wrap">
                                                         <TextBox.Style>
                                                             <Style TargetType="TextBox">
