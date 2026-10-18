@@ -15,6 +15,10 @@ Petit logiciel Windows façon Speccy : il affiche toutes les informations matér
    des disques SATA ; alerte critique, réserve, vie consommée et erreurs média des SSD NVMe. Chaque compteur est
    noté vert, orange ou rouge avec des seuils inspirés des statistiques de pannes Backblaze, et les problèmes
    remontent dans le bilan et le rapport client. Lecture seule. ✅
+8. **Mises à jour des logiciels (winget)** : onglet qui liste les logiciels ayant une version plus récente
+   (version installée et version disponible), lu avec `winget upgrade` sans argument, ce qui n'installe rien.
+   Le bilan et le rapport client le reprennent, avec la commande `winget upgrade --all` en conseil.
+   Si winget est absent, l'onglet l'indique avec le lien du Microsoft Store. ✅
 
 ## Obtenir l'exécutable
 

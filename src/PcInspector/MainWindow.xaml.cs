@@ -49,6 +49,7 @@ public partial class MainWindow : Window
         new AdviceCollector(),
         new SystemCollector(),
         new SoftwareCollector(),
+        new WingetCollector(),
         new DriversCollector(),
         new ServicesCollector(),
         new StartupCollector(),
@@ -89,7 +90,7 @@ public partial class MainWindow : Window
             ScoreText.Text = "…";
             ScoreBadge.Background = (Brush)FindResource("MutedTextBrush");
             VerdictText.Text = "Bilan en cours…";
-            CountsText.Text = "Vérification des disques, de la mémoire, de la batterie, des plantages et de la sécurité.";
+            CountsText.Text = "Vérification des disques, de la mémoire, de la batterie, des plantages, de la sécurité et des mises à jour.";
             FindingList.ItemsSource = null;
             RefreshButton.IsEnabled = false;
             section = await Task.Run(() => CollectSafely(_health));

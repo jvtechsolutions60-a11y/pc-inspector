@@ -41,6 +41,9 @@ public sealed class HealthCollector : ICollector
     {
         var findings = new List<Finding>();
 
+        // winget peut prendre plusieurs secondes : il tourne pendant les autres contrôles.
+        var winget = Winget.ReadUpdatesAsync();
+
         // Un contrôle qui échoue (classe WMI absente, accès refusé) ne doit pas bloquer les autres.
         void Run(Action check)
         {
@@ -65,6 +68,7 @@ public sealed class HealthCollector : ICollector
         Run(() => Activation(Add));
         Run(() => Updates(Add));
         Run(() => WindowsVersion(Add));
+        SoftwareUpdates(winget.Result, Add);
 
         return new HealthReport(findings);
     }
@@ -246,6 +250,21 @@ public sealed class HealthCollector : ICollector
         // La liste des mises à jour en attente (longue à obtenir) reste dans l'onglet Sécurité.
         if (SecurityCollector.IsRebootPending())
             add(Severity.Warning, "Mises à jour", "Un redémarrage est nécessaire pour terminer des mises à jour.", "Sécurité");
+    }
+
+    private static void SoftwareUpdates(Winget.Result result, AddFinding add)
+    {
+        // Sans winget, rien n'est affiché : l'onglet explique comment l'installer.
+        if (result.Updates is not { } updates) return;
+        const string tab = "Mises à jour logiciels";
+        if (updates.Count == 0)
+        {
+            add(Severity.Ok, "Logiciels", "Logiciels à jour (vérifié avec winget).", tab);
+            return;
+        }
+        var names = string.Join(", ", updates.Take(3).Select(u => u.Name));
+        add(Severity.Warning, "Logiciels",
+            $"{updates.Count} logiciel(s) à mettre à jour ({names}{(updates.Count > 3 ? "…" : "")}) : commande conseillée « winget upgrade --all ».", tab);
     }
 
     private static void WindowsVersion(AddFinding add)
