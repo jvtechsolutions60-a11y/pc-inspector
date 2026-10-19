@@ -29,6 +29,7 @@ public partial class MainWindow : Window
         ComputerText.Text = Environment.MachineName;
         ShowWindowsVersion();
         ShowGlary();
+        _ = ShowActivationAsync();
         _ = RefreshWindowsUpdateAsync();
         _ = RefreshWingetAsync();
     }
@@ -41,6 +42,20 @@ public partial class MainWindow : Window
         SetCard(Win11Value, version.IsWindows11 ? "Oui" : "Non", version.IsWindows11 ? "OkBrush" : "WarnBrush");
         Win11Detail.Text = $"{version.Name} {version.DisplayVersion} (build {version.Build})".Replace("  ", " ")
             + (version.IsWindows11 ? "" : "\nCompatibilité : voir PC Inspector, onglet Windows 11.");
+    }
+
+    private async Task ShowActivationAsync()
+    {
+        var activation = await Activation.ReadAsync();
+        var (text, brush) = activation.State switch
+        {
+            ActivationState.Permanent => ("Permanente", "OkBrush"),
+            ActivationState.Expires => ("Temporaire", "WarnBrush"),
+            ActivationState.NotActivated => ("Non activé", "BadBrush"),
+            _ => ("?", "BadBrush"),
+        };
+        SetCard(ActivationValue, text, brush);
+        ActivationDetail.Text = activation.Text;
     }
 
     private void ShowGlary()

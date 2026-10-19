@@ -42,7 +42,7 @@ qui ne font que des constats et des conseils). Il enchaîne, étape par étape :
 2. la **recherche et l'installation des mises à jour Windows** (agent Windows Update, une par une, sans redémarrer) ;
 3. **`winget upgrade --all`** en silencieux (source winget).
 
-En haut, un résumé rapide : Windows 11 oui ou non, mises à jour Windows en attente, logiciels à mettre à jour,
+En haut, un résumé rapide : Windows 11 oui ou non, activation de Windows (résultat de `slmgr /xpr`), mises à jour Windows en attente, logiciels à mettre à jour,
 Glary installé ou non. Chaque étape peut être décochée, et un journal garde la trace de tout ce qui a été fait.
 
 L'action *Build PC Maintenance* produit `PcMaintenance.exe` dans les artefacts du run.

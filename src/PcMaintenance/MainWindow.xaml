@@ -24,12 +24,19 @@
             </Grid.RowDefinitions>
 
             <!-- Résumé rapide -->
-            <UniformGrid Grid.Row="0" Columns="4" Margin="0,0,-10,16">
+            <UniformGrid Grid.Row="0" Columns="5" Margin="0,0,-10,16">
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <TextBlock Text="Windows 11" Style="{StaticResource CardTitle}"/>
                         <TextBlock x:Name="Win11Value" Text="…" Style="{StaticResource CardValue}"/>
                         <TextBlock x:Name="Win11Detail" Style="{StaticResource CardDetail}"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Activation (slmgr /xpr)" Style="{StaticResource CardTitle}"/>
+                        <TextBlock x:Name="ActivationValue" Text="…" Style="{StaticResource CardValue}"/>
+                        <TextBlock x:Name="ActivationDetail" Text="Lecture en cours…" Style="{StaticResource CardDetail}"/>
                     </StackPanel>
                 </Border>
                 <Border Style="{StaticResource Card}">
