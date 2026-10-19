@@ -45,7 +45,9 @@ internal sealed record Activation(ActivationState State, string Text)
                                      .Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
             if (lines.Count == 0) return new Activation(ActivationState.Unknown, "slmgr n'a rien renvoyé.");
             var text = string.Join("\n", lines);
-            return new Activation(FromLicense() ?? FromText(text), text);
+            // Le texte de slmgr fait foi quand il est clair (c'est ce que voit le technicien) ;
+            // la licence sert pour les autres cas et pour les langues que le texte ne couvre pas.
+            return new Activation(PermanentText(text) ? ActivationState.Permanent : FromLicense() ?? FromText(text), text);
         }
         catch (Exception ex) when (ex is Win32Exception or IOException or InvalidOperationException)
         {
@@ -77,10 +79,14 @@ internal sealed record Activation(ActivationState State, string Text)
         }
     }
 
+    /// <summary>« La machine est activée de manière permanente », « L'ordinateur est définitivement activé », « permanently activated ».</summary>
+    private static bool PermanentText(string text) =>
+        Regex.IsMatch(text.Normalize(NormalizationForm.FormC), "permanent|d.{1,2}finitivement", RegexOptions.IgnoreCase);
+
     /// <summary>Repli si la licence est illisible : le texte est traduit selon la langue de Windows.</summary>
     private static ActivationState FromText(string text)
     {
-        if (Regex.IsMatch(text, "permanent|définitivement", RegexOptions.IgnoreCase)) return ActivationState.Permanent;
+        if (PermanentText(text)) return ActivationState.Permanent;
         // Activation par volume (KMS) ou période d'essai : une date d'expiration est donnée.
         if (Regex.IsMatch(text, @"\d{1,4}[/.\-]\d{1,2}[/.\-]\d{1,4}")) return ActivationState.Expires;
         return ActivationState.NotActivated;
