@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- Même choix que PC Inspector : .NET Framework 4.8, déjà présent sur Windows 10 et 11 -->
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <AssemblyName>PcMaintenance</AssemblyName>
+    <RootNamespace>PcMaintenance</RootNamespace>
+    <Product>PC Maintenance</Product>
+    <Company>JVTECH Solutions</Company>
+    <Version>0.1.0</Version>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+</Project>

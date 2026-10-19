@@ -1,0 +1,21 @@
+name: Build PC Maintenance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compiler PC Maintenance
+        run: dotnet build src/PcMaintenance/PcMaintenance.csproj -c Release -o publish/maintenance
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PcMaintenance
+          path: publish/maintenance/PcMaintenance.exe

@@ -32,3 +32,17 @@ et certaines sondes de température.
 - `src/PcInspector/Collectors/` : un collecteur par onglet, qui lit les infos (principalement via WMI).
 - `src/PcInspector/Models/` : le format commun des infos (sections, groupes, lignes), réutilisé par l'export.
 - `src/PcInspector/MainWindow.xaml` : la fenêtre (barre latérale + contenu de l'onglet).
+
+## PC Maintenance
+
+Troisième logiciel, `src/PcMaintenance/`, qui **agit** sur le PC (contrairement à PC Inspector et PC Sécurité,
+qui ne font que des constats et des conseils). Il enchaîne, étape par étape :
+
+1. la **maintenance 1 clic de Glary Utilities**, si Glary est installé (la suite démarre quand sa fenêtre est fermée) ;
+2. la **recherche et l'installation des mises à jour Windows** (agent Windows Update, une par une, sans redémarrer) ;
+3. **`winget upgrade --all`** en silencieux (source winget).
+
+En haut, un résumé rapide : Windows 11 oui ou non, mises à jour Windows en attente, logiciels à mettre à jour,
+Glary installé ou non. Chaque étape peut être décochée, et un journal garde la trace de tout ce qui a été fait.
+
+L'action *Build PC Maintenance* produit `PcMaintenance.exe` dans les artefacts du run.
