@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Management;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -43,7 +45,7 @@ internal sealed record Activation(ActivationState State, string Text)
                                      .Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
             if (lines.Count == 0) return new Activation(ActivationState.Unknown, "slmgr n'a rien renvoyé.");
             var text = string.Join("\n", lines);
-            return new Activation(Classify(text), text);
+            return new Activation(FromLicense() ?? FromText(text), text);
         }
         catch (Exception ex) when (ex is Win32Exception or IOException or InvalidOperationException)
         {
@@ -51,10 +53,34 @@ internal sealed record Activation(ActivationState State, string Text)
         }
     });
 
-    /// <summary>Le texte est traduit selon la langue de Windows : on cherche les mots qui reviennent en français et en anglais.</summary>
-    private static ActivationState Classify(string text)
+    /// <summary>
+    /// État lu directement dans la licence Windows (indépendant de la langue) :
+    /// LicenseStatus 1 = activé, et sans délai de grâce restant l'activation n'expire pas.
+    /// </summary>
+    private static ActivationState? FromLicense()
     {
-        if (Regex.IsMatch(text, "permanent", RegexOptions.IgnoreCase)) return ActivationState.Permanent;
+        const string windowsApplication = "55c92734-d682-4d71-983e-d6ec3f16059f";
+        try
+        {
+            using var searcher = new ManagementObjectSearcher(
+                "SELECT LicenseStatus, GracePeriodRemaining FROM SoftwareLicensingProduct " +
+                $"WHERE ApplicationID = '{windowsApplication}' AND PartialProductKey IS NOT NULL");
+            var licenses = searcher.Get().Cast<ManagementBaseObject>().ToList();
+            if (licenses.Count == 0) return null;
+            var active = licenses.FirstOrDefault(l => Convert.ToUInt32(l["LicenseStatus"]) == 1);
+            if (active is null) return ActivationState.NotActivated;
+            return Convert.ToUInt32(active["GracePeriodRemaining"]) == 0 ? ActivationState.Permanent : ActivationState.Expires;
+        }
+        catch (Exception ex) when (ex is ManagementException or COMException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Repli si la licence est illisible : le texte est traduit selon la langue de Windows.</summary>
+    private static ActivationState FromText(string text)
+    {
+        if (Regex.IsMatch(text, "permanent|définitivement", RegexOptions.IgnoreCase)) return ActivationState.Permanent;
         // Activation par volume (KMS) ou période d'essai : une date d'expiration est donnée.
         if (Regex.IsMatch(text, @"\d{1,4}[/.\-]\d{1,2}[/.\-]\d{1,4}")) return ActivationState.Expires;
         return ActivationState.NotActivated;
