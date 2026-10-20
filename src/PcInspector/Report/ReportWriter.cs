@@ -95,7 +95,7 @@ public static class ReportWriter
             sb.AppendLine("</section>");
         }
 
-        sb.AppendLine($"<footer>Généré par PC Inspector le {info.Date:dd/MM/yyyy à HH:mm}</footer>");
+        sb.AppendLine($"<footer>Généré par {E(AppInfo.Product)} {AppInfo.Version} le {info.Date:dd/MM/yyyy à HH:mm}</footer>");
         sb.AppendLine("</body></html>");
         return sb.ToString();
     }

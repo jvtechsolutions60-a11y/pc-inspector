@@ -85,6 +85,8 @@ public sealed class HealthCollector : ICollector
         var systemDisk = Wmi.QueryOptional($"SELECT DiskNumber FROM MSFT_Partition WHERE DriveLetter = '{systemLetter}'", Wmi.StorageScope)
             .FirstOrDefault()?.Str("DiskNumber");
 
+        var smart = DiskHealth.ReadAll();
+
         bool problem = false;
         foreach (var disk in disks)
         {
@@ -102,9 +104,24 @@ public sealed class HealthCollector : ICollector
                     break;
             }
 
+            // Les compteurs SMART repèrent une panne qui arrive alors que Windows affiche encore « sain ».
+            if (id is not null && smart.TryGetValue(id, out var health))
+            {
+                foreach (var (severity, message) in health.Problems)
+                {
+                    add(severity, "Disque", $"{name} {message}", "Stockage");
+                    problem = true;
+                }
+            }
+
             if (id is not null && counters.TryGetValue(id, out var c))
             {
-                if (c.ULong("Wear") is >= 80 and var wear)
+                if (c.ULong("Wear") is >= 100 and var worn)
+                {
+                    add(Severity.Critical, "Disque", $"{name} est usé à {worn} %, au-delà de sa durée de vie prévue : sauvegarder et le remplacer.", "Stockage");
+                    problem = true;
+                }
+                else if (c.ULong("Wear") is >= 80 and var wear)
                 {
                     add(Severity.Warning, "Disque", $"{name} est usé à {wear} % : prévoir son remplacement.", "Stockage");
                     problem = true;
@@ -123,7 +140,8 @@ public sealed class HealthCollector : ICollector
             }
         }
 
-        if (!problem) add(Severity.Ok, "Disque", disks.Count == 1 ? "Disque en bon état." : $"{disks.Count} disques en bon état.", "Stockage");
+        var checkedSmart = smart.Count > 0 ? " (compteurs SMART vérifiés)" : "";
+        if (!problem) add(Severity.Ok, "Disque", (disks.Count == 1 ? "Disque en bon état" : $"{disks.Count} disques en bon état") + checkedSmart + ".", "Stockage");
     }
 
     private static void SystemDriveSpace(AddFinding add)

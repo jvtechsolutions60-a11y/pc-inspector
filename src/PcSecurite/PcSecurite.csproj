@@ -11,7 +11,7 @@
     <RootNamespace>PcSecurite</RootNamespace>
     <Product>PC Sécurité</Product>
     <Company>JVTECH Solutions</Company>
-    <Version>0.2.0</Version>
+    <Version>1.0.0</Version>
     <ApplicationManifest>..\PcInspector\app.manifest</ApplicationManifest>
   </PropertyGroup>
 
@@ -22,6 +22,7 @@
   <!-- Code partagé avec PC Inspector : WMI, firmware, rapport et fenêtre d'export -->
   <ItemGroup>
     <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
+    <Compile Include="..\PcInspector\AppInfo.cs" Link="Shared\AppInfo.cs" />
     <Compile Include="..\PcInspector\Collectors\Wmi.cs" Link="Shared\Wmi.cs" />
     <Compile Include="..\PcInspector\Collectors\Firmware.cs" Link="Shared\Firmware.cs" />
     <Compile Include="..\PcInspector\Models\InfoSection.cs" Link="Shared\InfoSection.cs" />

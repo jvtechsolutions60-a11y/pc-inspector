@@ -30,6 +30,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Title = "PC Sécurité " + AppInfo.Version;
         // Corrections d'abord, puis ce qu'il faut changer, puis ce qui est en ordre ; les plus graves en haut.
         var view = (ListCollectionView)CollectionViewSource.GetDefaultView(_checks);
         view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(SecurityCheck.Group)));

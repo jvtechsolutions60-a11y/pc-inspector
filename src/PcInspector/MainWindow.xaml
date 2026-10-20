@@ -7,6 +7,7 @@
         FontFamily="Segoe UI" PreviewKeyDown="Window_PreviewKeyDown">
     <Window.Resources>
         <local:HasValueConverter x:Key="HasValue"/>
+        <local:StatusBrushConverter x:Key="StatusBrush"/>
     </Window.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
@@ -19,6 +20,7 @@
             <StackPanel DockPanel.Dock="Top" Margin="20,20,20,12">
                 <TextBlock Text="PC INSPECTOR" Foreground="White" FontSize="18" FontWeight="Bold"/>
                 <TextBlock Text="Analyse complète du PC" Foreground="#93C5FD" FontSize="12" Margin="0,2,0,0"/>
+                <TextBlock x:Name="VersionText" Foreground="#64748B" FontSize="11" Margin="0,2,0,0"/>
             </StackPanel>
             <Button DockPanel.Dock="Bottom" x:Name="ExportButton" Style="{StaticResource PrimaryButton}"
                     Content="Exporter le rapport" Margin="16" Click="ExportButton_Click"
@@ -203,7 +205,7 @@
                                                                    TextWrapping="Wrap" Margin="0,0,12,0"/>
                                                         <TextBox Grid.Column="1" Text="{Binding Value, Mode=OneWay}" IsReadOnly="True"
                                                                  BorderThickness="0" Background="Transparent" TextWrapping="Wrap" Padding="0"
-                                                                 Foreground="{StaticResource TextBrush}">
+                                                                 Foreground="{Binding Value, Converter={StaticResource StatusBrush}, FallbackValue={StaticResource TextBrush}}">
                                                             <TextBox.Style>
                                                                 <Style TargetType="TextBox">
                                                                     <Style.Triggers>

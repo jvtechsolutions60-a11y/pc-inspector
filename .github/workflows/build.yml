@@ -12,18 +12,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Le numéro de run sert de version : v1.0.N, affichée dans le logiciel et le rapport.
       - name: Compiler PC Inspector
-        run: dotnet build src/PcInspector/PcInspector.csproj -c Release -o publish/inspector
+        run: dotnet build src/PcInspector/PcInspector.csproj -c Release -o publish/inspector -p:Version=1.0.${{ github.run_number }}
 
       - name: Compiler PC Sécurité
-        run: dotnet build src/PcSecurite/PcSecurite.csproj -c Release -o publish/securite
+        run: dotnet build src/PcSecurite/PcSecurite.csproj -c Release -o publish/securite -p:Version=1.0.${{ github.run_number }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: PcInspector
+          name: PcInspector-v1.0.${{ github.run_number }}
           path: publish/inspector/PcInspector.exe
 
       - uses: actions/upload-artifact@v4
         with:
-          name: PcSecurite
+          name: PcSecurite-v1.0.${{ github.run_number }}
           path: publish/securite/PcSecurite.exe

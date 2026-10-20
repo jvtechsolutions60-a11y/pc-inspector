@@ -71,6 +71,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        VersionText.Text = App.Version;
+        Title = "PC Inspector " + App.Version;
         var items = new List<SidebarItem> { new(_health, "ACCUEIL") };
         items.AddRange(Tabs());
         _collectors = items.Select(i => i.Collector).ToList();
