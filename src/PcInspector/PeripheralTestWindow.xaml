@@ -1,0 +1,100 @@
+<Window x:Class="PcInspector.PeripheralTestWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Test des périphériques" Height="720" Width="900" MinHeight="480" MinWidth="640"
+        WindowStartupLocation="CenterOwner" Background="{StaticResource ContentBrush}" FontFamily="Segoe UI"
+        PreviewKeyDown="Window_PreviewKeyDown" Closed="Window_Closed">
+    <Window.Resources>
+        <Style x:Key="TestCard" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource CardBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="18,14"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+        </Style>
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+    </Window.Resources>
+    <DockPanel>
+        <Border DockPanel.Dock="Top" Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="24,14">
+            <StackPanel>
+                <TextBlock Text="Test des périphériques" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
+                <TextBlock Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,2,0,0"
+                           Text="Écran, clavier, haut-parleurs, micro et webcam, à faire avec le client. Rien n'est modifié sur le PC."/>
+            </StackPanel>
+        </Border>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24,16">
+            <StackPanel>
+                <Border Style="{StaticResource TestCard}">
+                    <StackPanel>
+                        <TextBlock Text="Écran : pixels morts et uniformité" Style="{StaticResource CardTitle}"/>
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="L'écran passe en plein écran, une couleur unie à la fois. Chercher les points qui restent noirs, blancs ou d'une autre couleur, et les zones plus claires. Clic ou Espace : couleur suivante. Échap : quitter."/>
+                        <Button Content="Lancer le test de l'écran" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left"
+                                Click="ScreenTest_Click"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource TestCard}">
+                    <StackPanel>
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" x:Name="KeyboardButton" Content="Démarrer le test du clavier"
+                                    Click="KeyboardButton_Click"/>
+                            <TextBlock Text="Clavier : touche par touche" Style="{StaticResource CardTitle}"/>
+                        </DockPanel>
+                        <TextBlock Style="{StaticResource Hint}" x:Name="KeyboardHint"
+                                   Text="Démarrer le test, puis appuyer sur chaque touche : elle passe au vert. Les touches restées grises n'ont pas répondu."/>
+                        <StackPanel x:Name="KeyRows"/>
+                        <TextBlock x:Name="OtherKeys" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource TestCard}">
+                    <StackPanel>
+                        <TextBlock Text="Haut-parleurs" Style="{StaticResource CardTitle}"/>
+                        <TextBlock Style="{StaticResource Hint}" Text="Un bip à gauche, puis à droite : vérifier que chaque côté sort bien, sans grésillement."/>
+                        <WrapPanel>
+                            <Button Content="◀  Gauche" Margin="0,0,8,0" Tag="left" Click="Speaker_Click"/>
+                            <Button Content="Droite  ▶" Margin="0,0,8,0" Tag="right" Click="Speaker_Click"/>
+                            <Button Content="Les deux" Tag="both" Click="Speaker_Click"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource TestCard}">
+                    <StackPanel>
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" x:Name="MicButton" Content="Écouter le micro" Click="MicButton_Click"/>
+                            <TextBlock Text="Micro" Style="{StaticResource CardTitle}"/>
+                        </DockPanel>
+                        <TextBlock Style="{StaticResource Hint}" Text="Parler ou taper près du micro : la barre doit bouger. Rien n'est enregistré."/>
+                        <ProgressBar x:Name="MicLevel" Height="14" Maximum="100" Foreground="{StaticResource OkBrush}"/>
+                        <TextBlock x:Name="MicStatus" Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource TestCard}">
+                    <StackPanel>
+                        <TextBlock Text="Webcam" Style="{StaticResource CardTitle}"/>
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="Ouvre l'application Caméra de Windows. Si l'image reste noire : cache ou interrupteur de la webcam, ou accès à la caméra coupé dans Paramètres > Confidentialité."/>
+                        <WrapPanel>
+                            <Button Content="Ouvrir la Caméra" Margin="0,0,8,0" Tag="microsoft.windows.camera:" Click="Open_Click"/>
+                            <Button Content="Réglages de confidentialité caméra" Tag="ms-settings:privacy-webcam" Click="Open_Click"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

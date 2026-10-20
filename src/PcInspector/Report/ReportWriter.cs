@@ -46,7 +46,7 @@ public static class ReportWriter
                 sb.AppendLine().AppendLine("  " + group.Title);
                 var width = group.Items.Count == 0 ? 0 : group.Items.Max(i => i.Label.Length);
                 foreach (var item in group.Items)
-                    sb.AppendLine($"    {item.Label.PadRight(width)}  {item.Value.Replace("\n", "\n      " + new string(' ', width))}" + (item.Url is null ? "" : $" ({item.Url})"));
+                    sb.AppendLine($"    {item.Label.PadRight(width)}  {item.Value.Replace("\n", "\n      " + new string(' ', width))}" + (IsWebLink(item.Url) ? $" ({item.Url})" : ""));
             }
         }
         return sb.ToString();
@@ -95,7 +95,7 @@ public static class ReportWriter
                 sb.AppendLine($"<div class=\"group\"><h3>{E(group.Title)}</h3><table>");
                 foreach (var item in group.Items)
                 {
-                    var value = item.Url is null ? E(item.Value).Replace("\n", "<br>") : $"<a href=\"{E(item.Url)}\">{E(item.Value)}</a>";
+                    var value = !IsWebLink(item.Url) ? E(item.Value).Replace("\n", "<br>") : $"<a href=\"{E(item.Url)}\">{E(item.Value)}</a>";
                     sb.AppendLine($"<tr><th>{E(item.Label)}</th><td{StatusClass(item.Value)}>{value}</td></tr>");
                 }
                 sb.AppendLine("</table></div>");
@@ -107,6 +107,9 @@ public static class ReportWriter
         sb.AppendLine("</body></html>");
         return sb.ToString();
     }
+
+    /// <summary>Les liens internes du logiciel (jvtech:…) ne servent à rien dans un rapport client.</summary>
+    private static bool IsWebLink(string? url) => url is not null && url.StartsWith("http", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Colore les résultats du bilan et des vérifications (✘ rouge, ! orange, ✔ vert).</summary>
     private static string StatusClass(string value) =>

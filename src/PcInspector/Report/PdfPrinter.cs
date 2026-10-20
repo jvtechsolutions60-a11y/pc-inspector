@@ -26,8 +26,10 @@ public static class PdfPrinter
             // Profil à part : sinon Edge confie la page à une fenêtre déjà ouverte et ne produit pas le PDF.
             var args = $"--headless --disable-gpu --no-first-run --no-pdf-header-footer --print-to-pdf-no-header " +
                        $"--user-data-dir=\"{Path.Combine(work, "profil")}\" --print-to-pdf=\"{pdfPath}\" \"{new Uri(htmlPath).AbsoluteUri}\"";
-            using var process = Process.Start(new ProcessStartInfo(browser, args) { UseShellExecute = false, CreateNoWindow = true })
-                                ?? throw new IOException("Impossible de lancer " + Path.GetFileName(browser) + ".");
+            Process? started;
+            try { started = Process.Start(new ProcessStartInfo(browser, args) { UseShellExecute = false, CreateNoWindow = true }); }
+            catch (System.ComponentModel.Win32Exception ex) { throw new IOException("Impossible de lancer " + Path.GetFileName(browser) + " : " + ex.Message, ex); }
+            using var process = started ?? throw new IOException("Impossible de lancer " + Path.GetFileName(browser) + ".");
             if (!process.WaitForExit(60_000))
             {
                 try { process.Kill(); } catch (InvalidOperationException) { }

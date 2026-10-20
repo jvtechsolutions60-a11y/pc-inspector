@@ -40,12 +40,14 @@ public partial class MainWindow : Window
         ("DIAGNOSTIC", new ICollector[]
         {
             new DiagnosticCollector(),
+            new MissingDriversCollector(),
             new BootPerformanceCollector(),
             new BatteryCollector(),
             new Windows11Collector(),
             new SecurityCollector(),
             new LicenseCollector(),
             new AdviceCollector(),
+            new UpgradeQuoteCollector(),
         }),
         ("LOGICIEL", new ICollector[]
         {
@@ -299,11 +301,52 @@ public partial class MainWindow : Window
         }
     }
 
+    private void PeripheralTest_Click(object sender, RoutedEventArgs e) => new PeripheralTestWindow { Owner = this }.Show();
+
+    private void LiveMonitor_Click(object sender, RoutedEventArgs e) => new LiveMonitorWindow { Owner = this }.Show();
+
+    private async void Label_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ExportWindow
+        {
+            Owner = this,
+            FilePrefix = "Etiquette",
+            Filter = "Étiquette à imprimer (*.html)|*.html|PDF (*.pdf)|*.pdf",
+        };
+        if (dialog.ShowDialog() != true || dialog.Info is null || dialog.FilePath is null) return;
+        var info = dialog.Info;
+        var path = dialog.FilePath;
+        try
+        {
+            await Task.Run(() => LabelWriter.Write(path, info));
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, "Impossible d'enregistrer l'étiquette : " + ex.Message, "Étiquette PC", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void UpdateLink_Click(object sender, RoutedEventArgs e) =>
         Process.Start(new ProcessStartInfo(_updateUrl) { UseShellExecute = true });
 
     private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
     {
+        if (e.Uri.OriginalString == Prices.EditLink)
+        {
+            e.Handled = true;
+            try
+            {
+                var file = Prices.EnsureFile();
+                Process.Start(new ProcessStartInfo("notepad.exe", $"\"{file}\"") { UseShellExecute = true });
+                ShowStatus("Après avoir enregistré les prix, actualiser l'onglet (F5).");
+            }
+            catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+            {
+                ShowStatus("Impossible d'ouvrir le fichier des prix : " + ex.Message);
+            }
+            return;
+        }
         Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
         e.Handled = true;
     }

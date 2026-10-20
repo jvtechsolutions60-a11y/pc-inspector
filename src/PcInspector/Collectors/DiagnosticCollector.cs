@@ -121,7 +121,7 @@ public sealed class DiagnosticCollector : ICollector
     private static string Duration(TimeSpan span) =>
         span.TotalDays >= 1 ? $"{(int)span.TotalDays} j {span.Hours} h" : $"{span.Hours} h {span.Minutes} min";
 
-    private static string DeviceError(ulong? code) => code switch
+    internal static string DeviceError(ulong? code) => code switch
     {
         1 => "Mal configuré (code 1)",
         3 => "Pilote corrompu ou mémoire insuffisante (code 3)",

@@ -31,7 +31,16 @@
             </StackPanel>
             <Button DockPanel.Dock="Bottom" x:Name="ExportButton" Style="{StaticResource PrimaryButton}"
                     Content="Exporter le rapport" Margin="16" Click="ExportButton_Click"
-                    ToolTip="Rapport client complet (HTML ou texte) avec ton logo"/>
+                    ToolTip="Rapport client complet (HTML, PDF ou texte) avec ton logo"/>
+            <StackPanel DockPanel.Dock="Bottom" Margin="16,8,16,0">
+                <TextBlock Text="OUTILS" Foreground="#64748B" FontSize="11" FontWeight="Bold" Margin="4,0,0,6"/>
+                <Button Content="Tester les périphériques" Margin="0,0,0,6" Click="PeripheralTest_Click"
+                        ToolTip="Écran, clavier, haut-parleurs, micro, webcam"/>
+                <Button Content="Suivi en direct" Margin="0,0,0,6" Click="LiveMonitor_Click"
+                        ToolTip="Charge et températures en courbes, pendant un test"/>
+                <Button Content="Étiquette PC" Click="Label_Click"
+                        ToolTip="Petite fiche à coller sous le PC : config, date, coordonnées"/>
+            </StackPanel>
             <ListBox x:Name="SectionList" Background="Transparent" BorderThickness="0"
                      SelectionChanged="SectionList_SelectionChanged"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
