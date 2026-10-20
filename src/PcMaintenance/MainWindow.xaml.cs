@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using PcInspector;
+using PcInspector.Report;
 using PcMaintenance.Maintenance;
 
 namespace PcMaintenance;
@@ -18,6 +21,10 @@ public partial class MainWindow : Window
     private bool _running;
     private volatile bool _stopRequested;
     private volatile bool _rebootRequired;
+    private readonly MaintenanceReport _report = new();
+    private readonly List<string> _installedUpdates = new();
+    private IReadOnlyList<WingetUpdate> _wingetUpdates = Array.Empty<WingetUpdate>();
+    private string _updateUrl = Updater.ReleasesPage;
 
     public MainWindow()
     {
@@ -29,7 +36,10 @@ public partial class MainWindow : Window
         ComputerText.Text = Environment.MachineName;
         VersionText.Text = AppVersion();
         Title = "PC Maintenance " + VersionText.Text;
+        PortableText.Visibility = AppPaths.IsPortable ? Visibility.Visible : Visibility.Collapsed;
+        LoadPack();
         _ = AnalyzeAsync();
+        _ = CheckUpdateAsync();
     }
 
     /// <summary>« v1.0.12 · 20/10/2026 » : numéro de compilation GitHub Actions et date du .exe.</summary>
@@ -40,6 +50,16 @@ public partial class MainWindow : Window
         var built = System.IO.File.GetLastWriteTime(assembly.Location);
         return $"v{version.Major}.{version.Minor}.{version.Build} · {built:dd/MM/yyyy}";
     }
+
+    private async Task CheckUpdateAsync()
+    {
+        if (await Updater.CheckAsync() is not { } update) return;
+        _updateUrl = update.Url;
+        UpdateText.Text = $"Nouvelle version {update.Tag} : télécharger";
+    }
+
+    private void UpdateLink_Click(object sender, RoutedEventArgs e) =>
+        Process.Start(new ProcessStartInfo(_updateUrl) { UseShellExecute = true });
 
     /// <summary>Remplit (ou rafraîchit) les cases du résumé ; le bouton reste grisé tant que tout n'est pas relu.</summary>
     private async Task AnalyzeAsync()
@@ -61,6 +81,7 @@ public partial class MainWindow : Window
     {
         if (_running) return;
         Log("Analyse relancée.");
+        LoadPack();
         await AnalyzeAsync();
     }
 
@@ -170,6 +191,7 @@ public partial class MainWindow : Window
             WingetDetail.Text = result.Error;
             return;
         }
+        _wingetUpdates = updates;
         SetCard(WingetValue, updates.Count == 0 ? "À jour" : $"{updates.Count} à mettre à jour", updates.Count == 0 ? "OkBrush" : "WarnBrush");
         var names = updates.Take(3).Select(u => $"• {u.Name} {u.Installed} → {u.Available}").ToList();
         if (updates.Count > 3) names.Add($"… et {updates.Count - 3} autre(s)");
@@ -188,23 +210,28 @@ public partial class MainWindow : Window
     private async void StartButton_Click(object sender, RoutedEventArgs e)
     {
         if (_running) return;
-        if (GlaryCheck.IsChecked != true && WuCheck.IsChecked != true && WingetCheck.IsChecked != true)
+        if (new[] { RestoreCheck, AdwCheck, GlaryCheck, WuCheck, WingetCheck, PackCheck }.All(c => c.IsChecked != true))
         {
             MessageBox.Show(this, "Cocher au moins une étape.", Title, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
         SetRunning(true);
+        _report.Begin();
         Log("===== Début de la maintenance =====");
         try
         {
+            if (RestoreCheck.IsChecked == true && !_stopRequested) await RunRestorePointAsync();
+            if (AdwCheck.IsChecked == true && !_stopRequested) await RunAdwCleanerAsync();
             if (GlaryCheck.IsChecked == true && !_stopRequested) await RunGlaryAsync();
             if (WuCheck.IsChecked == true && !_stopRequested) await RunWindowsUpdateAsync();
             if (WingetCheck.IsChecked == true && !_stopRequested) await RunWingetAsync();
+            if (PackCheck.IsChecked == true && !_stopRequested) await RunPackAsync();
             Log(_stopRequested ? "===== Maintenance arrêtée =====" : "===== Maintenance terminée =====");
         }
         finally
         {
+            _report.Finish();
             SetRunning(false);
         }
 
@@ -235,10 +262,12 @@ public partial class MainWindow : Window
             }
             GlaryStatus.Text = "Terminé.";
             Log("Glary Utilities : terminé.");
+            _report.Step("Glary Utilities (maintenance 1 clic)", "Fait");
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
         {
             GlaryStatus.Text = "Lancement impossible : " + ex.Message;
+            _report.Step("Glary Utilities (maintenance 1 clic)", GlaryStatus.Text);
             Log("Glary Utilities : lancement impossible : " + ex.Message);
         }
     }
@@ -251,6 +280,8 @@ public partial class MainWindow : Window
         var outcome = await Task.Run(() => InstallWindowsUpdates(status, log));
         WuStatus.Text = outcome;
         Log("Windows Update : " + outcome);
+        _report.Step("Mises à jour Windows", outcome);
+        _report.Detail("Mises à jour Windows installées", _installedUpdates);
     }
 
     /// <summary>Recherche puis installe chaque mise à jour, en s'arrêtant entre deux si on le demande.</summary>
@@ -258,6 +289,7 @@ public partial class MainWindow : Window
     {
         try
         {
+            lock (_installedUpdates) _installedUpdates.Clear();
             status.Report("Recherche des mises à jour…");
             var agent = WindowsUpdate.Create();
             var updates = agent.Search();
@@ -276,6 +308,7 @@ public partial class MainWindow : Window
                     if (agent.Install(update, out var reboot))
                     {
                         installed++;
+                        lock (_installedUpdates) _installedUpdates.Add(update.Title);
                         log.Report(reboot ? "    installée, redémarrage nécessaire" : "    installée");
                         if (reboot) _rebootRequired = true;
                     }
@@ -316,6 +349,8 @@ public partial class MainWindow : Window
             var other => $"Terminé avec des erreurs (code 0x{other:X8}) : voir le journal.",
         };
         Log("winget : " + WingetStatus.Text);
+        _report.Step("Mise à jour des logiciels (winget)", WingetStatus.Text);
+        if (code is 0) _report.Detail("Logiciels mis à jour", _wingetUpdates.Select(u => $"{u.Name} {u.Installed} → {u.Available}"));
     }
 
     private void SetRunning(bool running)
@@ -327,6 +362,11 @@ public partial class MainWindow : Window
             _rebootRequired = false;
         }
         StartButton.IsEnabled = !running;
+        ReportButton.IsEnabled = !running;
+        RestoreCheck.IsEnabled = !running;
+        AdwCheck.IsEnabled = !running;
+        PackCheck.IsEnabled = !running;
+        PackList.IsEnabled = !running;
         StopButton.IsEnabled = running;
         StopButton.Content = "Arrêter après l'étape";
         GlaryCheck.IsEnabled = !running && _glaryFolder is not null;
@@ -334,6 +374,102 @@ public partial class MainWindow : Window
         RefreshButton.IsEnabled = !running;
         WuCheck.IsEnabled = !running;
         WingetCheck.IsEnabled = !running;
+    }
+
+    // ---------- Nouvelles étapes ----------
+
+    private async Task RunRestorePointAsync()
+    {
+        Log("--- Point de restauration ---");
+        RestoreStatus.Text = "Création en cours…";
+        var result = await Task.Run(() => RestorePoint.Create(new Progress<string>(Log)));
+        RestoreStatus.Text = result;
+        Log("Point de restauration : " + result);
+        _report.Step("Point de restauration", result);
+    }
+
+    private async Task RunAdwCleanerAsync()
+    {
+        Log("--- AdwCleaner ---");
+        AdwStatus.Text = "En cours (voir le journal)…";
+        var result = await AdwCleaner.RunAsync(new Progress<string>(Log));
+        AdwStatus.Text = result.Summary;
+        Log("AdwCleaner : " + result.Summary + (result.LogPath is null ? "" : " Journal : " + result.LogPath));
+        _report.Step("Suppression des adwares (AdwCleaner)", result.Summary);
+    }
+
+    private void LoadPack()
+    {
+        PackList.Children.Clear();
+        foreach (var item in SoftwarePack.Load())
+            PackList.Children.Add(new CheckBox { Content = item.Name, Tag = item, IsChecked = item.Checked, Margin = new Thickness(0, 2, 14, 2) });
+    }
+
+    private void EditPack_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var file = SoftwarePack.EnsureFile();
+            Process.Start(new ProcessStartInfo("notepad.exe", $"\"{file}\"") { UseShellExecute = true });
+            Log($"Liste du pack ouverte : {file}. Relancer l'analyse après l'avoir enregistrée pour la recharger.");
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            Log("Impossible d'ouvrir la liste du pack : " + ex.Message);
+        }
+    }
+
+    // « Déjà installé » : winget n'a rien à faire.
+    private const int WingetAlreadyInstalled = unchecked((int)0x8A15002B);
+
+    private async Task RunPackAsync()
+    {
+        var items = PackList.Children.OfType<CheckBox>().Where(c => c.IsChecked == true).Select(c => (PackItem)c.Tag).ToList();
+        Log("--- Pack logiciels nouveau PC ---");
+        if (items.Count == 0)
+        {
+            PackStatus.Text = "Aucun logiciel coché.";
+            return;
+        }
+
+        var done = new List<string>();
+        int installed = 0, already = 0, failed = 0;
+        foreach (var item in items)
+        {
+            if (_stopRequested) break;
+            PackStatus.Text = $"Installation de {item.Name}…";
+            Log($"{item.Name} : winget install -e --id {item.Id}");
+            var code = await Winget.InstallAsync(item.Id, new Progress<string>(Log));
+            if (code is null) { PackStatus.Text = "winget n'est pas installé sur ce PC."; Log(PackStatus.Text); break; }
+            if (code == 0) { installed++; done.Add(item.Name + " : installé"); }
+            else if (code == WingetAlreadyInstalled) { already++; done.Add(item.Name + " : déjà installé"); }
+            else { failed++; done.Add($"{item.Name} : échec (code 0x{code:X8})"); }
+        }
+        var summary = $"{installed} installé(s)" + (already > 0 ? $", {already} déjà présent(s)" : "") + (failed > 0 ? $", {failed} en échec" : "") + ".";
+        if (done.Count > 0) PackStatus.Text = summary;
+        Log("Pack logiciels : " + PackStatus.Text);
+        _report.Step("Pack logiciels nouveau PC", PackStatus.Text);
+        _report.Detail("Logiciels du pack", done);
+    }
+
+    private void ReportButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_report.IsEmpty)
+        {
+            MessageBox.Show(this, "Lancer d'abord la maintenance : le rapport décrit les étapes réalisées.", Title, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var dialog = new ExportWindow { Owner = this, FilePrefix = "Maintenance" };
+        if (dialog.ShowDialog() != true || dialog.Info is null || dialog.FilePath is null) return;
+        try
+        {
+            ReportWriter.Write(dialog.FilePath, dialog.Info, _report.ToSections());
+            Process.Start(new ProcessStartInfo(dialog.FilePath) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, "Impossible d'enregistrer le rapport : " + ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void StopButton_Click(object sender, RoutedEventArgs e)

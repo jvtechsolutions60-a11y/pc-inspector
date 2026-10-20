@@ -28,7 +28,7 @@ public static class ReportWriter
     public static string Text(ReportInfo info, IReadOnlyList<InfoSection> sections)
     {
         var sb = new StringBuilder();
-        var title = string.IsNullOrWhiteSpace(info.Company) ? "Rapport PC Inspector" : $"Rapport {info.Company}";
+        var title = string.IsNullOrWhiteSpace(info.Company) ? $"Rapport {AppInfo.Product}" : $"Rapport {info.Company}";
         sb.AppendLine(title).AppendLine(new string('=', title.Length));
         AppendTextLine(sb, "Date", info.Date.ToString("dd/MM/yyyy HH:mm"));
         AppendTextLine(sb, "Client", info.Client);
@@ -70,7 +70,7 @@ public static class ReportWriter
         if (LogoDataUri(info.LogoPath) is { } logo) sb.AppendLine($"<img class=\"logo\" src=\"{logo}\" alt=\"\">");
         sb.AppendLine("<div class=\"head\">");
         sb.AppendLine($"<h1>{(string.IsNullOrWhiteSpace(info.Company) ? "Rapport PC" : E(info.Company))}</h1>");
-        sb.AppendLine("<p class=\"sub\">Rapport d'analyse du PC</p></div>");
+        sb.AppendLine($"<p class=\"sub\">{E(Subtitle)}</p></div>");
         sb.AppendLine("<table class=\"meta\">");
         void Meta(string label, string value)
         {
@@ -107,6 +107,13 @@ public static class ReportWriter
         sb.AppendLine("</body></html>");
         return sb.ToString();
     }
+
+    private static string Subtitle => AppInfo.Product switch
+    {
+        "PC Maintenance" => "Rapport de maintenance",
+        "PC Sécurité" => "Bilan de sécurité du PC",
+        _ => "Rapport d'analyse du PC",
+    };
 
     /// <summary>Les liens internes du logiciel (jvtech:…) ne servent à rien dans un rapport client.</summary>
     private static bool IsWebLink(string? url) => url is not null && url.StartsWith("http", StringComparison.OrdinalIgnoreCase);
