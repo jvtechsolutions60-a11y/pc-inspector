@@ -78,5 +78,7 @@
             <Setter Property="Margin" Value="0,0,8,0"/>
             <Setter Property="Background" Value="#33FFFFFF"/>
         </Style>
+        <!-- Couleur « à traiter » du bilan -->
+        <SolidColorBrush x:Key="CriticalBrush" Color="#DC2626"/>
     </Application.Resources>
 </Application>

@@ -77,8 +77,82 @@
             </ListBox>
         </DockPanel>
 
+        <!-- Écran d'accueil : bilan en 1 clic -->
+        <DockPanel Grid.Column="1" x:Name="HealthPanel" Visibility="Collapsed">
+            <Border DockPanel.Dock="Top" Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1"
+                    Padding="28,20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Border x:Name="ScoreBadge" Width="96" Height="96" CornerRadius="48" Background="{StaticResource InfoBrush}">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock x:Name="ScoreText" Text="…" FontSize="34" FontWeight="Bold" Foreground="White"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="/ 100" Foreground="White" Opacity="0.85" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="20,0" VerticalAlignment="Center">
+                        <TextBlock x:Name="VerdictText" Text="Bilan en cours…" FontSize="22" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="CountsText" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                        <Button x:Name="HealthExportButton" Style="{StaticResource PrimaryButton}" Content="Exporter le rapport client"
+                                Click="ExportButton_Click"/>
+                        <Button x:Name="HealthRefreshButton" Content="Relancer le bilan" Margin="0,8,0,0"
+                                Click="HealthRefreshButton_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+            <TextBlock DockPanel.Dock="Top" x:Name="HealthStatus" Foreground="{StaticResource MutedTextBrush}"
+                       Margin="28,12,28,0" Visibility="Collapsed" TextWrapping="Wrap"/>
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="28,18,28,8">
+                <ItemsControl x:Name="FindingList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{StaticResource CardBrush}" CornerRadius="8" Margin="0,0,0,8"
+                                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="5"/>
+                                        <ColumnDefinition Width="40"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border x:Name="Bar" CornerRadius="8,0,0,8" Background="{StaticResource OkBrush}"/>
+                                    <TextBlock x:Name="Mark" Grid.Column="1" Text="{Binding Mark}" FontSize="18" FontWeight="Bold"
+                                               Foreground="{StaticResource OkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="2" Margin="0,10">
+                                        <TextBlock Text="{Binding Area}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
+                                        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="0,2,0,0"
+                                                   Foreground="{StaticResource TextBrush}"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="3" Style="{StaticResource LinkButton}" Content="Voir le détail"
+                                            Tag="{Binding Tab}" Click="FindingDetail_Click" Margin="12,0" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding Severity}" Value="Critical">
+                                    <Setter TargetName="Bar" Property="Background" Value="{StaticResource CriticalBrush}"/>
+                                    <Setter TargetName="Mark" Property="Foreground" Value="{StaticResource CriticalBrush}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Severity}" Value="Warning">
+                                    <Setter TargetName="Bar" Property="Background" Value="{StaticResource WarningBrush}"/>
+                                    <Setter TargetName="Mark" Property="Foreground" Value="{StaticResource WarningBrush}"/>
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DockPanel>
+
         <!-- Contenu de l'onglet sélectionné -->
-        <DockPanel Grid.Column="1">
+        <DockPanel Grid.Column="1" x:Name="DetailPanel">
             <!-- En-tête de l'onglet : titre, recherche, actions -->
             <Border DockPanel.Dock="Top" Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1"
                     Padding="28,16">

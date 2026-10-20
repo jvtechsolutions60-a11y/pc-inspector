@@ -15,6 +15,32 @@ public sealed class Windows11Collector : ICollector
     public InfoSection Collect()
     {
         var section = new InfoSection(Title);
+        var (checks, allOk, unsure) = RunChecks();
+
+        var os = Wmi.Query("SELECT Caption, BuildNumber FROM Win32_OperatingSystem").FirstOrDefault();
+        var isWin11 = int.TryParse(os?.Str("BuildNumber"), out var build) && build >= 22000;
+
+        var verdict = new InfoGroup("Verdict")
+            .Add("Système actuel", os?.Str("Caption"))
+            .Add("Compatible Windows 11", allOk && !unsure ? "Oui"
+                : allOk ? "Probablement : vérifier le processeur dans la liste Microsoft"
+                : "Non : voir les points marqués ✘");
+        if (isWin11) verdict.Add("Remarque", "Windows 11 est déjà installé.");
+
+        section.Groups.Add(verdict);
+        section.Groups.Add(checks);
+        return section;
+    }
+
+    /// <summary>true si compatible, false si une exigence manque, null si le processeur n'est pas reconnu.</summary>
+    internal static bool? IsCompatible()
+    {
+        var (_, allOk, unsure) = RunChecks();
+        return !allOk ? false : unsure ? null : true;
+    }
+
+    private static (InfoGroup Checks, bool AllOk, bool Unsure) RunChecks()
+    {
         var checks = new InfoGroup("Exigences");
         bool allOk = true;
         bool unsure = false;
@@ -55,20 +81,7 @@ public sealed class Windows11Collector : ICollector
         var tpmEnabled = tpm?.Bool("IsEnabled_InitialValue") == true;
         Check("TPM 2.0", tpm is null ? false : tpmVersion == "2.0" && tpmEnabled,
             tpm is null ? "Aucun TPM détecté (ou désactivé dans le BIOS : fTPM / PTT)" : $"TPM {tpmVersion}" + (tpmEnabled ? "" : " désactivé"));
-
-        var os = Wmi.Query("SELECT Caption, BuildNumber FROM Win32_OperatingSystem").FirstOrDefault();
-        var isWin11 = int.TryParse(os?.Str("BuildNumber"), out var build) && build >= 22000;
-
-        var verdict = new InfoGroup("Verdict")
-            .Add("Système actuel", os?.Str("Caption"))
-            .Add("Compatible Windows 11", allOk && !unsure ? "Oui"
-                : allOk ? "Probablement : vérifier le processeur dans la liste Microsoft"
-                : "Non : voir les points marqués ✘");
-        if (isWin11) verdict.Add("Remarque", "Windows 11 est déjà installé.");
-
-        section.Groups.Add(verdict);
-        section.Groups.Add(checks);
-        return section;
+        return (checks, allOk, unsure);
     }
 
     /// <summary>
