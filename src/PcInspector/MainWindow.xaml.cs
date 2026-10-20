@@ -31,15 +31,19 @@ public partial class MainWindow : Window
             new MemoryCollector(),
             new GpuCollector(),
             new StorageCollector(),
+            new DiskUsageCollector(),
             new NetworkCollector(),
+            new SpeedTestCollector(),
             new TemperatureCollector(),
         }),
         ("DIAGNOSTIC", new ICollector[]
         {
             new DiagnosticCollector(),
+            new BootPerformanceCollector(),
             new BatteryCollector(),
             new Windows11Collector(),
             new SecurityCollector(),
+            new LicenseCollector(),
             new AdviceCollector(),
         }),
         ("LOGICIEL", new ICollector[]

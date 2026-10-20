@@ -11,6 +11,7 @@ Petit logiciel Windows façon Speccy : il affiche toutes les informations matér
 4. **Export** : rapport client HTML et TXT (logo, client, n° d'intervention). ✅
 5. **Logiciel** : système, logiciels installés, pilotes, services, démarrage. ✅
 6. **Bilan en 1 clic** : écran d'accueil avec une note sur 100, les points rouges en tête et l'export du rapport client. ✅
+7. **Outils inspirés de NirSoft** : licences Windows et Office, débit internet, temps de démarrage, espace disque. ✅
 
 Ergonomie : onglets classés Matériel / Diagnostic / Logiciel, recherche dans l'onglet (Ctrl+F), bouton Copier
 (texte prêt à coller dans un devis) et Actualiser (F5).
