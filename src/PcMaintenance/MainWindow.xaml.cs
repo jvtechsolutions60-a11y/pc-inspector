@@ -27,11 +27,41 @@ public partial class MainWindow : Window
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
         ComputerText.Text = Environment.MachineName;
-        ShowWindowsVersion();
-        ShowGlary();
-        _ = ShowActivationAsync();
-        _ = RefreshWindowsUpdateAsync();
-        _ = RefreshWingetAsync();
+        VersionText.Text = AppVersion();
+        Title = "PC Maintenance " + VersionText.Text;
+        _ = AnalyzeAsync();
+    }
+
+    /// <summary>« v1.0.12 · 20/10/2026 » : numéro de compilation GitHub Actions et date du .exe.</summary>
+    private static string AppVersion()
+    {
+        var assembly = typeof(MainWindow).Assembly;
+        var version = assembly.GetName().Version;
+        var built = System.IO.File.GetLastWriteTime(assembly.Location);
+        return $"v{version.Major}.{version.Minor}.{version.Build} · {built:dd/MM/yyyy}";
+    }
+
+    /// <summary>Remplit (ou rafraîchit) les cases du résumé ; le bouton reste grisé tant que tout n'est pas relu.</summary>
+    private async Task AnalyzeAsync()
+    {
+        RefreshButton.IsEnabled = false;
+        try
+        {
+            ShowWindowsVersion();
+            ShowGlary();
+            await Task.WhenAll(ShowActivationAsync(), RefreshWindowsUpdateAsync(), RefreshWingetAsync());
+        }
+        finally
+        {
+            RefreshButton.IsEnabled = !_running;
+        }
+    }
+
+    private async void RefreshButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_running) return;
+        Log("Analyse relancée.");
+        await AnalyzeAsync();
     }
 
     // ---------- Résumé rapide ----------
@@ -46,6 +76,8 @@ public partial class MainWindow : Window
 
     private async Task ShowActivationAsync()
     {
+        SetCard(ActivationValue, "…", null);
+        ActivationDetail.Text = "Lecture en cours…";
         var activation = await Activation.ReadAsync();
         var (text, brush) = activation.State switch
         {
@@ -65,8 +97,10 @@ public partial class MainWindow : Window
         _glaryFolder = Glary.FindFolder();
         var found = _glaryFolder is not null;
         InstallGlaryButton.Visibility = found ? Visibility.Collapsed : Visibility.Visible;
+        // Ne recoche l'étape que si Glary vient d'apparaître : un décochage volontaire est conservé.
+        if (!found) GlaryCheck.IsChecked = false;
+        else if (!GlaryCheck.IsEnabled) GlaryCheck.IsChecked = true;
         GlaryCheck.IsEnabled = found && !_running;
-        GlaryCheck.IsChecked = found;
         if (found)
         {
             SetCard(GlaryValue, "Installé", "OkBrush");
@@ -174,8 +208,7 @@ public partial class MainWindow : Window
             SetRunning(false);
         }
 
-        _ = RefreshWindowsUpdateAsync();
-        _ = RefreshWingetAsync();
+        _ = AnalyzeAsync();
 
         if (_rebootRequired || WindowsUpdate.IsRebootPending())
         {
@@ -298,6 +331,7 @@ public partial class MainWindow : Window
         StopButton.Content = "Arrêter après l'étape";
         GlaryCheck.IsEnabled = !running && _glaryFolder is not null;
         InstallGlaryButton.IsEnabled = !running;
+        RefreshButton.IsEnabled = !running;
         WuCheck.IsEnabled = !running;
         WingetCheck.IsEnabled = !running;
     }

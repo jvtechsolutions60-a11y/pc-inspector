@@ -13,9 +13,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Compiler PC Maintenance
-        run: dotnet build src/PcMaintenance/PcMaintenance.csproj -c Release -o publish/maintenance
+        # Le numéro de run sert de version : v1.0.N, affichée dans le logiciel.
+        run: dotnet build src/PcMaintenance/PcMaintenance.csproj -c Release -o publish/maintenance -p:Version=1.0.${{ github.run_number }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: PcMaintenance
+          name: PcMaintenance-v1.0.${{ github.run_number }}
           path: publish/maintenance/PcMaintenance.exe
