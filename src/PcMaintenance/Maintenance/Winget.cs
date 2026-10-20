@@ -59,10 +59,17 @@ internal static class Winget
     /// Met à jour tous les logiciels connus de winget, en silencieux, et recopie la sortie dans le journal.
     /// Renvoie le code de sortie de winget, ou null s'il est introuvable.
     /// </summary>
-    public static Task<int?> UpgradeAllAsync(IProgress<string> log) => Task.Run<int?>(() =>
+    // Source « winget » seulement : celle du Store demande un compte et ses propres conditions.
+    public static Task<int?> UpgradeAllAsync(IProgress<string> log) =>
+        RunAsync("upgrade --all --source winget --silent --accept-source-agreements --accept-package-agreements --disable-interactivity", log);
+
+    /// <summary>Installe un logiciel par son identifiant winget exact (ex. Glarysoft.GlaryUtilities).</summary>
+    public static Task<int?> InstallAsync(string id, IProgress<string> log) =>
+        RunAsync($"install --exact --id {id} --source winget --silent --accept-source-agreements --accept-package-agreements --disable-interactivity", log);
+
+    private static Task<int?> RunAsync(string arguments, IProgress<string> log) => Task.Run<int?>(() =>
     {
-        // Source « winget » seulement : celle du Store demande un compte et ses propres conditions.
-        using var process = Start("upgrade --all --source winget --silent --accept-source-agreements --accept-package-agreements --disable-interactivity");
+        using var process = Start(arguments);
         if (process is null)
         {
             log.Report(Missing);

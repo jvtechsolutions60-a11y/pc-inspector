@@ -58,20 +58,48 @@ public partial class MainWindow : Window
         ActivationDetail.Text = activation.Text;
     }
 
+    private const string GlaryWingetId = "Glarysoft.GlaryUtilities";
+
     private void ShowGlary()
     {
         _glaryFolder = Glary.FindFolder();
-        if (_glaryFolder is not null)
+        var found = _glaryFolder is not null;
+        InstallGlaryButton.Visibility = found ? Visibility.Collapsed : Visibility.Visible;
+        GlaryCheck.IsEnabled = found && !_running;
+        GlaryCheck.IsChecked = found;
+        if (found)
         {
             SetCard(GlaryValue, "Installé", "OkBrush");
             GlaryDetail.Text = _glaryFolder;
+            GlaryStatus.Text = "La suite démarre quand la fenêtre de Glary est fermée.";
             return;
         }
         SetCard(GlaryValue, "Absent", "WarnBrush");
         GlaryDetail.Text = "Non installé sur ce PC.";
-        GlaryCheck.IsChecked = false;
-        GlaryCheck.IsEnabled = false;
-        GlaryStatus.Text = "Glary Utilities n'est pas installé : étape ignorée.";
+        GlaryStatus.Text = $"Glary Utilities n'est pas installé : étape ignorée. Pour l'installer : winget install -e --id {GlaryWingetId}";
+    }
+
+    private async void InstallGlary_Click(object sender, RoutedEventArgs e)
+    {
+        if (_running) return;
+        SetRunning(true);
+        GlaryStatus.Text = "Installation de Glary Utilities en cours (voir le journal)…";
+        Log($"--- Installation de Glary Utilities : winget install -e --id {GlaryWingetId} ---");
+        try
+        {
+            var code = await Winget.InstallAsync(GlaryWingetId, new Progress<string>(Log));
+            Log(code switch
+            {
+                null => "winget n'est pas installé sur ce PC.",
+                0 => "Glary Utilities : installé.",
+                var other => $"Glary Utilities : échec de l'installation (code 0x{other:X8}).",
+            });
+        }
+        finally
+        {
+            SetRunning(false);
+            ShowGlary();
+        }
     }
 
     private async Task RefreshWindowsUpdateAsync()
@@ -269,6 +297,7 @@ public partial class MainWindow : Window
         StopButton.IsEnabled = running;
         StopButton.Content = "Arrêter après l'étape";
         GlaryCheck.IsEnabled = !running && _glaryFolder is not null;
+        InstallGlaryButton.IsEnabled = !running;
         WuCheck.IsEnabled = !running;
         WingetCheck.IsEnabled = !running;
     }
