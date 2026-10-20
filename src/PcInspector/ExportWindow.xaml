@@ -18,9 +18,11 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Grid.ColumnSpan="3" Text="Société, technicien et logo sont mémorisés pour les prochains rapports."
+        <TextBlock Grid.Row="0" Grid.ColumnSpan="3" x:Name="IntroText"
+                   Text="Société, technicien, contact et logo sont mémorisés. Le rapport est proposé dans le dossier du client."
                    Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,0,0,12"/>
 
         <TextBlock Grid.Row="1" Text="Société" VerticalAlignment="Center"/>
@@ -29,21 +31,25 @@
         <TextBlock Grid.Row="2" Text="Technicien" VerticalAlignment="Center"/>
         <TextBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" x:Name="TechnicianBox" Margin="0,4" Padding="3"/>
 
-        <TextBlock Grid.Row="3" Text="Logo" VerticalAlignment="Center"/>
-        <TextBox Grid.Row="3" Grid.Column="1" x:Name="LogoBox" Margin="0,4" Padding="3" IsReadOnly="True"/>
-        <Button Grid.Row="3" Grid.Column="2" Content="Parcourir…" Margin="6,4,0,4" Padding="8,2" Click="BrowseLogo_Click"/>
+        <TextBlock Grid.Row="3" Text="Contact" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" x:Name="ContactBox" Margin="0,4" Padding="3"
+                 ToolTip="Téléphone, e-mail ou site : repris sur le rapport et l'étiquette"/>
 
-        <TextBlock Grid.Row="4" Text="Client" VerticalAlignment="Center"/>
-        <TextBox Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" x:Name="ClientBox" Margin="0,4" Padding="3"/>
+        <TextBlock Grid.Row="4" Text="Logo" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="4" Grid.Column="1" x:Name="LogoBox" Margin="0,4" Padding="3" IsReadOnly="True"/>
+        <Button Grid.Row="4" Grid.Column="2" Content="Parcourir…" Margin="6,4,0,4" Padding="8,2" Click="BrowseLogo_Click"/>
 
-        <TextBlock Grid.Row="5" Text="N° d'intervention" VerticalAlignment="Center"/>
-        <TextBox Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2" x:Name="JobBox" Margin="0,4" Padding="3"/>
+        <TextBlock Grid.Row="5" Text="Client" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2" x:Name="ClientBox" Margin="0,4" Padding="3"/>
 
-        <TextBlock Grid.Row="6" Text="Notes" Margin="0,8,0,0"/>
-        <TextBox Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2" x:Name="NotesBox" Margin="0,4" Padding="3"
+        <TextBlock Grid.Row="6" Text="N° d'intervention" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2" x:Name="JobBox" Margin="0,4" Padding="3"/>
+
+        <TextBlock Grid.Row="7" Text="Notes" Margin="0,8,0,0"/>
+        <TextBox Grid.Row="7" Grid.Column="1" Grid.ColumnSpan="2" x:Name="NotesBox" Margin="0,4" Padding="3"
                  Height="80" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
 
-        <StackPanel Grid.Row="7" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+        <StackPanel Grid.Row="8" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
             <Button Content="Annuler" IsCancel="True" Padding="14,4" Margin="0,0,8,0"/>
             <Button Content="Exporter…" IsDefault="True" Padding="14,4" Click="Export_Click"/>
         </StackPanel>

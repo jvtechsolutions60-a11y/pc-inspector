@@ -16,6 +16,11 @@ public static class ClientGuide
 {
     public static void Write(string path, ReportInfo info, IReadOnlyList<SecurityCheck> checks)
     {
+        if (Path.GetExtension(path).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            PdfPrinter.FromHtml(Html(info, checks), path);
+            return;
+        }
         var content = Path.GetExtension(path).Equals(".txt", StringComparison.OrdinalIgnoreCase)
             ? Text(info, checks)
             : Html(info, checks);

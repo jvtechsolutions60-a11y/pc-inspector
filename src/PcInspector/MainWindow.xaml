@@ -21,6 +21,13 @@
                 <TextBlock Text="PC INSPECTOR" Foreground="White" FontSize="18" FontWeight="Bold"/>
                 <TextBlock Text="Analyse complète du PC" Foreground="#93C5FD" FontSize="12" Margin="0,2,0,0"/>
                 <TextBlock x:Name="VersionText" Foreground="#64748B" FontSize="11" Margin="0,2,0,0"/>
+                <TextBlock x:Name="UpdateNotice" Margin="0,6,0,0" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed">
+                    <Hyperlink x:Name="UpdateLink" Foreground="#FBBF24" Click="UpdateLink_Click">
+                        <Run x:Name="UpdateText"/>
+                    </Hyperlink>
+                </TextBlock>
+                <TextBlock x:Name="PortableText" Text="Mode clé USB : rien n'est enregistré sur ce PC" Foreground="#93C5FD"
+                           FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
             </StackPanel>
             <Button DockPanel.Dock="Bottom" x:Name="ExportButton" Style="{StaticResource PrimaryButton}"
                     Content="Exporter le rapport" Margin="16" Click="ExportButton_Click"

@@ -16,6 +16,9 @@ public partial class ExportWindow : Window
         var defaults = ReportInfo.LoadDefaults();
         CompanyBox.Text = defaults.Company;
         TechnicianBox.Text = defaults.Technician;
+        ContactBox.Text = defaults.Contact;
+        ClientBox.Text = defaults.Client;
+        JobBox.Text = defaults.JobNumber;
         LogoBox.Text = defaults.LogoPath;
         Loaded += (_, _) => ClientBox.Focus();
     }
@@ -25,6 +28,9 @@ public partial class ExportWindow : Window
     /// <summary>Début du nom de fichier proposé (« Rapport » par défaut).</summary>
     public string FilePrefix { get; set; } = "Rapport";
     public string? FilePath { get; private set; }
+
+    /// <summary>Types de fichier proposés ; le premier est choisi par défaut.</summary>
+    public string Filter { get; set; } = "Page web (*.html)|*.html|PDF (*.pdf)|*.pdf|Texte (*.txt)|*.txt";
 
     private void BrowseLogo_Click(object sender, RoutedEventArgs e)
     {
@@ -42,6 +48,7 @@ public partial class ExportWindow : Window
         {
             Company = CompanyBox.Text.Trim(),
             Technician = TechnicianBox.Text.Trim(),
+            Contact = ContactBox.Text.Trim(),
             LogoPath = LogoBox.Text.Trim(),
             Client = ClientBox.Text.Trim(),
             JobNumber = JobBox.Text.Trim(),
@@ -52,9 +59,10 @@ public partial class ExportWindow : Window
         var dialog = new SaveFileDialog
         {
             Title = "Enregistrer le rapport",
-            Filter = "Page web (*.html)|*.html|Texte (*.txt)|*.txt",
+            Filter = Filter,
             FileName = DefaultFileName(info),
-            InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            // Dossier client commun aux trois logiciels : Rapports\Client\date (sur la clé en mode clé USB).
+            InitialDirectory = AppPaths.ClientFolder(info.Client, info.Date),
         };
         if (dialog.ShowDialog(this) != true) return;
 

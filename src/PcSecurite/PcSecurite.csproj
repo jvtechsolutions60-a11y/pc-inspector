@@ -28,6 +28,8 @@
     <Compile Include="..\PcInspector\Models\InfoSection.cs" Link="Shared\InfoSection.cs" />
     <Compile Include="..\PcInspector\Report\ReportInfo.cs" Link="Shared\ReportInfo.cs" />
     <Compile Include="..\PcInspector\Report\ReportWriter.cs" Link="Shared\ReportWriter.cs" />
+    <Compile Include="..\PcInspector\Report\PdfPrinter.cs" Link="Shared\PdfPrinter.cs" />
+    <Compile Include="..\PcInspector\Updater.cs" Link="Shared\Updater.cs" />
     <Page Include="..\PcInspector\ExportWindow.xaml" Link="ExportWindow.xaml" />
     <Compile Include="..\PcInspector\ExportWindow.xaml.cs" Link="ExportWindow.xaml.cs" DependentUpon="ExportWindow.xaml" />
   </ItemGroup>

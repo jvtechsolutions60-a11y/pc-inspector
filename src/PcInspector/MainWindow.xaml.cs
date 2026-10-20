@@ -19,6 +19,7 @@ namespace PcInspector;
 public partial class MainWindow : Window
 {
     private readonly HealthCollector _health = new();
+    private string _updateUrl = Updater.ReleasesPage;
 
     // Les icônes viennent de la police Segoe MDL2 Assets, présente sur Windows 10 et 11.
     private static IEnumerable<SidebarItem> Tabs() => new (string Category, ICollector[] Collectors)[]
@@ -74,6 +75,14 @@ public partial class MainWindow : Window
         InitializeComponent();
         VersionText.Text = App.Version;
         Title = "PC Inspector " + App.Version;
+        PortableText.Visibility = AppPaths.IsPortable ? Visibility.Visible : Visibility.Collapsed;
+        Loaded += async (_, _) =>
+        {
+            if (await Updater.CheckAsync() is not { } update) return;
+            _updateUrl = update.Url;
+            UpdateText.Text = $"Nouvelle version {update.Tag} : télécharger";
+            UpdateNotice.Visibility = Visibility.Visible;
+        };
         var items = new List<SidebarItem> { new(_health, "ACCUEIL") };
         items.AddRange(Tabs());
         _collectors = items.Select(i => i.Collector).ToList();
@@ -289,6 +298,9 @@ public partial class MainWindow : Window
             return new InfoSection(collector.Title) { Error = $"Impossible de lire ces informations : {ex.Message}" };
         }
     }
+
+    private void UpdateLink_Click(object sender, RoutedEventArgs e) =>
+        Process.Start(new ProcessStartInfo(_updateUrl) { UseShellExecute = true });
 
     private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
     {

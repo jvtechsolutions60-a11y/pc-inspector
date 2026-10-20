@@ -13,7 +13,13 @@ public static class ReportWriter
 {
     public static void Write(string path, ReportInfo info, IReadOnlyList<InfoSection> sections)
     {
-        var content = Path.GetExtension(path).Equals(".txt", StringComparison.OrdinalIgnoreCase)
+        var extension = Path.GetExtension(path);
+        if (extension.Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            PdfPrinter.FromHtml(Html(info, sections), path);
+            return;
+        }
+        var content = extension.Equals(".txt", StringComparison.OrdinalIgnoreCase)
             ? Text(info, sections)
             : Html(info, sections);
         File.WriteAllText(path, content, new UTF8Encoding(true));
@@ -28,6 +34,7 @@ public static class ReportWriter
         AppendTextLine(sb, "Client", info.Client);
         AppendTextLine(sb, "Intervention n°", info.JobNumber);
         AppendTextLine(sb, "Technicien", info.Technician);
+        AppendTextLine(sb, "Contact", info.Contact);
         if (!string.IsNullOrWhiteSpace(info.Notes)) sb.AppendLine().AppendLine("Notes :").AppendLine(info.Notes.Trim());
 
         foreach (var section in sections)
@@ -73,6 +80,7 @@ public static class ReportWriter
         Meta("Client", info.Client);
         Meta("Intervention n°", info.JobNumber);
         Meta("Technicien", info.Technician);
+        Meta("Contact", info.Contact);
         sb.AppendLine("</table></header>");
 
         if (!string.IsNullOrWhiteSpace(info.Notes))
