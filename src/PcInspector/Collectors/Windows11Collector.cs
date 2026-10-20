@@ -15,6 +15,32 @@ public sealed class Windows11Collector : ICollector
     public InfoSection Collect()
     {
         var section = new InfoSection(Title);
+        var (checks, allOk, unsure) = RunChecks();
+
+        var os = Wmi.Query("SELECT Caption, BuildNumber FROM Win32_OperatingSystem").FirstOrDefault();
+        var isWin11 = int.TryParse(os?.Str("BuildNumber"), out var build) && build >= 22000;
+
+        var verdict = new InfoGroup("Verdict")
+            .Add("Système actuel", os?.Str("Caption"))
+            .Add("Compatible Windows 11", allOk && !unsure ? "Oui"
+                : allOk ? "Probablement : vérifier le processeur dans la liste Microsoft"
+                : "Non : voir les points marqués ✘");
+        if (isWin11) verdict.Add("Remarque", "Windows 11 est déjà installé.");
+
+        section.Groups.Add(verdict);
+        section.Groups.Add(checks);
+        return section;
+    }
+
+    /// <summary>true si compatible, false si une exigence manque, null si le processeur n'est pas reconnu.</summary>
+    internal static bool? IsCompatible()
+    {
+        var (_, allOk, unsure) = RunChecks();
+        return !allOk ? false : unsure ? null : true;
+    }
+
+    private static (InfoGroup Checks, bool AllOk, bool Unsure) RunChecks()
+    {
         var checks = new InfoGroup("Exigences");
         bool allOk = true;
         bool unsure = false;
@@ -55,20 +81,7 @@ public sealed class Windows11Collector : ICollector
         var tpmEnabled = tpm?.Bool("IsEnabled_InitialValue") == true;
         Check("TPM 2.0", tpm is null ? false : tpmVersion == "2.0" && tpmEnabled,
             tpm is null ? "Aucun TPM détecté (ou désactivé dans le BIOS : fTPM / PTT)" : $"TPM {tpmVersion}" + (tpmEnabled ? "" : " désactivé"));
-
-        var os = Wmi.Query("SELECT Caption, BuildNumber FROM Win32_OperatingSystem").FirstOrDefault();
-        var isWin11 = int.TryParse(os?.Str("BuildNumber"), out var build) && build >= 22000;
-
-        var verdict = new InfoGroup("Verdict")
-            .Add("Système actuel", os?.Str("Caption"))
-            .Add("Compatible Windows 11", allOk && !unsure ? "Oui"
-                : allOk ? "Probablement : vérifier le processeur dans la liste Microsoft"
-                : "Non : voir les points marqués ✘");
-        if (isWin11) verdict.Add("Remarque", "Windows 11 est déjà installé.");
-
-        section.Groups.Add(verdict);
-        section.Groups.Add(checks);
-        return section;
+        return (checks, allOk, unsure);
     }
 
     /// <summary>
@@ -79,11 +92,22 @@ public sealed class Windows11Collector : ICollector
     {
         if (Regex.IsMatch(name, @"Core\(TM\) Ultra|Core Ultra|Intel\(R\) Core\(TM\) [3579] ", RegexOptions.IgnoreCase)) return true;
 
+        // Depuis la 11e génération, Intel écrit la génération en toutes lettres : « 12th Gen Intel(R) Core(TM) i7-1260P ».
+        var gen = Regex.Match(name, @"\b(\d{1,2})(?:st|nd|rd|th) Gen\b", RegexOptions.IgnoreCase);
+        if (gen.Success) return int.Parse(gen.Groups[1].Value) >= 8;
+        // Alder Lake-N (N100, N200, i3-N305…), sortis avec la 12e génération.
+        if (Regex.IsMatch(name, @"\b(?:i3-)?N[123]\d{2}\b|Processor N\d{2,3}\b", RegexOptions.IgnoreCase)) return true;
+
         var intel = Regex.Match(name, @"\bi[3579]-(\d{4,5})", RegexOptions.IgnoreCase);
         if (intel.Success)
         {
             var digits = intel.Groups[1].Value;
-            var generation = digits.Length == 5 ? int.Parse(digits.Substring(0, 2)) : int.Parse(digits.Substring(0, 1));
+            // 5 chiffres : génération sur 2 chiffres (i7-10700, i5-12400).
+            // 4 chiffres commençant par 1 : portables 10e à 14e génération (i7-1065G7, i5-1135G7, i7-1260P, i5-1335U).
+            // Sinon le premier chiffre est la génération (i7-8550U, i5-9400).
+            var generation = digits.Length == 5 || digits[0] == '1'
+                ? int.Parse(digits.Substring(0, 2))
+                : int.Parse(digits.Substring(0, 1));
             return generation >= 8;
         }
 

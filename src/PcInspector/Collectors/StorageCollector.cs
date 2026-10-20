@@ -18,6 +18,9 @@ public sealed class StorageCollector : ICollector
             .GroupBy(r => r.Str("DeviceId")!)
             .ToDictionary(g => g.Key, g => g.First());
 
+        // Compteurs qui annoncent une panne (secteurs défectueux, journal NVMe), jugés en vert/orange/rouge.
+        var smart = DiskHealth.ReadAll();
+
         var disks = Wmi.QueryOptional("SELECT * FROM MSFT_PhysicalDisk", Wmi.StorageScope);
         foreach (var disk in disks.OrderBy(d => d.ULong("DeviceId")))
         {
@@ -40,6 +43,9 @@ public sealed class StorageCollector : ICollector
                      .Add("Erreurs d'écriture", counters.Str("WriteErrorsTotal"));
             }
 
+            if (disk.Str("DeviceId") is { } number && smart.TryGetValue(number, out var health))
+                AddHealth(group, health);
+
             section.Groups.Add(group);
         }
 
@@ -48,12 +54,15 @@ public sealed class StorageCollector : ICollector
         {
             foreach (var disk in Wmi.Query("SELECT * FROM Win32_DiskDrive"))
             {
-                section.Groups.Add(new InfoGroup(disk.Str("Model") ?? "Disque")
+                var group = new InfoGroup(disk.Str("Model") ?? "Disque")
                     .Add("Interface", disk.Str("InterfaceType"))
                     .Add("Capacité", Wmi.FormatBytes(disk.ULong("Size")))
                     .Add("État", disk.Str("Status"))
                     .Add("Numéro de série", disk.Str("SerialNumber"))
-                    .Add("Firmware", disk.Str("FirmwareRevision")));
+                    .Add("Firmware", disk.Str("FirmwareRevision"));
+                if (disk.Str("Index") is { } index && smart.TryGetValue(index, out var health))
+                    AddHealth(group, health);
+                section.Groups.Add(group);
             }
         }
 
@@ -70,6 +79,17 @@ public sealed class StorageCollector : ICollector
         if (volumes.Items.Count > 0) section.Groups.Add(volumes);
 
         return section;
+    }
+
+    /// <summary>Ajoute les compteurs SMART sans répéter ceux que Windows donne déjà (heures, température).</summary>
+    private static void AddHealth(InfoGroup group, DiskHealthResult health)
+    {
+        foreach (var (label, value) in health.Lines)
+        {
+            if (group.Items.Any(i => i.Label == label && i.Value != "—")) continue;
+            group.Items.RemoveAll(i => i.Label == label);
+            group.Add(label, value);
+        }
     }
 
     private static string? MediaType(ulong? media, ulong? bus) => (media, bus) switch

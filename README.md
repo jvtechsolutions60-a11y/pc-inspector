@@ -10,10 +10,53 @@ Petit logiciel Windows façon Speccy : il affiche toutes les informations matér
 3. **Diagnostic métier** : périphériques en erreur, plantages, batterie, compatibilité Windows 11, licence et sécurité, conseils d'upgrade, lien garantie. ✅
 4. **Export** : rapport client HTML et TXT (logo, client, n° d'intervention). ✅
 5. **Logiciel** : système, logiciels installés, pilotes, services, démarrage. ✅
+6. **Bilan en 1 clic** : écran d'accueil avec une note sur 100, les points rouges en tête et l'export du rapport client. ✅
+7. **Outils inspirés de NirSoft** : licences Windows et Office, débit internet, temps de démarrage, espace disque. ✅
+8. **Santé des disques façon Scrutiny** : secteurs réalloués, en attente et irrécupérables, erreurs CRC et alerte SMART
+   des disques SATA ; alerte critique, réserve, vie consommée et erreurs média des SSD NVMe. Chaque compteur est
+   noté vert, orange ou rouge avec des seuils inspirés des statistiques de pannes Backblaze, et les problèmes
+   remontent dans le bilan et le rapport client. Lecture seule. ✅
+9. **Mises à jour des logiciels (winget)** : onglet qui liste les logiciels ayant une version plus récente
+   (version installée et version disponible), lu avec `winget upgrade` sans argument, ce qui n'installe rien.
+   Le bilan et le rapport client le reprennent, avec la commande `winget upgrade --all` en conseil.
+   Si winget est absent, l'onglet l'indique avec le lien du Microsoft Store. ✅
+
+Ergonomie : onglets classés Matériel / Diagnostic / Logiciel, recherche dans l'onglet (Ctrl+F), bouton Copier
+(texte prêt à coller dans un devis) et Actualiser (F5).
+
+## PC Sécurité
+
+Deuxième petit logiciel, dans `src/PcSecurite` : un seul écran qui contrôle la sécurité du PC avec un feu
+vert, orange ou rouge par point et une note sur 100. Il vérifie la version de Windows (fin de support),
+l'antivirus, le pare-feu, les mises à jour, l'activation, l'UAC, SmartScreen, BitLocker, Secure Boot, le TPM,
+SMB1, le Bureau à distance, les comptes (Invité, sans mot de passe) et la connexion automatique.
+
+Veille d'octobre 2026, ajoutée ensuite : protections de Microsoft Defender (temps réel, falsification,
+exclusions suspectes), intégrité de la mémoire, protection LSA, blocage des pilotes vulnérables, WDigest,
+certificats Secure Boot 2023 (ceux de 2011 ont expiré en juin 2026), âge du BIOS, PowerShell 2.0, logiciels de
+prise en main à distance (arnaques au faux support), fichier hosts et proxy, Wi-Fi ouverts enregistrés,
+navigateurs pas à jour, logiciels avec failles exploitées (WinRAR, 7-Zip, Notepad++, PuTTY, VLC) et logiciels
+abandonnés (Flash, Java 6/7, vieux Acrobat, Office 2016, 2019 et 2021…).
+
+Les résultats sont triés : d'abord les **corrections à faire** (réglages, mises à jour), puis ce qu'il faut
+**changer ou remplacer** (Windows plus supporté, logiciel abandonné, vieux TPM), puis les points en ordre. La note est aussi donnée en classe de A à E, façon Nutri-Score.
+Chaque point rouge ou orange a un tutoriel « Comment faire ? » pas à pas, avec un bouton qui ouvre le bon réglage
+de Windows. Les tutoriels sont aussi repris dans le rapport client.
+
+- **Mode guidé** : passe les points à corriger un par un. Le technicien corrige lui-même, puis « Vérifier » refait
+  seulement ce contrôle. Le rapport indique la note avant/après et ce qui a été corrigé pendant l'intervention.
+- **Fiche conseils client** : un guide simple (HTML ou texte) des points restants, avec le pas à pas quand le client
+  peut le faire, ou « à confier à votre technicien » pour le BIOS, le registre, etc.
+
+PC Sécurité ne fait que lire et conseiller : il ne modifie jamais le PC. Les boutons « Ouvrir… » affichent seulement
+la page de réglages de Windows.
+Il ne modifie rien sur le PC. Le bouton « Exporter le rapport » produit le même rapport client que PC Inspector.
+
+Il partage le code WMI, le rapport et la fenêtre d'export avec PC Inspector (fichiers liés dans le `.csproj`).
 
 ## Obtenir l'exécutable
 
-- **Sans rien installer** : chaque push sur GitHub lance l'action *Build*, qui produit `PcInspector.exe`
+- **Sans rien installer** : chaque push sur GitHub lance l'action *Build*, qui produit `PcInspector.exe` et `PcSecurite.exe`
   dans les artefacts du run (onglet *Actions* du dépôt).
 - **Sur un PC Windows avec le SDK .NET** (ou Visual Studio) :
 
@@ -32,3 +75,17 @@ et certaines sondes de température.
 - `src/PcInspector/Collectors/` : un collecteur par onglet, qui lit les infos (principalement via WMI).
 - `src/PcInspector/Models/` : le format commun des infos (sections, groupes, lignes), réutilisé par l'export.
 - `src/PcInspector/MainWindow.xaml` : la fenêtre (barre latérale + contenu de l'onglet).
+
+## PC Maintenance
+
+Troisième logiciel, `src/PcMaintenance/`, qui **agit** sur le PC (contrairement à PC Inspector et PC Sécurité,
+qui ne font que des constats et des conseils). Il enchaîne, étape par étape :
+
+1. la **maintenance 1 clic de Glary Utilities**, si Glary est installé (la suite démarre quand sa fenêtre est fermée) ;
+2. la **recherche et l'installation des mises à jour Windows** (agent Windows Update, une par une, sans redémarrer) ;
+3. **`winget upgrade --all`** en silencieux (source winget).
+
+En haut, un résumé rapide : Windows 11 oui ou non, activation de Windows (résultat de `slmgr /xpr`), mises à jour Windows en attente, logiciels à mettre à jour,
+Glary installé ou non. Chaque étape peut être décochée, et un journal garde la trace de tout ce qui a été fait.
+
+L'action *Build PC Maintenance* produit `PcMaintenance.exe` dans les artefacts du run.

@@ -39,7 +39,7 @@ public static class ReportWriter
                 sb.AppendLine().AppendLine("  " + group.Title);
                 var width = group.Items.Count == 0 ? 0 : group.Items.Max(i => i.Label.Length);
                 foreach (var item in group.Items)
-                    sb.AppendLine($"    {item.Label.PadRight(width)}  {item.Value}" + (item.Url is null ? "" : $" ({item.Url})"));
+                    sb.AppendLine($"    {item.Label.PadRight(width)}  {item.Value.Replace("\n", "\n      " + new string(' ', width))}" + (item.Url is null ? "" : $" ({item.Url})"));
             }
         }
         return sb.ToString();
@@ -87,20 +87,27 @@ public static class ReportWriter
                 sb.AppendLine($"<div class=\"group\"><h3>{E(group.Title)}</h3><table>");
                 foreach (var item in group.Items)
                 {
-                    var value = item.Url is null ? E(item.Value) : $"<a href=\"{E(item.Url)}\">{E(item.Value)}</a>";
-                    sb.AppendLine($"<tr><th>{E(item.Label)}</th><td>{value}</td></tr>");
+                    var value = item.Url is null ? E(item.Value).Replace("\n", "<br>") : $"<a href=\"{E(item.Url)}\">{E(item.Value)}</a>";
+                    sb.AppendLine($"<tr><th>{E(item.Label)}</th><td{StatusClass(item.Value)}>{value}</td></tr>");
                 }
                 sb.AppendLine("</table></div>");
             }
             sb.AppendLine("</section>");
         }
 
-        sb.AppendLine($"<footer>Généré par PC Inspector le {info.Date:dd/MM/yyyy à HH:mm}</footer>");
+        sb.AppendLine($"<footer>Généré par {E(AppInfo.Product)} {AppInfo.Version} le {info.Date:dd/MM/yyyy à HH:mm}</footer>");
         sb.AppendLine("</body></html>");
         return sb.ToString();
     }
 
-    private static string? LogoDataUri(string path)
+    /// <summary>Colore les résultats du bilan et des vérifications (✘ rouge, ! orange, ✔ vert).</summary>
+    private static string StatusClass(string value) =>
+        value.StartsWith("✘ ", StringComparison.Ordinal) ? " class=\"bad\""
+        : value.StartsWith("! ", StringComparison.Ordinal) ? " class=\"warn\""
+        : value.StartsWith("✔ ", StringComparison.Ordinal) ? " class=\"ok\""
+        : "";
+
+    internal static string? LogoDataUri(string path)
     {
         try
         {
@@ -136,6 +143,9 @@ h3{font-size:14px;margin:14px 0 6px}
 .group tr+tr th,.group tr+tr td{border-top:1px solid #f3f4f6}
 .notes p{background:#f5f6f8;padding:12px;border-radius:6px}
 .error{color:#b91c1c}
+td.bad{color:#b91c1c;font-weight:600}
+td.warn{color:#b45309}
+td.ok{color:#15803d}
 footer{margin-top:40px;color:#9ca3af;font-size:12px;text-align:center}
 section,.group{break-inside:avoid-page}
 @media print{body{margin:0}a{color:inherit;text-decoration:none}}
