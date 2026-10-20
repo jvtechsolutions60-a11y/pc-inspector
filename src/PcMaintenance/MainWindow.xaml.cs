@@ -202,7 +202,7 @@ public partial class MainWindow : Window
     private void SetCard(TextBlock value, string text, string? brush)
     {
         value.Text = text;
-        value.Foreground = (Brush)FindResource(brush ?? "TextBrush") : (Brush)FindResource(brush);
+        value.Foreground = (Brush)FindResource(brush ?? "TextBrush");
     }
 
     // ---------- Maintenance ----------
