@@ -22,6 +22,7 @@
   <!-- Code partagé avec PC Inspector : version, dossiers (mode clé USB), mises à jour, rapport client et fenêtre d'export -->
   <ItemGroup>
     <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
+    <Page Include="..\PcInspector\Theme.xaml" Link="Theme.xaml" />
     <Compile Include="..\PcInspector\AppInfo.cs" Link="Shared\AppInfo.cs" />
     <Compile Include="..\PcInspector\Updater.cs" Link="Shared\Updater.cs" />
     <Compile Include="..\PcInspector\Models\InfoSection.cs" Link="Shared\InfoSection.cs" />

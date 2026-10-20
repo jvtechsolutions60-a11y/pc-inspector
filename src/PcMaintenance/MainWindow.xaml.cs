@@ -90,7 +90,7 @@ public partial class MainWindow : Window
     private void ShowWindowsVersion()
     {
         var version = WindowsVersion.Read();
-        SetCard(Win11Value, version.IsWindows11 ? "Oui" : "Non", version.IsWindows11 ? "OkBrush" : "WarnBrush");
+        SetCard(Win11Value, version.IsWindows11 ? "Oui" : "Non", version.IsWindows11 ? "OkBrush" : "WarningBrush");
         Win11Detail.Text = $"{version.Name} {version.DisplayVersion} (build {version.Build})".Replace("  ", " ")
             + (version.IsWindows11 ? "" : "\nCompatibilité : voir PC Inspector, onglet Windows 11.");
     }
@@ -103,9 +103,9 @@ public partial class MainWindow : Window
         var (text, brush) = activation.State switch
         {
             ActivationState.Permanent => ("Permanente", "OkBrush"),
-            ActivationState.Expires => ("Temporaire", "WarnBrush"),
-            ActivationState.NotActivated => ("Non activé", "BadBrush"),
-            _ => ("?", "BadBrush"),
+            ActivationState.Expires => ("Temporaire", "WarningBrush"),
+            ActivationState.NotActivated => ("Non activé", "DangerBrush"),
+            _ => ("?", "DangerBrush"),
         };
         SetCard(ActivationValue, text, brush);
         ActivationDetail.Text = activation.Text;
@@ -129,7 +129,7 @@ public partial class MainWindow : Window
             GlaryStatus.Text = "La suite démarre quand la fenêtre de Glary est fermée.";
             return;
         }
-        SetCard(GlaryValue, "Absent", "WarnBrush");
+        SetCard(GlaryValue, "Absent", "WarningBrush");
         GlaryDetail.Text = "Non installé sur ce PC.";
         GlaryStatus.Text = $"Glary Utilities n'est pas installé : étape ignorée. Pour l'installer : winget install -e --id {GlaryWingetId}";
     }
@@ -166,7 +166,7 @@ public partial class MainWindow : Window
             var updates = await Task.Run(() => WindowsUpdate.Create().Search());
             var reboot = WindowsUpdate.IsRebootPending();
             SetCard(WuValue, updates.Count == 0 ? "À jour" : $"{updates.Count} en attente",
-                updates.Count == 0 && !reboot ? "OkBrush" : "WarnBrush");
+                updates.Count == 0 && !reboot ? "OkBrush" : "WarningBrush");
             var titles = updates.Take(3).Select(u => "• " + u.Title).ToList();
             if (updates.Count > 3) titles.Add($"… et {updates.Count - 3} autre(s)");
             if (reboot) titles.Insert(0, "Redémarrage en attente pour finir une installation.");
@@ -175,7 +175,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex) when (WindowsUpdate.IsExpected(ex))
         {
-            SetCard(WuValue, "?", "BadBrush");
+            SetCard(WuValue, "?", "DangerBrush");
             WuDetail.Text = "Recherche impossible : " + WindowsUpdate.Describe(ex);
         }
     }
@@ -187,12 +187,12 @@ public partial class MainWindow : Window
         var result = await Winget.ListAsync();
         if (result.Updates is not { } updates)
         {
-            SetCard(WingetValue, "?", "BadBrush");
+            SetCard(WingetValue, "?", "DangerBrush");
             WingetDetail.Text = result.Error;
             return;
         }
         _wingetUpdates = updates;
-        SetCard(WingetValue, updates.Count == 0 ? "À jour" : $"{updates.Count} à mettre à jour", updates.Count == 0 ? "OkBrush" : "WarnBrush");
+        SetCard(WingetValue, updates.Count == 0 ? "À jour" : $"{updates.Count} à mettre à jour", updates.Count == 0 ? "OkBrush" : "WarningBrush");
         var names = updates.Take(3).Select(u => $"• {u.Name} {u.Installed} → {u.Available}").ToList();
         if (updates.Count > 3) names.Add($"… et {updates.Count - 3} autre(s)");
         WingetDetail.Text = names.Count == 0 ? "Tous les logiciels connus de winget sont à jour." : string.Join("\n", names);
@@ -202,7 +202,7 @@ public partial class MainWindow : Window
     private void SetCard(TextBlock value, string text, string? brush)
     {
         value.Text = text;
-        value.Foreground = brush is null ? Brushes.Black : (Brush)FindResource(brush);
+        value.Foreground = (Brush)FindResource(brush ?? "TextBrush") : (Brush)FindResource(brush);
     }
 
     // ---------- Maintenance ----------

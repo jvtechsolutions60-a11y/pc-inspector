@@ -26,10 +26,11 @@
         </Style>
     </Window.Resources>
     <DockPanel>
-        <Border DockPanel.Dock="Top" Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="24,14">
+        <Border DockPanel.Dock="Top" Background="{StaticResource HeaderBrush}" Padding="24,16">
             <StackPanel>
-                <TextBlock Text="Test des périphériques" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
-                <TextBlock Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,2,0,0"
+                <TextBlock Text="PC INSPECTOR · OUTILS" Style="{StaticResource AppSubtitle}" FontWeight="SemiBold" Margin="0"/>
+                <TextBlock Text="Test des périphériques" Foreground="White" FontSize="18" FontWeight="SemiBold" Margin="0,2,0,0"/>
+                <TextBlock Foreground="{StaticResource HeaderMutedBrush}" TextWrapping="Wrap" Margin="0,4,0,0"
                            Text="Écran, clavier, haut-parleurs, micro et webcam, à faire avec le client. Rien n'est modifié sur le PC."/>
             </StackPanel>
         </Border>

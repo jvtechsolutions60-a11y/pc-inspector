@@ -5,10 +5,11 @@
         WindowStartupLocation="CenterOwner" Background="{StaticResource ContentBrush}" FontFamily="Segoe UI"
         Loaded="Window_Loaded" Closed="Window_Closed">
     <DockPanel>
-        <Border DockPanel.Dock="Top" Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="24,14">
+        <Border DockPanel.Dock="Top" Background="{StaticResource HeaderBrush}" Padding="24,16">
             <StackPanel>
-                <TextBlock Text="Suivi en direct" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
-                <TextBlock Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,2,0,0"
+                <TextBlock Text="PC INSPECTOR · OUTILS" Style="{StaticResource AppSubtitle}" FontWeight="SemiBold" Margin="0"/>
+                <TextBlock Text="Suivi en direct" Foreground="White" FontSize="18" FontWeight="SemiBold" Margin="0,2,0,0"/>
+                <TextBlock Foreground="{StaticResource HeaderMutedBrush}" TextWrapping="Wrap" Margin="0,4,0,0"
                            Text="Charge et températures toutes les 2 secondes, sur les 5 dernières minutes. Laisser ouvert pendant un test, un jeu ou une vidéo pour repérer une surchauffe."/>
             </StackPanel>
         </Border>

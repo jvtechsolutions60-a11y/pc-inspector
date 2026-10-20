@@ -76,6 +76,8 @@ Il partage le code WMI, le rapport et la fenêtre d'export avec PC Inspector (fi
   réglages, rapports et téléchargements dans `JVTECH\` sur la clé : rien n'est écrit sur le PC du client.
 - **Mise à jour** : au démarrage, chaque logiciel regarde la dernière version publiée sur GitHub et affiche un lien
   « Nouvelle version » si elle est plus récente. Rien n'est téléchargé tout seul.
+- **Charte commune** (`src/PcInspector/Theme.xaml`, partagé par les quatre .exe) : mêmes couleurs, boutons, cartes et en-têtes
+  sombres partout, et les mêmes couleurs dans les rapports. Vert = en ordre, orange = à surveiller, rouge = à traiter.
 - Version commune **v1.0.N** (N = numéro de compilation), affichée dans chaque logiciel et en pied de rapport.
 
 ## Obtenir l'exécutable

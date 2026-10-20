@@ -5,21 +5,21 @@
         WindowStartupLocation="CenterScreen" Background="{StaticResource ContentBrush}" FontFamily="Segoe UI"
         Loaded="Window_Loaded">
     <DockPanel>
-        <Border DockPanel.Dock="Top" Background="{StaticResource HeaderBrush}" Padding="24,18">
+        <Border DockPanel.Dock="Top" Background="{StaticResource HeaderBrush}" Padding="28,18">
             <DockPanel>
-                <Border DockPanel.Dock="Right" x:Name="PortableBadge" Background="#33FFFFFF" CornerRadius="12" Padding="10,3"
+                <Border DockPanel.Dock="Right" x:Name="PortableBadge" Style="{StaticResource Chip}" Margin="0"
                         VerticalAlignment="Center" Visibility="Collapsed"
                         ToolTip="Lancé depuis une clé USB : réglages et rapports sont enregistrés sur la clé, rien sur le PC.">
                     <TextBlock Text="Mode clé USB" Foreground="White" FontSize="12"/>
                 </Border>
                 <StackPanel>
-                    <TextBlock Text="JVTECH OUTILS" Foreground="White" FontSize="20" FontWeight="Bold"/>
-                    <TextBlock x:Name="VersionText" Foreground="#93C5FD" FontSize="12" Margin="0,2,0,0"/>
+                    <TextBlock Text="JVTECH OUTILS" Style="{StaticResource AppName}"/>
+                    <TextBlock x:Name="VersionText" Style="{StaticResource AppSubtitle}"/>
                 </StackPanel>
             </DockPanel>
         </Border>
 
-        <Border DockPanel.Dock="Top" x:Name="UpdateBanner" Background="#EFF6FF" BorderBrush="#BFDBFE" BorderThickness="0,0,0,1"
+        <Border DockPanel.Dock="Top" x:Name="UpdateBanner" Background="{StaticResource AccentSoftBrush}" BorderBrush="#BFDBFE" BorderThickness="0,0,0,1"
                 Padding="24,10" Visibility="Collapsed">
             <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextBrush}">
                 <Run x:Name="UpdateText"/>
@@ -42,7 +42,7 @@
             <Button Style="{StaticResource ToolButton}" Tag="PcSecurite.exe" Click="Tool_Click">
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Left" Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="28"
-                               Foreground="#16A34A" Width="48" VerticalAlignment="Center"/>
+                               Foreground="{StaticResource OkBrush}" Width="48" VerticalAlignment="Center"/>
                     <StackPanel>
                         <TextBlock Text="PC Sécurité" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
                         <TextBlock Text="Contrôle de la sécurité avec une note et un pas à pas pour chaque point. Ne modifie rien."
@@ -53,7 +53,7 @@
             <Button Style="{StaticResource ToolButton}" Tag="PcMaintenance.exe" Click="Tool_Click">
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Left" Text="&#xE90F;" FontFamily="Segoe MDL2 Assets" FontSize="28"
-                               Foreground="#D97706" Width="48" VerticalAlignment="Center"/>
+                               Foreground="{StaticResource WarningBrush}" Width="48" VerticalAlignment="Center"/>
                     <StackPanel>
                         <TextBlock Text="PC Maintenance" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
                         <TextBlock Text="Nettoyage, mises à jour, AdwCleaner et logiciels de base. Agit sur le PC."

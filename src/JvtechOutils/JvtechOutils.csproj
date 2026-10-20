@@ -17,6 +17,7 @@
   <!-- Version, dossiers (mode clé USB) et vérification des mises à jour, partagés avec les trois logiciels -->
   <ItemGroup>
     <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
+    <Page Include="..\PcInspector\Theme.xaml" Link="Theme.xaml" />
     <Compile Include="..\PcInspector\AppInfo.cs" Link="Shared\AppInfo.cs" />
     <Compile Include="..\PcInspector\Updater.cs" Link="Shared\Updater.cs" />
   </ItemGroup>

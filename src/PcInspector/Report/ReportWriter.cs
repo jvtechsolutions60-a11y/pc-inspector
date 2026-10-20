@@ -146,25 +146,25 @@ public static class ReportWriter
     }
 
     private const string Css = @"
-body{font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;margin:32px auto;max-width:900px;padding:0 16px;font-size:14px}
-header{display:flex;align-items:center;gap:20px;border-bottom:3px solid #3d8bfd;padding-bottom:16px;margin-bottom:24px;flex-wrap:wrap}
+body{font-family:'Segoe UI',Arial,sans-serif;color:#0f172a;margin:32px auto;max-width:900px;padding:0 16px;font-size:14px}
+header{display:flex;align-items:center;gap:20px;border-bottom:3px solid #2563eb;padding-bottom:16px;margin-bottom:24px;flex-wrap:wrap}
 .logo{max-height:70px;max-width:200px}
 .head{flex:1}
 h1{margin:0;font-size:24px}
-.sub{margin:4px 0 0;color:#6b7280}
-.meta th{text-align:left;color:#6b7280;font-weight:normal;padding:2px 12px 2px 0}
-h2{font-size:18px;color:#3d8bfd;border-bottom:1px solid #e5e7eb;padding-bottom:4px;margin-top:28px}
+.sub{margin:4px 0 0;color:#64748b}
+.meta th{text-align:left;color:#64748b;font-weight:normal;padding:2px 12px 2px 0}
+h2{font-size:18px;color:#2563eb;border-bottom:1px solid #e2e8f0;padding-bottom:4px;margin-top:28px}
 h3{font-size:14px;margin:14px 0 6px}
 .group table{border-collapse:collapse;width:100%}
-.group th{text-align:left;font-weight:normal;color:#6b7280;width:220px;padding:3px 8px 3px 0;vertical-align:top}
+.group th{text-align:left;font-weight:normal;color:#64748b;width:220px;padding:3px 8px 3px 0;vertical-align:top}
 .group td{padding:3px 0}
-.group tr+tr th,.group tr+tr td{border-top:1px solid #f3f4f6}
-.notes p{background:#f5f6f8;padding:12px;border-radius:6px}
+.group tr+tr th,.group tr+tr td{border-top:1px solid #f1f5f9}
+.notes p{background:#f1f5f9;padding:12px;border-radius:6px}
 .error{color:#b91c1c}
 td.bad{color:#b91c1c;font-weight:600}
 td.warn{color:#b45309}
 td.ok{color:#15803d}
-footer{margin-top:40px;color:#9ca3af;font-size:12px;text-align:center}
+footer{margin-top:40px;color:#94a3b8;font-size:12px;text-align:center}
 section,.group{break-inside:avoid-page}
 @media print{body{margin:0}a{color:inherit;text-decoration:none}}
 ";
