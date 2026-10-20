@@ -27,10 +27,19 @@ public partial class MainWindow : Window
     private int? _initialScore;
     private readonly List<string> _initiallyToDo = new();
 
+    private string _updateUrl = Updater.ReleasesPage;
+
     public MainWindow()
     {
         InitializeComponent();
         Title = "PC Sécurité " + AppInfo.Version;
+        if (AppPaths.IsPortable) PortableRun.Text = "  ·  mode clé USB";
+        Loaded += async (_, _) =>
+        {
+            if (await Updater.CheckAsync() is not { } update) return;
+            _updateUrl = update.Url;
+            UpdateText.Text = $"  ·  nouvelle version {update.Tag} : télécharger";
+        };
         // Corrections d'abord, puis ce qu'il faut changer, puis ce qui est en ordre ; les plus graves en haut.
         var view = (ListCollectionView)CollectionViewSource.GetDefaultView(_checks);
         view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(SecurityCheck.Group)));
@@ -174,6 +183,9 @@ public partial class MainWindow : Window
             MessageBox.Show(owner, "Impossible d'ouvrir ce réglage : " + ex.Message, "PC Sécurité", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
+
+    private void UpdateLink_Click(object sender, RoutedEventArgs e) =>
+        Process.Start(new ProcessStartInfo(_updateUrl) { UseShellExecute = true });
 
     private void ExportButton_Click(object sender, RoutedEventArgs e) =>
         Export("Rapport", (path, info) =>

@@ -18,13 +18,29 @@
         <!-- Barre latérale : onglets classés Matériel / Diagnostic / Logiciel -->
         <DockPanel Grid.Column="0" Background="{StaticResource SidebarBrush}">
             <StackPanel DockPanel.Dock="Top" Margin="20,20,20,12">
-                <TextBlock Text="PC INSPECTOR" Foreground="White" FontSize="18" FontWeight="Bold"/>
-                <TextBlock Text="Analyse complète du PC" Foreground="#93C5FD" FontSize="12" Margin="0,2,0,0"/>
-                <TextBlock x:Name="VersionText" Foreground="#64748B" FontSize="11" Margin="0,2,0,0"/>
+                <TextBlock Text="PC INSPECTOR" Style="{StaticResource AppName}"/>
+                <TextBlock Text="Analyse complète du PC" Style="{StaticResource AppSubtitle}"/>
+                <TextBlock x:Name="VersionText" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,2,0,0"/>
+                <TextBlock x:Name="UpdateNotice" Margin="0,6,0,0" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed">
+                    <Hyperlink x:Name="UpdateLink" Foreground="{StaticResource UpdateBrush}" Click="UpdateLink_Click">
+                        <Run x:Name="UpdateText"/>
+                    </Hyperlink>
+                </TextBlock>
+                <TextBlock x:Name="PortableText" Text="Mode clé USB : rien n'est enregistré sur ce PC" Foreground="{StaticResource HeaderTextBrush}"
+                           FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
             </StackPanel>
             <Button DockPanel.Dock="Bottom" x:Name="ExportButton" Style="{StaticResource PrimaryButton}"
                     Content="Exporter le rapport" Margin="16" Click="ExportButton_Click"
-                    ToolTip="Rapport client complet (HTML ou texte) avec ton logo"/>
+                    ToolTip="Rapport client complet (HTML, PDF ou texte) avec ton logo"/>
+            <StackPanel DockPanel.Dock="Bottom" Margin="16,8,16,0">
+                <TextBlock Text="OUTILS" Foreground="#64748B" FontSize="11" FontWeight="Bold" Margin="4,0,0,6"/>
+                <Button Style="{StaticResource DarkButton}" Content="Tester les périphériques" Margin="0,0,0,6" Click="PeripheralTest_Click"
+                        ToolTip="Écran, clavier, haut-parleurs, micro, webcam"/>
+                <Button Style="{StaticResource DarkButton}" Content="Suivi en direct" Margin="0,0,0,6" Click="LiveMonitor_Click"
+                        ToolTip="Charge et températures en courbes, pendant un test"/>
+                <Button Style="{StaticResource DarkButton}" Content="Étiquette PC" Click="Label_Click"
+                        ToolTip="Petite fiche à coller sous le PC : config, date, coordonnées"/>
+            </StackPanel>
             <ListBox x:Name="SectionList" Background="Transparent" BorderThickness="0"
                      SelectionChanged="SectionList_SelectionChanged"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -162,7 +178,7 @@
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                         <Grid Width="220" Margin="0,0,8,0">
                             <TextBox x:Name="SearchBox" Padding="28,6,8,6" VerticalContentAlignment="Center"
-                                     BorderBrush="#CBD5E1" TextChanged="SearchBox_TextChanged"
+                                     BorderBrush="{StaticResource ControlBorderBrush}" TextChanged="SearchBox_TextChanged"
                                      ToolTip="Filtrer les lignes de cet onglet (Ctrl+F)"/>
                             <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource MutedTextBrush}"
                                        Margin="9,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"/>

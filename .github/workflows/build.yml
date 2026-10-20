@@ -9,22 +9,48 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      # Le numéro de run sert de version commune aux quatre .exe : v1.0.N, affichée dans les logiciels et les rapports.
+      VERSION: 1.0.${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
 
-      # Le numéro de run sert de version : v1.0.N, affichée dans le logiciel et le rapport.
       - name: Compiler PC Inspector
-        run: dotnet build src/PcInspector/PcInspector.csproj -c Release -o publish/inspector -p:Version=1.0.${{ github.run_number }}
+        run: dotnet build src/PcInspector/PcInspector.csproj -c Release -o publish/inspector -p:Version=${{ env.VERSION }}
 
       - name: Compiler PC Sécurité
-        run: dotnet build src/PcSecurite/PcSecurite.csproj -c Release -o publish/securite -p:Version=1.0.${{ github.run_number }}
+        run: dotnet build src/PcSecurite/PcSecurite.csproj -c Release -o publish/securite -p:Version=${{ env.VERSION }}
+
+      - name: Compiler PC Maintenance
+        run: dotnet build src/PcMaintenance/PcMaintenance.csproj -c Release -o publish/maintenance -p:Version=${{ env.VERSION }}
+
+      - name: Compiler le lanceur JVTECH Outils
+        run: dotnet build src/JvtechOutils/JvtechOutils.csproj -c Release -o publish/lanceur -p:Version=${{ env.VERSION }}
+
+      - name: Réunir les quatre .exe
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force publish/outils | Out-Null
+          Copy-Item publish/inspector/PcInspector.exe, publish/securite/PcSecurite.exe, publish/maintenance/PcMaintenance.exe, publish/lanceur/JvtechOutils.exe publish/outils/
+          Compress-Archive -Path publish/outils/* -DestinationPath publish/JVTECH-Outils-v${{ env.VERSION }}.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: PcInspector-v1.0.${{ github.run_number }}
-          path: publish/inspector/PcInspector.exe
+          name: JVTECH-Outils-v${{ env.VERSION }}
+          path: publish/outils/*.exe
 
-      - uses: actions/upload-artifact@v4
+      # Sur main : une version publiée par compilation, que les logiciels consultent pour signaler une mise à jour.
+      - name: Publier la version
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
         with:
-          name: PcSecurite-v1.0.${{ github.run_number }}
-          path: publish/securite/PcSecurite.exe
+          tag_name: v${{ env.VERSION }}
+          name: JVTECH Outils v${{ env.VERSION }}
+          body: |
+            PC Inspector, PC Sécurité, PC Maintenance et le lanceur JVTECH Outils, version v${{ env.VERSION }}.
+            Télécharger le .zip, le décompresser (sur une clé USB pour le mode clé USB) et lancer JvtechOutils.exe.
+          files: |
+            publish/JVTECH-Outils-v${{ env.VERSION }}.zip
+            publish/outils/*.exe

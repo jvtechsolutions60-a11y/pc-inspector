@@ -220,6 +220,23 @@ public static class Tutorials
             "Lancer une analyse antivirus complète.",
         }, "Ouvrir le fichier hosts", "notepad.exe", "\"" + Hosts + "\"", clientCanDo: false),
 
+        "Serveurs DNS" => new(new[]
+        {
+            "Le bouton ouvre les Connexions réseau : double-cliquer sur la carte utilisée (Wi-Fi ou Ethernet), puis « Propriétés ».",
+            "Sélectionner « Protocole Internet version 4 (TCP/IPv4) » puis « Propriétés ».",
+            "Cocher « Obtenir les adresses des serveurs DNS automatiquement » (ou mettre un DNS connu choisi par le client), puis OK.",
+            "Vérifier aussi les DNS dans l'interface de la box : un routeur piraté peut distribuer un faux DNS à tous les appareils.",
+            "Lancer une analyse antivirus et AdwCleaner : certains logiciels malveillants remettent le faux DNS.",
+        }, "Ouvrir les Connexions réseau", "ncpa.cpl", clientCanDo: false),
+
+        "Tâches planifiées" => new(new[]
+        {
+            "Le bouton ouvre le Planificateur de tâches : cliquer sur « Bibliothèque du Planificateur de tâches ».",
+            "Retrouver chaque tâche signalée par son nom, et regarder l'onglet « Actions » pour voir le programme lancé.",
+            "Si le client ne connaît pas ce programme : clic droit sur la tâche > « Désactiver » (plutôt que supprimer, pour pouvoir revenir en arrière).",
+            "Lancer une analyse antivirus complète et AdwCleaner (PC Maintenance) pour supprimer le programme lui-même.",
+        }, "Ouvrir le Planificateur de tâches", "taskschd.msc", clientCanDo: false),
+
         "Réseaux Wi-Fi enregistrés" => new(new[]
         {
             "Ouvrir Paramètres > Réseau et Internet > Wi-Fi > Gérer les réseaux connus.",

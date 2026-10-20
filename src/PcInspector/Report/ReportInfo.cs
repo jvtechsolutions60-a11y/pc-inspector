@@ -10,14 +10,15 @@ public sealed class ReportInfo
 {
     public string Company { get; set; } = "";
     public string Technician { get; set; } = "";
+    /// <summary>Téléphone, e-mail ou site, repris sur l'étiquette collée sur le PC.</summary>
+    public string Contact { get; set; } = "";
     public string LogoPath { get; set; } = "";
     public string Client { get; set; } = "";
     public string JobNumber { get; set; } = "";
     public string Notes { get; set; } = "";
     public DateTime Date { get; set; } = DateTime.Now;
 
-    private static string SettingsPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PcInspector", "settings.ini");
+    private static string SettingsPath => Path.Combine(AppPaths.SettingsFolder, "settings.ini");
 
     /// <summary>Société, technicien et logo sont mémorisés d'un rapport à l'autre.</summary>
     public static ReportInfo LoadDefaults()
@@ -34,6 +35,13 @@ public sealed class ReportInfo
             info.Company = values.TryGetValue("Company", out var c) ? c : "";
             info.Technician = values.TryGetValue("Technician", out var t) ? t : "";
             info.LogoPath = values.TryGetValue("LogoPath", out var l) ? l : "";
+            info.Contact = values.TryGetValue("Contact", out var contact) ? contact : "";
+            // Même client et même n° d'intervention dans les trois logiciels pendant la journée : un seul dossier client.
+            if (values.TryGetValue("LastDate", out var day) && day == DateTime.Today.ToString("yyyy-MM-dd"))
+            {
+                info.Client = values.TryGetValue("LastClient", out var client) ? client : "";
+                info.JobNumber = values.TryGetValue("LastJob", out var job) ? job : "";
+            }
         }
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }
@@ -50,6 +58,10 @@ public sealed class ReportInfo
                 "Company=" + OneLine(Company),
                 "Technician=" + OneLine(Technician),
                 "LogoPath=" + OneLine(LogoPath),
+                "Contact=" + OneLine(Contact),
+                "LastDate=" + Date.ToString("yyyy-MM-dd"),
+                "LastClient=" + OneLine(Client),
+                "LastJob=" + OneLine(JobNumber),
             });
         }
         catch (IOException) { }

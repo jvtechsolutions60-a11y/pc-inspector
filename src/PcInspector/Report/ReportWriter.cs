@@ -13,7 +13,13 @@ public static class ReportWriter
 {
     public static void Write(string path, ReportInfo info, IReadOnlyList<InfoSection> sections)
     {
-        var content = Path.GetExtension(path).Equals(".txt", StringComparison.OrdinalIgnoreCase)
+        var extension = Path.GetExtension(path);
+        if (extension.Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            PdfPrinter.FromHtml(Html(info, sections), path);
+            return;
+        }
+        var content = extension.Equals(".txt", StringComparison.OrdinalIgnoreCase)
             ? Text(info, sections)
             : Html(info, sections);
         File.WriteAllText(path, content, new UTF8Encoding(true));
@@ -22,12 +28,13 @@ public static class ReportWriter
     public static string Text(ReportInfo info, IReadOnlyList<InfoSection> sections)
     {
         var sb = new StringBuilder();
-        var title = string.IsNullOrWhiteSpace(info.Company) ? "Rapport PC Inspector" : $"Rapport {info.Company}";
+        var title = string.IsNullOrWhiteSpace(info.Company) ? $"Rapport {AppInfo.Product}" : $"Rapport {info.Company}";
         sb.AppendLine(title).AppendLine(new string('=', title.Length));
         AppendTextLine(sb, "Date", info.Date.ToString("dd/MM/yyyy HH:mm"));
         AppendTextLine(sb, "Client", info.Client);
         AppendTextLine(sb, "Intervention n°", info.JobNumber);
         AppendTextLine(sb, "Technicien", info.Technician);
+        AppendTextLine(sb, "Contact", info.Contact);
         if (!string.IsNullOrWhiteSpace(info.Notes)) sb.AppendLine().AppendLine("Notes :").AppendLine(info.Notes.Trim());
 
         foreach (var section in sections)
@@ -39,7 +46,7 @@ public static class ReportWriter
                 sb.AppendLine().AppendLine("  " + group.Title);
                 var width = group.Items.Count == 0 ? 0 : group.Items.Max(i => i.Label.Length);
                 foreach (var item in group.Items)
-                    sb.AppendLine($"    {item.Label.PadRight(width)}  {item.Value.Replace("\n", "\n      " + new string(' ', width))}" + (item.Url is null ? "" : $" ({item.Url})"));
+                    sb.AppendLine($"    {item.Label.PadRight(width)}  {item.Value.Replace("\n", "\n      " + new string(' ', width))}" + (IsWebLink(item.Url) ? $" ({item.Url})" : ""));
             }
         }
         return sb.ToString();
@@ -63,7 +70,7 @@ public static class ReportWriter
         if (LogoDataUri(info.LogoPath) is { } logo) sb.AppendLine($"<img class=\"logo\" src=\"{logo}\" alt=\"\">");
         sb.AppendLine("<div class=\"head\">");
         sb.AppendLine($"<h1>{(string.IsNullOrWhiteSpace(info.Company) ? "Rapport PC" : E(info.Company))}</h1>");
-        sb.AppendLine("<p class=\"sub\">Rapport d'analyse du PC</p></div>");
+        sb.AppendLine($"<p class=\"sub\">{E(Subtitle)}</p></div>");
         sb.AppendLine("<table class=\"meta\">");
         void Meta(string label, string value)
         {
@@ -73,6 +80,7 @@ public static class ReportWriter
         Meta("Client", info.Client);
         Meta("Intervention n°", info.JobNumber);
         Meta("Technicien", info.Technician);
+        Meta("Contact", info.Contact);
         sb.AppendLine("</table></header>");
 
         if (!string.IsNullOrWhiteSpace(info.Notes))
@@ -87,7 +95,7 @@ public static class ReportWriter
                 sb.AppendLine($"<div class=\"group\"><h3>{E(group.Title)}</h3><table>");
                 foreach (var item in group.Items)
                 {
-                    var value = item.Url is null ? E(item.Value).Replace("\n", "<br>") : $"<a href=\"{E(item.Url)}\">{E(item.Value)}</a>";
+                    var value = !IsWebLink(item.Url) ? E(item.Value).Replace("\n", "<br>") : $"<a href=\"{E(item.Url)}\">{E(item.Value)}</a>";
                     sb.AppendLine($"<tr><th>{E(item.Label)}</th><td{StatusClass(item.Value)}>{value}</td></tr>");
                 }
                 sb.AppendLine("</table></div>");
@@ -99,6 +107,16 @@ public static class ReportWriter
         sb.AppendLine("</body></html>");
         return sb.ToString();
     }
+
+    private static string Subtitle => AppInfo.Product switch
+    {
+        "PC Maintenance" => "Rapport de maintenance",
+        "PC Sécurité" => "Bilan de sécurité du PC",
+        _ => "Rapport d'analyse du PC",
+    };
+
+    /// <summary>Les liens internes du logiciel (jvtech:…) ne servent à rien dans un rapport client.</summary>
+    private static bool IsWebLink(string? url) => url is not null && url.StartsWith("http", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Colore les résultats du bilan et des vérifications (✘ rouge, ! orange, ✔ vert).</summary>
     private static string StatusClass(string value) =>
@@ -128,25 +146,25 @@ public static class ReportWriter
     }
 
     private const string Css = @"
-body{font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;margin:32px auto;max-width:900px;padding:0 16px;font-size:14px}
-header{display:flex;align-items:center;gap:20px;border-bottom:3px solid #3d8bfd;padding-bottom:16px;margin-bottom:24px;flex-wrap:wrap}
+body{font-family:'Segoe UI',Arial,sans-serif;color:#0f172a;margin:32px auto;max-width:900px;padding:0 16px;font-size:14px}
+header{display:flex;align-items:center;gap:20px;border-bottom:3px solid #2563eb;padding-bottom:16px;margin-bottom:24px;flex-wrap:wrap}
 .logo{max-height:70px;max-width:200px}
 .head{flex:1}
 h1{margin:0;font-size:24px}
-.sub{margin:4px 0 0;color:#6b7280}
-.meta th{text-align:left;color:#6b7280;font-weight:normal;padding:2px 12px 2px 0}
-h2{font-size:18px;color:#3d8bfd;border-bottom:1px solid #e5e7eb;padding-bottom:4px;margin-top:28px}
+.sub{margin:4px 0 0;color:#64748b}
+.meta th{text-align:left;color:#64748b;font-weight:normal;padding:2px 12px 2px 0}
+h2{font-size:18px;color:#2563eb;border-bottom:1px solid #e2e8f0;padding-bottom:4px;margin-top:28px}
 h3{font-size:14px;margin:14px 0 6px}
 .group table{border-collapse:collapse;width:100%}
-.group th{text-align:left;font-weight:normal;color:#6b7280;width:220px;padding:3px 8px 3px 0;vertical-align:top}
+.group th{text-align:left;font-weight:normal;color:#64748b;width:220px;padding:3px 8px 3px 0;vertical-align:top}
 .group td{padding:3px 0}
-.group tr+tr th,.group tr+tr td{border-top:1px solid #f3f4f6}
-.notes p{background:#f5f6f8;padding:12px;border-radius:6px}
+.group tr+tr th,.group tr+tr td{border-top:1px solid #f1f5f9}
+.notes p{background:#f1f5f9;padding:12px;border-radius:6px}
 .error{color:#b91c1c}
 td.bad{color:#b91c1c;font-weight:600}
 td.warn{color:#b45309}
 td.ok{color:#15803d}
-footer{margin-top:40px;color:#9ca3af;font-size:12px;text-align:center}
+footer{margin-top:40px;color:#94a3b8;font-size:12px;text-align:center}
 section,.group{break-inside:avoid-page}
 @media print{body{margin:0}a{color:inherit;text-decoration:none}}
 ";

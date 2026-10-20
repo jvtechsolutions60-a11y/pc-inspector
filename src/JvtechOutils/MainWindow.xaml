@@ -1,0 +1,73 @@
+<Window x:Class="JvtechOutils.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="JVTECH Outils" Width="560" SizeToContent="Height" ResizeMode="CanMinimize"
+        WindowStartupLocation="CenterScreen" Background="{StaticResource ContentBrush}" FontFamily="Segoe UI"
+        Loaded="Window_Loaded">
+    <DockPanel>
+        <Border DockPanel.Dock="Top" Background="{StaticResource HeaderBrush}" Padding="28,18">
+            <DockPanel>
+                <Border DockPanel.Dock="Right" x:Name="PortableBadge" Style="{StaticResource Chip}" Margin="0"
+                        VerticalAlignment="Center" Visibility="Collapsed"
+                        ToolTip="Lancé depuis une clé USB : réglages et rapports sont enregistrés sur la clé, rien sur le PC.">
+                    <TextBlock Text="Mode clé USB" Foreground="White" FontSize="12"/>
+                </Border>
+                <StackPanel>
+                    <TextBlock Text="JVTECH OUTILS" Style="{StaticResource AppName}"/>
+                    <TextBlock x:Name="VersionText" Style="{StaticResource AppSubtitle}"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <Border DockPanel.Dock="Top" x:Name="UpdateBanner" Background="{StaticResource AccentSoftBrush}" BorderBrush="#BFDBFE" BorderThickness="0,0,0,1"
+                Padding="24,10" Visibility="Collapsed">
+            <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextBrush}">
+                <Run x:Name="UpdateText"/>
+                <Hyperlink x:Name="UpdateLink" Click="UpdateLink_Click">Télécharger</Hyperlink>
+            </TextBlock>
+        </Border>
+
+        <StackPanel Margin="24,20,24,16">
+            <Button Style="{StaticResource ToolButton}" Tag="PcInspector.exe" Click="Tool_Click">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Left" Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="28"
+                               Foreground="{StaticResource AccentBrush}" Width="48" VerticalAlignment="Center"/>
+                    <StackPanel>
+                        <TextBlock Text="PC Inspector" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
+                        <TextBlock Text="Tout le matériel et le logiciel du PC, le bilan sur 100, les tests et le rapport client. Ne modifie rien."
+                                   TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </DockPanel>
+            </Button>
+            <Button Style="{StaticResource ToolButton}" Tag="PcSecurite.exe" Click="Tool_Click">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Left" Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="28"
+                               Foreground="{StaticResource OkBrush}" Width="48" VerticalAlignment="Center"/>
+                    <StackPanel>
+                        <TextBlock Text="PC Sécurité" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
+                        <TextBlock Text="Contrôle de la sécurité avec une note et un pas à pas pour chaque point. Ne modifie rien."
+                                   TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </DockPanel>
+            </Button>
+            <Button Style="{StaticResource ToolButton}" Tag="PcMaintenance.exe" Click="Tool_Click">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Left" Text="&#xE90F;" FontFamily="Segoe MDL2 Assets" FontSize="28"
+                               Foreground="{StaticResource WarningBrush}" Width="48" VerticalAlignment="Center"/>
+                    <StackPanel>
+                        <TextBlock Text="PC Maintenance" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
+                        <TextBlock Text="Nettoyage, mises à jour, AdwCleaner et logiciels de base. Agit sur le PC."
+                                   TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </DockPanel>
+            </Button>
+
+            <DockPanel Margin="2,4,2,0">
+                <TextBlock DockPanel.Dock="Right">
+                    <Hyperlink Click="ReportsLink_Click">Ouvrir le dossier des rapports</Hyperlink>
+                </TextBlock>
+                <TextBlock x:Name="StatusText" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap"/>
+            </DockPanel>
+        </StackPanel>
+    </DockPanel>
+</Window>

@@ -19,4 +19,18 @@
     <Reference Include="System.Management" />
   </ItemGroup>
 
+  <!-- Code partagé avec PC Inspector : version, dossiers (mode clé USB), mises à jour, rapport client et fenêtre d'export -->
+  <ItemGroup>
+    <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
+    <Page Include="..\PcInspector\Theme.xaml" Link="Theme.xaml" />
+    <Compile Include="..\PcInspector\AppInfo.cs" Link="Shared\AppInfo.cs" />
+    <Compile Include="..\PcInspector\Updater.cs" Link="Shared\Updater.cs" />
+    <Compile Include="..\PcInspector\Models\InfoSection.cs" Link="Shared\InfoSection.cs" />
+    <Compile Include="..\PcInspector\Report\ReportInfo.cs" Link="Shared\ReportInfo.cs" />
+    <Compile Include="..\PcInspector\Report\ReportWriter.cs" Link="Shared\ReportWriter.cs" />
+    <Compile Include="..\PcInspector\Report\PdfPrinter.cs" Link="Shared\PdfPrinter.cs" />
+    <Page Include="..\PcInspector\ExportWindow.xaml" Link="ExportWindow.xaml" />
+    <Compile Include="..\PcInspector\ExportWindow.xaml.cs" Link="ExportWindow.xaml.cs" DependentUpon="ExportWindow.xaml" />
+  </ItemGroup>
+
 </Project>

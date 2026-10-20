@@ -16,6 +16,11 @@ public static class ClientGuide
 {
     public static void Write(string path, ReportInfo info, IReadOnlyList<SecurityCheck> checks)
     {
+        if (Path.GetExtension(path).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            PdfPrinter.FromHtml(Html(info, checks), path);
+            return;
+        }
         var content = Path.GetExtension(path).Equals(".txt", StringComparison.OrdinalIgnoreCase)
             ? Text(info, checks)
             : Html(info, checks);
@@ -98,22 +103,22 @@ public static class ClientGuide
     }
 
     private const string Css = @"
-body{font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;margin:32px auto;max-width:800px;padding:0 16px;font-size:15px;line-height:1.5}
-header{display:flex;align-items:center;gap:20px;border-bottom:3px solid #3d8bfd;padding-bottom:16px;margin-bottom:20px}
+body{font-family:'Segoe UI',Arial,sans-serif;color:#0f172a;margin:32px auto;max-width:800px;padding:0 16px;font-size:15px;line-height:1.5}
+header{display:flex;align-items:center;gap:20px;border-bottom:3px solid #2563eb;padding-bottom:16px;margin-bottom:20px}
 .logo{max-height:70px;max-width:200px}
 .head{flex:1}
 h1{margin:0;font-size:24px}
-.sub{margin:4px 0 0;color:#6b7280}
+.sub{margin:4px 0 0;color:#64748b}
 .grade{width:64px;height:64px;border-radius:12px;color:#fff;font-size:36px;font-weight:bold;display:flex;align-items:center;justify-content:center}
 .gA{background:#16a34a}.gB{background:#65a30d}.gC{background:#eab308}.gD{background:#f97316}.gE{background:#dc2626}
 .intro{font-size:16px}
-section{border-left:5px solid;padding:4px 16px;margin:18px 0;background:#f9fafb;border-radius:4px;break-inside:avoid-page}
+section{border-left:5px solid;padding:4px 16px;margin:18px 0;background:#f8fafc;border-radius:4px;break-inside:avoid-page}
 section.danger{border-color:#dc2626}
-section.warning{border-color:#f59e0b}
+section.warning{border-color:#d97706}
 h2{font-size:18px;margin:8px 0}
 ol{margin:6px 0 10px;padding-left:22px}
-.pro{font-style:italic;color:#6b7280}
-footer{margin-top:36px;color:#6b7280;text-align:center}
+.pro{font-style:italic;color:#64748b}
+footer{margin-top:36px;color:#64748b;text-align:center}
 @media print{body{margin:0}}
 ";
 }
