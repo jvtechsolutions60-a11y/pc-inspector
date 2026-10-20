@@ -16,8 +16,10 @@
 
         <!-- Barre latérale : un onglet par composant -->
         <DockPanel Grid.Column="0" Background="{StaticResource SidebarBrush}">
-            <TextBlock DockPanel.Dock="Top" Text="PC Inspector" Foreground="White"
-                       FontSize="18" FontWeight="SemiBold" Margin="18,18,18,14"/>
+            <StackPanel DockPanel.Dock="Top" Margin="18,18,18,14">
+                <TextBlock Text="PC Inspector" Foreground="White" FontSize="18" FontWeight="SemiBold"/>
+                <TextBlock x:Name="VersionText" Foreground="White" Opacity="0.6" FontSize="11"/>
+            </StackPanel>
             <Button DockPanel.Dock="Bottom" x:Name="ExportButton" Content="Exporter le rapport"
                     Margin="14" Padding="8,6" Click="ExportButton_Click"/>
             <ListBox x:Name="SectionList" Background="Transparent" BorderThickness="0"

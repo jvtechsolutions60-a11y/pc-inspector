@@ -13,9 +13,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Compiler l'exécutable
-        run: dotnet build src/PcInspector/PcInspector.csproj -c Release -o publish
+        # Le numéro de run sert de version : v1.0.N, affichée dans le logiciel et le rapport.
+        run: dotnet build src/PcInspector/PcInspector.csproj -c Release -o publish -p:Version=1.0.${{ github.run_number }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: PcInspector
+          name: PcInspector-v1.0.${{ github.run_number }}
           path: publish/PcInspector.exe

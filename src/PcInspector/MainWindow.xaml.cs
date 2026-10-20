@@ -24,6 +24,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        VersionText.Text = App.Version;
+        Title = "PC Inspector " + App.Version;
         _collectors = new List<ICollector> { _health };
         _collectors.AddRange(DetailCollectors());
         SectionList.ItemsSource = _collectors;
