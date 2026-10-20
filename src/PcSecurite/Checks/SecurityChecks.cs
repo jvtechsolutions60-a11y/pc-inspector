@@ -35,12 +35,14 @@ public static partial class SecurityChecks
         ("Bureau à distance", RemoteDesktop),
         ("Logiciels de prise en main à distance", RemoteAccessTools),
         ("Redirections réseau (hosts, proxy)", NetworkRedirects),
+        ("Serveurs DNS", DnsServers),
         ("Réseaux Wi-Fi enregistrés", WifiProfiles),
         ("Comptes utilisateurs", Accounts),
         ("Connexion automatique", AutoLogon),
         ("Navigateurs internet", Browsers),
         ("Logiciels avec failles connues", VulnerableSoftware),
         ("Logiciels abandonnés", ObsoleteSoftware),
+        ("Tâches planifiées", ScheduledTasks),
         // En dernier : peut prendre jusqu'à 90 secondes.
         ("Mises à jour en attente", PendingUpdates),
     };
