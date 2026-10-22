@@ -44,9 +44,9 @@ internal sealed class MaintenanceReport
         if (list.Count > 0) _details.Add((title, list));
     }
 
-    public List<InfoSection> ToSections(string title = "Maintenance du PC")
+    public List<InfoSection> ToSections(string sectionTitle = "Maintenance du PC")
     {
-        var section = new InfoSection(title);
+        var section = new InfoSection(sectionTitle);
         var summary = new InfoGroup("Résumé")
             .Add("Ordinateur", Environment.MachineName)
             .Add("Début", Start.ToString("dd/MM/yyyy HH:mm"))
