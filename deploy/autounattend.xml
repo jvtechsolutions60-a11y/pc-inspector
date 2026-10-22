@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Installation automatique de Windows 11 pour la préparation des PC d'achat-revente (JVTECH).
+  ATTENTION : efface entièrement le disque 0 du PC, sans rien demander.
+  - Windows en français, clavier AZERTY, fuseau de Paris.
+  - Édition et activation : celles de la licence enregistrée dans le BIOS du PC (sinon Windows demande l'édition).
+  - Démarre en mode audit (compte Administrateur intégré, sans écrans de bienvenue) et lance
+    C:\JVTECH\PcMaintenance.exe /preparation, copié depuis sources\$OEM$\$1\JVTECH de la clé.
+  - À la fin, PC Maintenance remet le PC au premier démarrage : l'acheteur crée son propre compte.
+-->
+<unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+  <settings pass="windowsPE">
+    <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <SetupUILanguage>
+        <UILanguage>fr-FR</UILanguage>
+      </SetupUILanguage>
+      <InputLocale>040c:0000040c</InputLocale>
+      <SystemLocale>fr-FR</SystemLocale>
+      <UILanguage>fr-FR</UILanguage>
+      <UserLocale>fr-FR</UserLocale>
+    </component>
+    <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <!-- Disque 0 effacé puis découpé pour un démarrage UEFI : système EFI, réservée Microsoft, Windows. -->
+      <DiskConfiguration>
+        <Disk wcm:action="add">
+          <DiskID>0</DiskID>
+          <WillWipeDisk>true</WillWipeDisk>
+          <CreatePartitions>
+            <CreatePartition wcm:action="add">
+              <Order>1</Order>
+              <Type>EFI</Type>
+              <Size>300</Size>
+            </CreatePartition>
+            <CreatePartition wcm:action="add">
+              <Order>2</Order>
+              <Type>MSR</Type>
+              <Size>16</Size>
+            </CreatePartition>
+            <CreatePartition wcm:action="add">
+              <Order>3</Order>
+              <Type>Primary</Type>
+              <Extend>true</Extend>
+            </CreatePartition>
+          </CreatePartitions>
+          <ModifyPartitions>
+            <ModifyPartition wcm:action="add">
+              <Order>1</Order>
+              <PartitionID>1</PartitionID>
+              <Format>FAT32</Format>
+              <Label>Systeme</Label>
+            </ModifyPartition>
+            <ModifyPartition wcm:action="add">
+              <Order>2</Order>
+              <PartitionID>2</PartitionID>
+            </ModifyPartition>
+            <ModifyPartition wcm:action="add">
+              <Order>3</Order>
+              <PartitionID>3</PartitionID>
+              <Format>NTFS</Format>
+              <Label>Windows</Label>
+              <Letter>C</Letter>
+            </ModifyPartition>
+          </ModifyPartitions>
+        </Disk>
+      </DiskConfiguration>
+      <ImageInstall>
+        <OSImage>
+          <InstallTo>
+            <DiskID>0</DiskID>
+            <PartitionID>3</PartitionID>
+          </InstallTo>
+          <WillShowUI>OnError</WillShowUI>
+        </OSImage>
+      </ImageInstall>
+      <UserData>
+        <AcceptEula>true</AcceptEula>
+        <!-- Clé vide : Windows prend la licence du BIOS et l'édition qui va avec. -->
+        <ProductKey>
+          <Key></Key>
+          <WillShowUI>OnError</WillShowUI>
+        </ProductKey>
+      </UserData>
+    </component>
+  </settings>
+  <settings pass="specialize">
+    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <TimeZone>Romance Standard Time</TimeZone>
+    </component>
+  </settings>
+  <settings pass="oobeSystem">
+    <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <InputLocale>040c:0000040c</InputLocale>
+      <SystemLocale>fr-FR</SystemLocale>
+      <UILanguage>fr-FR</UILanguage>
+      <UserLocale>fr-FR</UserLocale>
+    </component>
+    <!-- Mode audit : pas d'écrans de bienvenue, ouverture de session automatique en Administrateur. -->
+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <Reseal>
+        <Mode>Audit</Mode>
+      </Reseal>
+    </component>
+  </settings>
+  <settings pass="auditUser">
+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <RunSynchronous>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <Description>Préparation revente JVTECH</Description>
+          <Path>cmd.exe /c start "" "C:\JVTECH\PcMaintenance.exe" /preparation</Path>
+        </RunSynchronousCommand>
+      </RunSynchronous>
+    </component>
+  </settings>
+</unattend>

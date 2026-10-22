@@ -121,4 +121,22 @@ installées, logiciels mis à jour, espace disque avant/après, durée.
 En haut, un résumé rapide : Windows 11 oui ou non, activation de Windows (résultat de `slmgr /xpr`), mises à jour Windows en attente, logiciels à mettre à jour,
 Glary installé ou non. Chaque étape peut être décochée, et un journal garde la trace de tout ce qui a été fait.
 
+### Préparation revente (installation automatique)
+
+Pour les PC d'achat-revente : on efface tout et on réinstalle propre, sans rester devant. Le kit
+`JVTECH-Kit-Preparation-v1.0.N.zip` (publié avec chaque version, sources dans `deploy/`) se copie sur une clé
+d'installation de Windows 11 :
+
+- `autounattend.xml` efface le disque 0, installe Windows 11 en français sans aucune question (édition et licence
+  du BIOS) et démarre en **mode audit** ;
+- `PcMaintenance.exe /preparation` (copié dans `C:\JVTECH`) enchaîne alors, en reprenant seul après chaque redémarrage :
+  applications inutiles retirées (`debloat.ini`), pilotes et BIOS du constructeur (Dell Command Update,
+  Lenovo System Update, HP Image Assistant, BIOS seulement sur secteur), Windows Update en boucle pilotes compris,
+  nettoyage, contrôle des pilotes manquants et de l'activation, rapport sur la clé ;
+- à la fin, Sysprep remet le PC au **premier démarrage** et l'éteint : l'acheteur crée son propre compte.
+
+Les étapes se règlent dans `options.ini`. Mode d'emploi : `deploy/LISEZMOI.txt`.
+Prochaines étapes prévues : démarrage par le réseau (serveur PXE sur un mini PC Windows, image mise à jour chaque mois),
+puis tableau de bord des postes.
+
 L'action *Build* compile aussi `PcMaintenance.exe`.

@@ -36,10 +36,25 @@ jobs:
           Copy-Item publish/inspector/PcInspector.exe, publish/securite/PcSecurite.exe, publish/maintenance/PcMaintenance.exe, publish/lanceur/JvtechOutils.exe publish/outils/
           Compress-Archive -Path publish/outils/* -DestinationPath publish/JVTECH-Outils-v${{ env.VERSION }}.zip
 
+      # Kit clé USB : autounattend.xml à la racine, PC Maintenance et ses réglages recopiés par Windows dans C:\JVTECH.
+      - name: Préparer le kit de préparation revente
+        shell: pwsh
+        run: |
+          $jvtech = 'publish/kit/sources/$OEM$/$1/JVTECH'
+          New-Item -ItemType Directory -Force -Path $jvtech | Out-Null
+          Copy-Item deploy/autounattend.xml, deploy/LISEZMOI.txt publish/kit/
+          Copy-Item publish/maintenance/PcMaintenance.exe, deploy/options.ini, deploy/debloat.ini -Destination $jvtech
+          Compress-Archive -Path publish/kit/* -DestinationPath publish/JVTECH-Kit-Preparation-v${{ env.VERSION }}.zip
+
       - uses: actions/upload-artifact@v4
         with:
           name: JVTECH-Outils-v${{ env.VERSION }}
           path: publish/outils/*.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JVTECH-Kit-Preparation-v${{ env.VERSION }}
+          path: publish/kit/
 
       # Sur main : une version publiée par compilation, que les logiciels consultent pour signaler une mise à jour.
       - name: Publier la version
@@ -51,6 +66,8 @@ jobs:
           body: |
             PC Inspector, PC Sécurité, PC Maintenance et le lanceur JVTECH Outils, version v${{ env.VERSION }}.
             Télécharger le .zip, le décompresser (sur une clé USB pour le mode clé USB) et lancer JvtechOutils.exe.
+            Kit de préparation revente (installation automatique de Windows 11) : voir LISEZMOI.txt dans JVTECH-Kit-Preparation.
           files: |
             publish/JVTECH-Outils-v${{ env.VERSION }}.zip
+            publish/JVTECH-Kit-Preparation-v${{ env.VERSION }}.zip
             publish/outils/*.exe

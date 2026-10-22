@@ -28,17 +28,24 @@ internal sealed class WindowsUpdate
         return new WindowsUpdate(session);
     }
 
-    /// <summary>Mises à jour logicielles non installées et non masquées (comme la page Windows Update).</summary>
-    public List<Update> Search()
+    // Type de mise à jour pour l'agent : 1 = logiciel, 2 = pilote.
+    private const int SoftwareType = 1;
+
+    /// <summary>
+    /// Mises à jour logicielles non installées et non masquées (comme la page Windows Update).
+    /// Avec les pilotes : tous les pilotes proposés, mais pas les mises à jour logicielles facultatives (« préversions »).
+    /// </summary>
+    public List<Update> Search(bool withDrivers = false)
     {
         var searcher = Call(_session, "CreateUpdateSearcher");
-        var result = Call(searcher, "Search", "IsInstalled=0 and IsHidden=0 and Type='Software'");
+        var result = Call(searcher, "Search", withDrivers ? "IsInstalled=0 and IsHidden=0" : "IsInstalled=0 and IsHidden=0 and Type='Software'");
         var updates = Get(result, "Updates");
         var count = Convert.ToInt32(Get(updates, "Count"));
         var list = new List<Update>();
         for (var i = 0; i < count; i++)
         {
             var item = Get(updates, "Item", i)!;
+            if (withDrivers && Get(item, "BrowseOnly") is true && Convert.ToInt32(Get(item, "Type")) == SoftwareType) continue;
             list.Add(new Update(item, Get(item, "Title")?.ToString() ?? "?"));
         }
         return list;

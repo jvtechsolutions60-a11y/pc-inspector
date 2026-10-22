@@ -1,0 +1,48 @@
+KIT PRÉPARATION REVENTE JVTECH
+==============================
+
+À quoi ça sert
+--------------
+Préparer un PC d'achat-revente sans rester devant : on démarre sur la clé, et le PC
+  1. efface le disque et installe Windows 11 en français, sans aucune question ;
+  2. retire les applications préinstallées inutiles (liste dans debloat.ini) ;
+  3. installe les pilotes et le BIOS du constructeur (Dell, Lenovo, HP) ;
+  4. passe Windows Update en boucle, pilotes compris, avec les redémarrages, jusqu'à ce qu'il n'y ait plus rien ;
+  5. vérifie les pilotes manquants et l'activation, et écrit le rapport sur la clé (JVTECH\Rapports\Preparation) ;
+  6. se remet au premier démarrage et s'éteint : l'acheteur choisit sa langue et crée son propre compte.
+
+ATTENTION : le disque du PC (disque 0) est entièrement effacé dès le démarrage sur la clé.
+Ne jamais laisser cette clé branchée sur un PC client.
+
+Fabriquer la clé (une seule fois)
+---------------------------------
+1. Créer une clé d'installation de Windows 11 avec l'outil de Microsoft
+   (« Outil de création de supports », https://www.microsoft.com/fr-fr/software-download/windows11).
+   Avec Rufus : décocher toutes les options de personnalisation proposées à la fin.
+2. Copier le contenu de ce kit à la racine de la clé, en acceptant de fusionner le dossier « sources » :
+     autounattend.xml                      -> à la racine de la clé
+     sources\$OEM$\$1\JVTECH\...            -> dans le dossier sources de la clé
+   Windows recopie tout seul le dossier JVTECH dans C:\JVTECH pendant l'installation.
+
+Préparer un PC
+--------------
+1. Brancher le câble réseau (Internet obligatoire) et le chargeur pour un portable.
+2. Démarrer sur la clé (touche F12, F9, Échap ou F8 selon la marque).
+3. C'est tout : le PC redémarre plusieurs fois. L'écran « Préparation revente » montre l'étape en cours.
+   Il faut compter 1 à 3 heures selon le PC et la connexion.
+4. Quand le PC s'est éteint, il est prêt. Retirer la clé avant de le rallumer.
+
+Le PC a plusieurs disques ? Windows est installé sur le disque 0 : débrancher le disque en trop
+si ce n'est pas le bon, ou vérifier après coup dans le rapport.
+
+Réglages
+--------
+- sources\$OEM$\$1\JVTECH\options.ini : activer ou couper une étape (BIOS, constructeur, premier démarrage…).
+- sources\$OEM$\$1\JVTECH\debloat.ini : applications à retirer.
+
+En cas de souci
+---------------
+- Le journal complet est dans C:\JVTECH\preparation.log tant que la préparation n'est pas finie.
+- « Arrêter la préparation » en haut de l'écran : le PC reste en mode audit, à finir à la main.
+  Pour reprendre : C:\JVTECH\PcMaintenance.exe /preparation
+- Si Windows demande l'édition à installer : ce PC n'a pas de licence dans son BIOS, choisir Famille ou Pro.
