@@ -26,12 +26,14 @@ internal sealed class PreparationRunner
     private const string RunKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
     private const string RunValue = "JVTECH-Preparation";
     private const string StorePolicyKey = @"SOFTWARE\Policies\Microsoft\WindowsStore";
+    private const string DeliveryPolicyKey = @"SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization";
 
     private readonly IProgress<string> _log;
     private readonly IProgress<PreparationStep> _step;
     private readonly IProgress<string> _status;
     private readonly PreparationOptions _options = PreparationOptions.Load();
     private readonly PreparationState _state = PreparationState.Load();
+    private readonly ServerLink _server = ServerLink.Load();
 
     public volatile bool StopRequested;
 
@@ -44,8 +46,22 @@ internal sealed class PreparationRunner
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         });
         _step = step;
-        _status = status;
+        _status = new Progress<string>(text =>
+        {
+            status.Report(text);
+            _server.Status(Model(), Serial(), _state.Started, StepName(_state.Step), text);
+        });
     }
+
+    private static string StepName(PreparationStep step) => step switch
+    {
+        PreparationStep.Start => "Mise en route",
+        PreparationStep.Debloat => "Applications inutiles",
+        PreparationStep.Manufacturer => "Pilotes et BIOS du constructeur",
+        PreparationStep.WindowsUpdate => "Windows Update et pilotes",
+        PreparationStep.Finish => "Contrôle final et rapport",
+        _ => "Terminé",
+    };
 
     public PreparationStep Current => _state.Step;
     public DateTime Started => _state.Started;
@@ -130,6 +146,8 @@ internal sealed class PreparationRunner
             Run("powercfg.exe", "/change " + setting, TimeSpan.FromSeconds(30));
         // Le Store met à jour ses applications pour le compte en cours, ce qui empêcherait Sysprep de finir.
         using (var key = Registry.LocalMachine.CreateSubKey(StorePolicyKey)) key?.SetValue("AutoDownload", 2, RegistryValueKind.DWord);
+        // Les PC préparés en même temps s'échangent les mises à jour sur le réseau de l'atelier : téléchargées une seule fois.
+        using (var key = Registry.LocalMachine.CreateSubKey(DeliveryPolicyKey)) key?.SetValue("DODownloadMode", 1, RegistryValueKind.DWord);
         // winget fait partie de « Programme d'installation d'application », pas encore enregistré pour le compte du mode audit.
         PowerShell.Run("Add-AppxPackage -RegisterByFamilyName -MainPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe -ErrorAction SilentlyContinue", TimeSpan.FromMinutes(3));
         WaitForNetwork();
@@ -220,17 +238,25 @@ internal sealed class PreparationRunner
         Restore();
         WriteReport();
         RemoveAutoStart();
+        _server.Status(Model(), Serial(), _state.Started, "Prêt pour la revente",
+            _options.Reseal ? "Remise au premier démarrage : le PC s'éteint." : "Préparation terminée.", finished: true, toCheck: missing.Count > 0);
     }
 
     /// <summary>Remet ce qui avait été changé pour la préparation.</summary>
     private void Restore()
     {
         Run("powercfg.exe", "/restoredefaultschemes", TimeSpan.FromSeconds(30));
+        RemovePolicy(StorePolicyKey, "AutoDownload");
+        RemovePolicy(DeliveryPolicyKey, "DODownloadMode");
+    }
+
+    private static void RemovePolicy(string path, string value)
+    {
         try
         {
-            using var key = Registry.LocalMachine.OpenSubKey(StorePolicyKey, writable: true);
-            key?.DeleteValue("AutoDownload", throwOnMissingValue: false);
-            if (key is not null && key.ValueCount == 0 && key.SubKeyCount == 0) Registry.LocalMachine.DeleteSubKey(StorePolicyKey, throwOnMissingSubKey: false);
+            using var key = Registry.LocalMachine.OpenSubKey(path, writable: true);
+            key?.DeleteValue(value, throwOnMissingValue: false);
+            if (key is not null && key.ValueCount == 0 && key.SubKeyCount == 0) Registry.LocalMachine.DeleteSubKey(path, throwOnMissingSubKey: false);
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or System.Security.SecurityException) { }
     }
@@ -260,6 +286,12 @@ internal sealed class PreparationRunner
                 var path = Path.Combine(folder, name);
                 ReportWriter.Write(path, info, report.ToSections("Préparation du PC"));
                 _log.Report("Rapport enregistré : " + path);
+                // Reçu par le serveur de l'atelier : inutile d'en laisser une copie sur le PC vendu.
+                if (_server.Report(Serial(), path) && path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), StringComparison.OrdinalIgnoreCase))
+                {
+                    _log.Report("Rapport envoyé au serveur de l'atelier.");
+                    try { File.Delete(path); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+                }
                 return;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

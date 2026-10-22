@@ -29,6 +29,9 @@ jobs:
       - name: Compiler le lanceur JVTECH Outils
         run: dotnet build src/JvtechOutils/JvtechOutils.csproj -c Release -o publish/lanceur -p:Version=${{ env.VERSION }}
 
+      - name: Compiler JVTECH Serveur PXE
+        run: dotnet build src/JvtechServeur/JvtechServeur.csproj -c Release -o publish/serveur-build -p:Version=${{ env.VERSION }}
+
       - name: Réunir les quatre .exe
         shell: pwsh
         run: |
@@ -36,15 +39,16 @@ jobs:
           Copy-Item publish/inspector/PcInspector.exe, publish/securite/PcSecurite.exe, publish/maintenance/PcMaintenance.exe, publish/lanceur/JvtechOutils.exe publish/outils/
           Compress-Archive -Path publish/outils/* -DestinationPath publish/JVTECH-Outils-v${{ env.VERSION }}.zip
 
-      # Kit clé USB : autounattend.xml à la racine, PC Maintenance et ses réglages recopiés par Windows dans C:\JVTECH.
-      - name: Préparer le kit de préparation revente
+      # Serveur PXE du mini PC de l'atelier : le serveur, et à côté le kit qu'il ajoute à l'installation de Windows
+      # (autounattend.xml, PC Maintenance et ses réglages, recopiés par Windows dans C:\JVTECH).
+      - name: Préparer le serveur PXE
         shell: pwsh
         run: |
-          $jvtech = 'publish/kit/sources/$OEM$/$1/JVTECH'
-          New-Item -ItemType Directory -Force -Path $jvtech | Out-Null
-          Copy-Item deploy/autounattend.xml, deploy/LISEZMOI.txt publish/kit/
-          Copy-Item publish/maintenance/PcMaintenance.exe, deploy/options.ini, deploy/debloat.ini -Destination $jvtech
-          Compress-Archive -Path publish/kit/* -DestinationPath publish/JVTECH-Kit-Preparation-v${{ env.VERSION }}.zip
+          New-Item -ItemType Directory -Force -Path publish/serveur/Kit/JVTECH | Out-Null
+          Copy-Item publish/serveur-build/JvtechServeur.exe, deploy/LISEZMOI.txt publish/serveur/
+          Copy-Item deploy/autounattend.xml publish/serveur/Kit/
+          Copy-Item publish/maintenance/PcMaintenance.exe, deploy/options.ini, deploy/debloat.ini -Destination publish/serveur/Kit/JVTECH
+          Compress-Archive -Path publish/serveur/* -DestinationPath publish/JVTECH-Serveur-PXE-v${{ env.VERSION }}.zip
 
       - uses: actions/upload-artifact@v4
         with:
@@ -53,8 +57,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: JVTECH-Kit-Preparation-v${{ env.VERSION }}
-          path: publish/kit/
+          name: JVTECH-Serveur-PXE-v${{ env.VERSION }}
+          path: publish/serveur/
 
       # Sur main : une version publiée par compilation, que les logiciels consultent pour signaler une mise à jour.
       - name: Publier la version
@@ -66,8 +70,8 @@ jobs:
           body: |
             PC Inspector, PC Sécurité, PC Maintenance et le lanceur JVTECH Outils, version v${{ env.VERSION }}.
             Télécharger le .zip, le décompresser (sur une clé USB pour le mode clé USB) et lancer JvtechOutils.exe.
-            Kit de préparation revente (installation automatique de Windows 11) : voir LISEZMOI.txt dans JVTECH-Kit-Preparation.
+            Préparation revente par le réseau (PXE) : JVTECH-Serveur-PXE, à installer sur le mini PC de l'atelier (voir LISEZMOI.txt).
           files: |
             publish/JVTECH-Outils-v${{ env.VERSION }}.zip
-            publish/JVTECH-Kit-Preparation-v${{ env.VERSION }}.zip
+            publish/JVTECH-Serveur-PXE-v${{ env.VERSION }}.zip
             publish/outils/*.exe
