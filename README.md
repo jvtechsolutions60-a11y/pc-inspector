@@ -121,4 +121,26 @@ installées, logiciels mis à jour, espace disque avant/après, durée.
 En haut, un résumé rapide : Windows 11 oui ou non, activation de Windows (résultat de `slmgr /xpr`), mises à jour Windows en attente, logiciels à mettre à jour,
 Glary installé ou non. Chaque étape peut être décochée, et un journal garde la trace de tout ce qui a été fait.
 
-L'action *Build* compile aussi `PcMaintenance.exe`.
+### Préparation revente (installation automatique par le réseau)
+
+Pour les PC d'achat-revente : on efface tout et on réinstalle propre, sans clé USB et sans rester devant.
+`JVTECH-Serveur-PXE-v1.0.N.zip` (publié avec chaque version) s'installe sur un mini PC Windows de l'atelier :
+
+- **JVTECH Serveur PXE** (`src/JvtechServeur`) prépare tout depuis une ISO de Windows 11 avec les outils de Windows
+  (DISM, bcdedit) : partage en lecture seule des fichiers d'installation, Windows PE modifié pour lancer l'installation
+  depuis ce partage, et démarrage réseau compatible Secure Boot (proxyDHCP et TFTP intégrés, gestionnaire de démarrage
+  signé Microsoft ; la box garde son rôle de DHCP). Les PC ne sont acceptés que pendant 30 minutes après un clic ;
+- chaque jour il cherche la mise à jour cumulative de Windows 11 sur le catalogue Microsoft Update et l'intègre
+  à l'image quand aucun PC n'est en cours ;
+- son écran suit tous les PC (étape, durée, rapport) et compte les PC préparés par mois.
+
+Sur le PC, `deploy/autounattend.xml` efface le disque 0, installe Windows 11 en français sans aucune question et
+démarre en **mode audit**. `PcMaintenance.exe /preparation` enchaîne alors, en reprenant seul après chaque redémarrage :
+nettoyage par [Win11Debloat](https://github.com/Raphire/Win11Debloat) (version figée, mode Sysprep) puis applications des fabricants retirées (`debloat.ini`), publicités et suggestions coupées, pilotes et BIOS du constructeur (Dell Command Update, Lenovo System
+Update, HP Image Assistant, BIOS seulement sur secteur), Windows Update en boucle pilotes compris (partage des
+mises à jour entre PC du réseau), nettoyage, contrôle des pilotes et de l'activation, rapport envoyé au serveur.
+À la fin, Sysprep remet le PC au **premier démarrage** et l'éteint : l'acheteur crée son propre compte.
+
+Les étapes se règlent dans `options.ini`. Mode d'emploi : `deploy/LISEZMOI.txt`.
+
+L'action *Build* compile aussi `PcMaintenance.exe` et `JvtechServeur.exe`.

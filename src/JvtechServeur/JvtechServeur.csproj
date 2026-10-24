@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- Comme les autres logiciels : .NET Framework 4.8, déjà présent sur Windows 10 et 11 -->
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <AssemblyName>JvtechServeur</AssemblyName>
+    <RootNamespace>JvtechServeur</RootNamespace>
+    <Product>JVTECH Serveur PXE</Product>
+    <Company>JVTECH Solutions</Company>
+    <Version>1.0.0</Version>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <!-- Version et charte graphique, partagées avec les autres logiciels -->
+  <ItemGroup>
+    <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
+    <Page Include="..\PcInspector\Theme.xaml" Link="Theme.xaml" />
+    <Compile Include="..\PcInspector\AppInfo.cs" Link="Shared\AppInfo.cs" />
+  </ItemGroup>
+
+</Project>

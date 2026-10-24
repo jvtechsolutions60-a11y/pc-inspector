@@ -19,11 +19,12 @@ internal sealed class MaintenanceReport
 
     public bool IsEmpty => _steps.Count == 0;
 
-    public void Begin()
+    /// <summary>Repart de zéro ; la préparation revente donne l'heure de son vrai début, avant les redémarrages.</summary>
+    public void Begin(DateTime? start = null)
     {
         _steps.Clear();
         _details.Clear();
-        Start = DateTime.Now;
+        Start = start ?? DateTime.Now;
         End = null;
         FreeBefore = FreeSpace();
         FreeAfter = null;
@@ -43,9 +44,9 @@ internal sealed class MaintenanceReport
         if (list.Count > 0) _details.Add((title, list));
     }
 
-    public List<InfoSection> ToSections()
+    public List<InfoSection> ToSections(string sectionTitle = "Maintenance du PC")
     {
-        var section = new InfoSection("Maintenance du PC");
+        var section = new InfoSection(sectionTitle);
         var summary = new InfoGroup("Résumé")
             .Add("Ordinateur", Environment.MachineName)
             .Add("Début", Start.ToString("dd/MM/yyyy HH:mm"))
