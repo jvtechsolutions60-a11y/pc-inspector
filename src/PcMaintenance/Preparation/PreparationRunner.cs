@@ -84,6 +84,7 @@ internal sealed class PreparationRunner
                 case PreparationStep.Debloat:
                     if (_options.Debloat) await Task.Run(RunDebloat);
                     else _state.Result("Applications inutiles", "Étape désactivée dans options.ini.");
+                    if (_options.Tweaks) await Task.Run(RunTweaks);
                     Next(PreparationStep.Manufacturer);
                     break;
 
@@ -161,6 +162,14 @@ internal sealed class PreparationRunner
         _state.Result("Applications inutiles", removed.Count == 0 ? "Aucune trouvée." : $"{removed.Count} retirée(s)" + (errors.Count > 0 ? $", {errors.Count} en échec." : "."));
         _state.Detail("Applications retirées", removed);
         _state.Detail("Applications non retirées", errors);
+    }
+
+    private void RunTweaks()
+    {
+        _status.Report("Publicités et suggestions de Windows…");
+        var done = Tweaks.Run(_log);
+        _state.Result("Publicités et suggestions", done.Count == 2 ? "Coupées pour l'acheteur (menu Démarrer, recherche, widgets)." : "Coupées en partie : voir le journal.");
+        _state.Detail("Réglages pour l'acheteur", done);
     }
 
     /// <summary>Un passage de Windows Update. Renvoie la raison du redémarrage, ou null quand il n'y a plus rien à faire.</summary>
