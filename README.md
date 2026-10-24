@@ -136,7 +136,7 @@ Pour les PC d'achat-revente : on efface tout et on réinstalle propre, sans clé
 
 Sur le PC, `deploy/autounattend.xml` efface le disque 0, installe Windows 11 en français sans aucune question et
 démarre en **mode audit**. `PcMaintenance.exe /preparation` enchaîne alors, en reprenant seul après chaque redémarrage :
-applications inutiles retirées (`debloat.ini`), pilotes et BIOS du constructeur (Dell Command Update, Lenovo System
+nettoyage par [Win11Debloat](https://github.com/Raphire/Win11Debloat) (version figée, mode Sysprep) puis applications des fabricants retirées (`debloat.ini`), publicités et suggestions coupées, pilotes et BIOS du constructeur (Dell Command Update, Lenovo System
 Update, HP Image Assistant, BIOS seulement sur secteur), Windows Update en boucle pilotes compris (partage des
 mises à jour entre PC du réseau), nettoyage, contrôle des pilotes et de l'activation, rapport envoyé au serveur.
 À la fin, Sysprep remet le PC au **premier démarrage** et l'éteint : l'acheteur crée son propre compte.

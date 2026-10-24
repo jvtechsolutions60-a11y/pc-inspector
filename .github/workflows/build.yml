@@ -14,6 +14,7 @@ jobs:
     env:
       # Le numéro de run sert de version commune aux quatre .exe : v1.0.N, affichée dans les logiciels et les rapports.
       VERSION: 1.0.${{ github.run_number }}
+      WIN11DEBLOAT: 2026.08.24
     steps:
       - uses: actions/checkout@v4
 
@@ -48,6 +49,12 @@ jobs:
           Copy-Item publish/serveur-build/JvtechServeur.exe, deploy/LISEZMOI.txt publish/serveur/
           Copy-Item deploy/autounattend.xml publish/serveur/Kit/
           Copy-Item publish/maintenance/PcMaintenance.exe, deploy/options.ini, deploy/debloat.ini -Destination publish/serveur/Kit/JVTECH
+          # Win11Debloat (MIT), version figée : changer WIN11DEBLOAT pour passer à une version plus récente.
+          $tag = '${{ env.WIN11DEBLOAT }}'
+          Invoke-WebRequest "https://github.com/Raphire/Win11Debloat/archive/refs/tags/$tag.zip" -OutFile publish/win11debloat.zip
+          Expand-Archive publish/win11debloat.zip publish/win11debloat
+          Copy-Item "publish/win11debloat/Win11Debloat-$tag" -Destination publish/serveur/Kit/JVTECH/Win11Debloat -Recurse
+          if (-not (Test-Path publish/serveur/Kit/JVTECH/Win11Debloat/Win11Debloat.ps1)) { throw 'Win11Debloat.ps1 introuvable' }
           Compress-Archive -Path publish/serveur/* -DestinationPath publish/JVTECH-Serveur-PXE-v${{ env.VERSION }}.zip
 
       - uses: actions/upload-artifact@v4

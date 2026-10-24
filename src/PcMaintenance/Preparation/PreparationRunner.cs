@@ -157,6 +157,15 @@ internal sealed class PreparationRunner
 
     private void RunDebloat()
     {
+        if (_options.Win11Debloat && Win11Debloat.Available)
+        {
+            _status.Report("Nettoyage de Windows (Win11Debloat)…");
+            var error = Win11Debloat.Run(_log);
+            _state.Result("Win11Debloat", error is null ? "Applications, Copilot, Recall, Bing, widgets, suggestions et télémétrie coupés." : "Échec : " + error);
+        }
+        else if (_options.Win11Debloat) _log.Report("Win11Debloat absent du kit : seulement la liste debloat.ini.");
+
+        // Complète Win11Debloat : applications des fabricants et de la liste de l'atelier.
         _status.Report("Retrait des applications inutiles…");
         var (removed, errors) = Debloat.Run(_log);
         _state.Result("Applications inutiles", removed.Count == 0 ? "Aucune trouvée." : $"{removed.Count} retirée(s)" + (errors.Count > 0 ? $", {errors.Count} en échec." : "."));

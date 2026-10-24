@@ -6,7 +6,8 @@ JVTECH SERVEUR PXE · PRÉPARATION REVENTE
 Préparer les PC d'achat-revente par le réseau, sans clé USB et sans rester devant.
 On démarre le PC sur le réseau (touche F12), et il
   1. efface le disque et installe Windows 11 en français, sans aucune question ;
-  2. retire les applications préinstallées inutiles (liste dans Kit\JVTECH\debloat.ini) ;
+  2. nettoie Windows avec Win11Debloat (applications, Copilot, Recall, Bing, widgets, publicités, télémétrie)
+     puis retire les applications des fabricants (liste dans Kit\JVTECH\debloat.ini) ;
   3. installe les pilotes et le BIOS du constructeur (Dell, Lenovo, HP) ;
   4. passe Windows Update en boucle, pilotes compris, jusqu'à ce qu'il n'y ait plus rien ;
   5. vérifie les pilotes manquants et l'activation, et envoie son rapport au serveur ;

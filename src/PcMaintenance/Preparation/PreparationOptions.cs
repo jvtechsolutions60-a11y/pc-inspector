@@ -14,6 +14,8 @@ internal sealed class PreparationOptions
 {
     /// <summary>Retirer les applications préinstallées inutiles (liste dans debloat.ini).</summary>
     public bool Debloat { get; private set; } = true;
+    /// <summary>Lancer Win11Debloat (fourni avec le kit) avant la liste debloat.ini.</summary>
+    public bool Win11Debloat { get; private set; } = true;
     /// <summary>Couper publicités, suggestions, Bing dans la recherche et widgets pour l'acheteur.</summary>
     public bool Tweaks { get; private set; } = true;
     /// <summary>Pilotes et logiciels du constructeur (Dell, Lenovo, HP).</summary>
@@ -40,6 +42,7 @@ internal sealed class PreparationOptions
                 .GroupBy(p => p[0].Trim(), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First()[1].Trim(), StringComparer.OrdinalIgnoreCase);
             options.Debloat = Flag(values, "Debloat", options.Debloat);
+            options.Win11Debloat = Flag(values, "Win11Debloat", options.Win11Debloat);
             options.Tweaks = Flag(values, "Publicites", options.Tweaks);
             options.Manufacturer = Flag(values, "Constructeur", options.Manufacturer);
             options.Bios = Flag(values, "Bios", options.Bios);

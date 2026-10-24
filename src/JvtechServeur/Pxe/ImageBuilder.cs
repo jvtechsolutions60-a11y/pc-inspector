@@ -148,8 +148,13 @@ if (Test-Path $dst) {{
         var oem = Path.Combine(ServerConfig.InstallFolder, @"sources\$OEM$\$1\JVTECH");
         Directory.CreateDirectory(oem);
         File.Copy(Path.Combine(kit, "autounattend.xml"), Path.Combine(ServerConfig.InstallFolder, "autounattend.xml"), true);
-        foreach (var file in Directory.GetFiles(Path.Combine(kit, "JVTECH")))
-            File.Copy(file, Path.Combine(oem, Path.GetFileName(file)), true);
+        var source = Path.Combine(kit, "JVTECH");
+        foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var target = Path.Combine(oem, file.Substring(source.Length + 1));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target, true);
+        }
         File.WriteAllLines(Path.Combine(oem, "serveur.ini"), new[]
         {
             "# Écrit par JVTECH Serveur PXE : où PC Maintenance envoie l'avancement et le rapport.",
