@@ -480,6 +480,59 @@ public partial class MainWindow : Window
         Log("Arrêt demandé : la maintenance s'arrête à la fin de l'étape en cours.");
     }
 
+    private void Win11Upgrade_Click(object sender, RoutedEventArgs e)
+    {
+        const string title = "Passer à Windows 11";
+        if (_running) return;
+        var version = WindowsVersion.Read();
+        if (version.IsWindows11 && MessageBox.Show(this,
+                $"Ce PC est déjà sous {version.Name} {version.DisplayVersion}. Lancer quand même l'installation depuis une ISO (passage à une version plus récente, ou réparation en gardant les fichiers) ?",
+                title, MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+
+        var blockers = Windows11Upgrade.Blockers();
+        if (blockers.Count > 0)
+        {
+            Log("Passage à Windows 11 impossible : " + string.Join(" ", blockers));
+            MessageBox.Show(this, string.Join("\n\n", blockers), title, MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "ISO de Windows 11 (téléchargée sur le site de Microsoft)",
+            Filter = "Image ISO (*.iso)|*.iso",
+            InitialDirectory = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"),
+        };
+        if (dialog.ShowDialog(this) != true) return;
+
+        var warnings = Windows11Upgrade.Warnings();
+        var message = "Windows 11 va être installé par-dessus Windows, en gardant les fichiers, les logiciels et les réglages.\n\n"
+            + "• Ce PC n'est pas officiellement compatible : Microsoft ne garantit pas les mises à jour, et chaque nouvelle version annuelle "
+            + "devra peut-être être installée de la même façon.\n"
+            + "• Un filigrane « Configuration requise non remplie » peut apparaître.\n"
+            + "• Le PC redémarre plusieurs fois (30 à 90 minutes). Brancher le chargeur.\n"
+            + "• Une sauvegarde des données du client est conseillée avant de lancer.\n"
+            + string.Concat(warnings.Select(w => "• " + w + "\n"))
+            + "\nLancer la mise à niveau ?";
+        if (MessageBox.Show(this, message, title, MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+
+        var iso = dialog.FileName;
+        var log = new Progress<string>(Log);
+        Win11Button.IsEnabled = false;
+        Task.Run(() => Windows11Upgrade.Start(iso, log)).ContinueWith(t =>
+        {
+            Win11Button.IsEnabled = true;
+            var error = t.Exception?.GetBaseException().Message ?? t.Result;
+            if (error is null)
+            {
+                _report.Step("Passage à Windows 11", "Mise à niveau lancée depuis l'ISO (PC non compatible), fichiers et logiciels gardés.");
+                return;
+            }
+            Log("Passage à Windows 11 : " + error);
+            MessageBox.Show(this, error, title, MessageBoxButton.OK, MessageBoxImage.Error);
+        }, TaskScheduler.FromCurrentSynchronizationContext());
+    }
+
     private void OpenWindowsUpdate_Click(object sender, RoutedEventArgs e) =>
         Process.Start(new ProcessStartInfo("ms-settings:windowsupdate") { UseShellExecute = true });
 

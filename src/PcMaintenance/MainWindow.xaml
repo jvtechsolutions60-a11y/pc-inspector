@@ -86,6 +86,8 @@
                         <Button Content="Ouvrir Windows Update" Margin="0,8,0,0" Click="OpenWindowsUpdate_Click"/>
                         <Button x:Name="ReportButton" Content="Rapport de maintenance" Margin="0,8,0,0"
                                 Click="ReportButton_Click" ToolTip="Fiche client de ce qui a été fait (HTML, PDF ou texte)"/>
+                        <Button x:Name="Win11Button" Content="Passer à Windows 11…" Margin="0,8,0,0" Click="Win11Upgrade_Click"
+                                ToolTip="PC refusé par Windows Update (TPM, processeur, Secure Boot) : mise à niveau depuis une ISO, en gardant fichiers et logiciels"/>
                     </StackPanel>
                     <StackPanel>
                         <TextBlock Text="Étapes" Style="{StaticResource SectionTitle}"/>
