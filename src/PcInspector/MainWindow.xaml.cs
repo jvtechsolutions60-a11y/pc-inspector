@@ -327,6 +327,30 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void TrackingSheet_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ExportWindow
+        {
+            Owner = this,
+            FilePrefix = "Fiche-suivi",
+            Filter = "PDF (*.pdf)|*.pdf|Page web (*.html)|*.html",
+        };
+        if (dialog.ShowDialog() != true || dialog.Info is null || dialog.FilePath is null) return;
+        var info = dialog.Info;
+        var path = dialog.FilePath;
+        ShowStatus("Fiche de suivi : bilan du PC en cours…");
+        try
+        {
+            await Task.Run(() => TrackingSheetWriter.Write(path, info));
+            ShowStatus("Fiche de suivi enregistrée.");
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, "Impossible d'enregistrer la fiche de suivi : " + ex.Message, "Fiche de suivi", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void UpdateLink_Click(object sender, RoutedEventArgs e) =>
         Process.Start(new ProcessStartInfo(_updateUrl) { UseShellExecute = true });
 
