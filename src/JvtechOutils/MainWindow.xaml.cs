@@ -39,7 +39,7 @@ public partial class MainWindow : Window
         }
         try
         {
-            // Les trois logiciels demandent les droits administrateur : Windows affiche sa confirmation.
+            // PC Inspector, PC Sécurité et PC Maintenance demandent les droits administrateur : Windows affiche sa confirmation.
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true, WorkingDirectory = AppPaths.ExeFolder });
             StatusText.Text = "";
         }

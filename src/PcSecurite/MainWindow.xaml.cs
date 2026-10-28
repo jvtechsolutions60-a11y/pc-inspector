@@ -152,7 +152,7 @@ public partial class MainWindow : Window
 
     private void SetButtons(bool enabled)
     {
-        RescanButton.IsEnabled = ExportButton.IsEnabled = ClientGuideButton.IsEnabled = enabled;
+        RescanButton.IsEnabled = ExportButton.IsEnabled = ClientGuideButton.IsEnabled = CyberButton.IsEnabled = enabled;
         GuidedButton.IsEnabled = enabled && _checks.Any(c => c.NeedsAction);
     }
 
@@ -193,6 +193,58 @@ public partial class MainWindow : Window
 
     private void ClientGuideButton_Click(object sender, RoutedEventArgs e) =>
         Export("Conseils securite", (path, info) => ClientGuide.Write(path, info, _checks.ToList()));
+
+    /// <summary>
+    /// Résultats de ce poste au format lu par JVTECH Diagnostic Cyber (.jvsec) : une ligne par contrôle,
+    /// « Controle=Nom|Statut|Détail ». Rien n'est envoyé : le fichier est importé à la main.
+    /// </summary>
+    private void CyberButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Résultats pour le diagnostic cyber",
+            Filter = "Résultats PC Sécurité (*.jvsec)|*.jvsec",
+            FileName = Environment.MachineName + ".jvsec",
+            InitialDirectory = AppPaths.EnsureFolder(System.IO.Path.Combine(AppPaths.ReportsRoot, "Diagnostic cyber", "Postes")),
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        var lines = new List<string>
+        {
+            "# PC Sécurité, résultats pour JVTECH Diagnostic Cyber",
+            "Poste=" + Environment.MachineName,
+            "Windows=" + WindowsName(),
+            "DatePoste=" + DateTime.Now.ToString("yyyy-MM-dd HH:mm"),
+        };
+        lines.AddRange(_checks.Select(c => $"Controle={c.Name}|{c.Status}|{OneLine(c.Detail)}"));
+        try
+        {
+            System.IO.File.WriteAllLines(dialog.FileName, lines, new System.Text.UTF8Encoding(true));
+            MessageBox.Show(this, "Résultats enregistrés. Dans JVTECH Diagnostic Cyber, cliquer sur « Importer les postes ».",
+                "PC Sécurité", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, "Impossible d'enregistrer le fichier : " + ex.Message, "PC Sécurité", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private static string OneLine(string? text) => (text ?? "").Replace("\r", "").Replace("\n", " ").Replace("|", "/").Trim();
+
+    private static string WindowsName()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
+            var name = key?.GetValue("ProductName") as string ?? "Windows";
+            // ProductName dit encore « Windows 10 » sur Windows 11 : le numéro de build tranche.
+            if (int.TryParse(key?.GetValue("CurrentBuildNumber") as string, out var build) && build >= 22000) name = name.Replace("Windows 10", "Windows 11");
+            return $"{name} {key?.GetValue("DisplayVersion") as string}".Trim();
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException)
+        {
+            return "Windows";
+        }
+    }
 
     private void Export(string prefix, Action<string, ReportInfo> write)
     {

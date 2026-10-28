@@ -69,7 +69,7 @@ Il partage le code WMI, le rapport et la fenêtre d'export avec PC Inspector (fi
 ## Communs aux trois logiciels
 
 - **Lanceur JVTECH Outils** (`src/JvtechOutils`, `JvtechOutils.exe`) : un écran d'accueil qui ouvre PC Inspector, PC Sécurité
-  ou PC Maintenance, rangés dans le même dossier, et le dossier des rapports.
+  PC Maintenance ou Diagnostic Cyber, rangés dans le même dossier, et le dossier des rapports.
 - **Dossier client commun** : les rapports sont proposés dans `Documents\JVTECH\Rapports\<client>\<date>`. Le client et le
   n° d'intervention saisis dans un logiciel sont repris dans les autres le même jour.
 - **Mode clé USB** : lancés depuis une clé (ou avec un fichier `portable.txt` à côté des .exe), les logiciels gardent
@@ -144,3 +144,20 @@ mises à jour entre PC du réseau), nettoyage, contrôle des pilotes et de l'act
 Les étapes se règlent dans `options.ini`. Mode d'emploi : `deploy/LISEZMOI.txt`.
 
 L'action *Build* compile aussi `PcMaintenance.exe` et `JvtechServeur.exe`.
+
+## JVTECH Diagnostic Cyber
+
+Quatrième logiciel, `src/JvtechCyber/` (`JvtechCyber.exe`) : la sécurité de **l'entreprise** (le système
+d'information), là où PC Sécurité regarde un seul poste. Ne modifie rien sur le PC.
+
+- **Un dossier par entreprise** dans `Rapports\Diagnostic cyber\<entreprise>`, avec l'historique des diagnostics et la
+  progression de la note d'un diagnostic à l'autre.
+- **Questionnaire en 9 thèmes**, chacun noté de 0 à 3 : sauvegardes, mises à jour, antivirus, comptes et mots de passe,
+  arnaques, réseau et Wi-Fi, accès à distance et portables, inventaire et prestataires, incident et continuité.
+  Référentiel JVTECH rédigé d'après les recommandations publiques de l'ANSSI et de cybermalveillance.gouv.fr.
+- **Note sur 100** (les thèmes essentiels comptent double) et **6 menaces** (rançongiciel, fraude au virement, piratage de
+  la messagerie, fuite de données, perte de données, faux support) marquées exposée, en partie couverte ou couverte.
+- **Postes** : dans PC Sécurité, le bouton *Pour le diagnostic cyber* enregistre un fichier `.jvsec` par poste, que
+  *Importer les postes* reprend. Les constats s'affichent sous chaque thème concerné.
+- **Plan d'action et rapport PDF** : les prochaines étapes de chaque thème, de la plus urgente à la moins urgente, avec le
+  coût indicatif et le prix JVTECH de la prestation (*Mes tarifs*, fichier `tarifs-cyber.ini`).

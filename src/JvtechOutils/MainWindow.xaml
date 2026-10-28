@@ -61,6 +61,17 @@
                     </StackPanel>
                 </DockPanel>
             </Button>
+            <Button Style="{StaticResource ToolButton}" Tag="JvtechCyber.exe" Click="Tool_Click">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Left" Text="&#xE8D7;" FontFamily="Segoe MDL2 Assets" FontSize="28"
+                               Foreground="{StaticResource DangerBrush}" Width="48" VerticalAlignment="Center"/>
+                    <StackPanel>
+                        <TextBlock Text="Diagnostic Cyber" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
+                        <TextBlock Text="Sécurité de l'entreprise : questionnaire, menaces, plan d'action chiffré et rapport. Ne modifie rien."
+                                   TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </DockPanel>
+            </Button>
 
             <DockPanel Margin="2,4,2,0">
                 <TextBlock DockPanel.Dock="Right">
