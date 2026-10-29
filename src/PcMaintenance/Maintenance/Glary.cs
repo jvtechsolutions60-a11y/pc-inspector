@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -88,98 +89,179 @@ internal static class Glary
     private static readonly Regex ScanButton = new("^(Analyser|Rechercher|Scan)", RegexOptions.IgnoreCase);
     private static readonly Regex RepairButton = new("^(Réparer|Corriger|Repair|Fix)", RegexOptions.IgnoreCase);
 
+    // La fenêtre de Glary est dessinée par Glary lui-même : Windows n'y voit souvent aucun bouton. On clique alors au
+    // centre du gros bouton vert en bas de la fenêtre, qui affiche « Analyser » puis « Réparer les problèmes ».
+    private const double ButtonX = 0.50;
+    private const double ButtonY = 0.88;
+
     /// <summary>
-    /// Pilote la fenêtre de Glary sans intervention : lance l'analyse si elle n'a pas démarré seule, clique sur
-    /// « Réparer les problèmes » dès qu'il est disponible, puis ferme la fenêtre quand la réparation est finie.
-    /// Si les boutons ne sont pas trouvés (autre version de Glary), la fenêtre reste ouverte et on attend sa fermeture.
+    /// Pilote la maintenance 1 clic sans intervention : clic sur « Analyser », attente de la fin de l'analyse,
+    /// clic sur « Réparer », attente de la fin de la réparation, puis fermeture de la fenêtre.
+    /// Si quelque chose ne colle pas, la fenêtre reste ouverte et la suite attend qu'on la ferme.
     /// </summary>
-    private static void Drive(Process process, IProgress<string> log)
+    private static void Drive(Process launched, IProgress<string> log)
     {
-        var launched = DateTime.UtcNow;
-        var deadline = launched.AddMinutes(30);
-        var scanClicked = false;
-        var repaired = false;
-        DateTime? repairStarted = null;
-        var shown = false;
-        while (!process.HasExited && DateTime.UtcNow < deadline)
+        var window = WaitForWindow(launched, TimeSpan.FromSeconds(60));
+        if (window is not { } w)
         {
-            Thread.Sleep(2000);
-            AutomationElement? window;
-            try
-            {
-                process.Refresh();
-                if (process.MainWindowHandle == IntPtr.Zero) continue;
-                window = AutomationElement.FromHandle(process.MainWindowHandle);
-            }
-            catch (Exception ex) when (ex is InvalidOperationException or ElementNotAvailableException or ArgumentException) { continue; }
+            log.Report("Glary : fenêtre introuvable, terminer la maintenance à la main puis fermer la fenêtre.");
+            return;
+        }
+        Thread.Sleep(3000); // laisser la fenêtre se dessiner
 
-            var buttons = Buttons(window);
-            if (!shown)
-            {
-                shown = true;
-                log.Report("Boutons de Glary : " + (buttons.Count == 0 ? "aucun lisible" : string.Join(", ", buttons.Select(b => b.Name))));
-            }
+        log.Report("Glary : clic sur « Analyser ».");
+        if (!Press(w, ScanButton, log)) return;
+        // L'analyse démarre : attendre qu'elle se termine (Glary ne travaille plus et le bouton vert est revenu).
+        if (!WaitUntilIdle(w, TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(30), log)) return;
 
-            if (!repaired)
-            {
-                var repair = buttons.FirstOrDefault(b => RepairButton.IsMatch(b.Name) && b.Enabled);
-                if (repair.Element is not null && Invoke(repair.Element))
-                {
-                    repaired = true;
-                    repairStarted = DateTime.UtcNow;
-                    log.Report("Glary : réparation lancée automatiquement.");
-                    continue;
-                }
-                var scan = buttons.FirstOrDefault(b => ScanButton.IsMatch(b.Name) && b.Enabled);
-                if (!scanClicked && scan.Element is not null && DateTime.UtcNow - launched > TimeSpan.FromSeconds(10) && Invoke(scan.Element))
-                {
-                    scanClicked = true;
-                    log.Report("Glary : analyse lancée automatiquement.");
-                }
-                continue;
-            }
+        log.Report("Glary : analyse terminée, clic sur « Réparer les problèmes ».");
+        if (Press(w, RepairButton, log))
+        {
+            if (!WaitUntilIdle(w, TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(30), log)) return;
+        }
+        else log.Report("Glary : pas de bouton « Réparer » (rien à réparer ?).");
 
-            // Réparation finie quand le bouton d'analyse revient (ou que le bouton de réparation a disparu) depuis un moment.
-            var finished = buttons.Any(b => ScanButton.IsMatch(b.Name) && b.Enabled) || !buttons.Any(b => RepairButton.IsMatch(b.Name));
-            if (finished && DateTime.UtcNow - repairStarted > TimeSpan.FromSeconds(20))
+        log.Report("Glary : réparation terminée, fermeture de la fenêtre.");
+        try { w.Process.CloseMainWindow(); }
+        catch (InvalidOperationException) { }
+    }
+
+    private readonly record struct GlaryWindow(Process Process, IntPtr Handle);
+
+    /// <summary>La fenêtre de la maintenance 1 clic, même si le programme lancé a passé la main à un autre processus.</summary>
+    private static GlaryWindow? WaitForWindow(Process launched, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var candidates = new List<Process>();
+            try { if (!launched.HasExited) { launched.Refresh(); candidates.Add(launched); } }
+            catch (InvalidOperationException) { }
+            candidates.AddRange(Process.GetProcessesByName(Path.GetFileNameWithoutExtension(OneClick)));
+            foreach (var process in candidates)
             {
-                log.Report("Glary : réparation terminée, fermeture de la fenêtre.");
                 try
                 {
-                    if (window.TryGetCurrentPattern(WindowPattern.Pattern, out var pattern)) ((WindowPattern)pattern).Close();
-                    else process.CloseMainWindow();
+                    process.Refresh();
+                    if (!process.HasExited && process.MainWindowHandle != IntPtr.Zero && IsWindowVisible(process.MainWindowHandle))
+                        return new GlaryWindow(process, process.MainWindowHandle);
                 }
-                catch (Exception ex) when (ex is InvalidOperationException or ElementNotAvailableException) { process.CloseMainWindow(); }
-                return;
+                catch (InvalidOperationException) { }
             }
+            Thread.Sleep(1000);
         }
-        if (!repaired && !process.HasExited) log.Report("Glary : boutons introuvables, terminer la maintenance à la main puis fermer la fenêtre.");
+        return null;
     }
 
-    private static List<(AutomationElement Element, string Name, bool Enabled)> Buttons(AutomationElement window)
+    /// <summary>Clique sur le bouton par son nom si Windows le voit, sinon sur le bouton vert du bas de la fenêtre.</summary>
+    private static bool Press(GlaryWindow window, Regex label, IProgress<string> log)
     {
-        var list = new List<(AutomationElement, string, bool)>();
-        try
+        if (window.Process.HasExited) return false;
+        ShowWindow(window.Handle, 9); // SW_RESTORE
+        SetForegroundWindow(window.Handle);
+        Thread.Sleep(500);
+
+        if (FindByName(window.Handle, label) is { } element)
         {
-            var found = window.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button));
-            foreach (AutomationElement button in found)
+            if (element.TryGetCurrentPattern(InvokePattern.Pattern, out var pattern))
             {
-                var name = button.Current.Name?.Trim() ?? "";
-                if (name.Length > 0) list.Add((button, name, button.Current.IsEnabled && !button.Current.IsOffscreen));
+                try { ((InvokePattern)pattern).Invoke(); return true; }
+                catch (Exception ex) when (ex is InvalidOperationException or ElementNotAvailableException) { }
             }
+            var r = element.Current.BoundingRectangle;
+            if (!r.IsEmpty) { Click((int)(r.Left + r.Width / 2), (int)(r.Top + r.Height / 2)); return true; }
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ElementNotAvailableException) { }
-        return list;
+
+        if (!GetWindowRect(window.Handle, out var rect)) return false;
+        var x = rect.Left + (int)((rect.Right - rect.Left) * ButtonX);
+        var y = rect.Top + (int)((rect.Bottom - rect.Top) * ButtonY);
+        if (!IsGreen(x, y))
+        {
+            log.Report("Glary : le bouton vert n'est pas à l'endroit attendu, terminer à la main puis fermer la fenêtre.");
+            return false;
+        }
+        Click(x, y);
+        return true;
     }
 
-    private static bool Invoke(AutomationElement button)
+    private static AutomationElement? FindByName(IntPtr handle, Regex label)
     {
         try
         {
-            if (!button.TryGetCurrentPattern(InvokePattern.Pattern, out var pattern)) return false;
-            ((InvokePattern)pattern).Invoke();
-            return true;
+            foreach (AutomationElement element in AutomationElement.FromHandle(handle).FindAll(TreeScope.Descendants, Condition.TrueCondition))
+            {
+                var name = element.Current.Name?.Trim() ?? "";
+                if (label.IsMatch(name) && element.Current.IsEnabled && !element.Current.IsOffscreen) return element;
+            }
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ElementNotAvailableException) { return false; }
+        catch (Exception ex) when (ex is InvalidOperationException or ElementNotAvailableException or ArgumentException) { }
+        return null;
     }
+
+    /// <summary>
+    /// Attend que Glary ait fini : presque plus de processeur utilisé pendant 10 secondes et le bouton vert affiché
+    /// (pendant l'analyse, le bouton du bas sert à arrêter : on ne clique pas dessus).
+    /// </summary>
+    private static bool WaitUntilIdle(GlaryWindow window, TimeSpan minimum, TimeSpan timeout, IProgress<string> log)
+    {
+        var started = DateTime.UtcNow;
+        var lastCpu = Cpu(window.Process);
+        var quietSince = DateTime.UtcNow;
+        while (DateTime.UtcNow - started < timeout)
+        {
+            Thread.Sleep(2000);
+            if (window.Process.HasExited) return false;
+            var cpu = Cpu(window.Process);
+            if ((cpu - lastCpu).TotalMilliseconds > 200) quietSince = DateTime.UtcNow;
+            lastCpu = cpu;
+            if (DateTime.UtcNow - started < minimum || DateTime.UtcNow - quietSince < TimeSpan.FromSeconds(10)) continue;
+            if (!GetWindowRect(window.Handle, out var rect)) return false;
+            var x = rect.Left + (int)((rect.Right - rect.Left) * ButtonX);
+            var y = rect.Top + (int)((rect.Bottom - rect.Top) * ButtonY);
+            if (FindByName(window.Handle, ScanButton) is not null || FindByName(window.Handle, RepairButton) is not null || IsGreen(x, y)) return true;
+        }
+        log.Report("Glary : délai dépassé, terminer à la main puis fermer la fenêtre.");
+        return false;
+    }
+
+    private static TimeSpan Cpu(Process process)
+    {
+        try { process.Refresh(); return process.TotalProcessorTime; }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { return TimeSpan.Zero; }
+    }
+
+    /// <summary>Vrai si le point de l'écran est du vert franc des boutons de Glary.</summary>
+    private static bool IsGreen(int x, int y)
+    {
+        var dc = GetDC(IntPtr.Zero);
+        try
+        {
+            var color = GetPixel(dc, x, y);
+            int r = (int)(color & 0xFF), g = (int)((color >> 8) & 0xFF), b = (int)((color >> 16) & 0xFF);
+            return g > 140 && g > r + 60 && g > b + 60;
+        }
+        finally { ReleaseDC(IntPtr.Zero, dc); }
+    }
+
+    private static void Click(int x, int y)
+    {
+        SetCursorPos(x, y);
+        Thread.Sleep(150);
+        mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero); // bouton gauche enfoncé
+        Thread.Sleep(80);
+        mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero); // relâché
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Rect { public int Left, Top, Right, Bottom; }
+
+    [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out Rect rect);
+    [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int command);
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr hWnd);
+    [DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] private static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
+    [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr hWnd);
+    [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hWnd, IntPtr dc);
+    [DllImport("gdi32.dll")] private static extern uint GetPixel(IntPtr dc, int x, int y);
 }
