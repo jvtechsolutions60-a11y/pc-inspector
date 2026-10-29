@@ -40,7 +40,7 @@ public static class TrackingSheetWriter
         var gpus = string.Join(" + ", Wmi.Query("SELECT Name FROM Win32_VideoController")
             .Select(g => g.Str("Name")?.Replace("(R)", "").Replace("(TM)", "").Trim())
             .Where(n => !string.IsNullOrEmpty(n) && !n!.Contains("Basic") && !n.Contains("Remote")));
-        var model = $"{system?.Str("Manufacturer")} {system?.Str("Model")}".Trim();
+        var model = MachineIdentity.Model();
 
         // Un domaine est « vérifié » s'il a un point vert et aucun point rouge ou orange.
         bool Verified(params string[] areas) =>
@@ -119,7 +119,7 @@ small{display:block;color:#475569;font-size:7pt;margin-top:1px;line-height:1.2}
 
         html.AppendLine("<h2>1&nbsp; IDENTIFICATION / RÉCEPTION</h2><table>");
         html.AppendLine($"<tr><td>{Field("Réf. stock", info.JobNumber)}</td><td>{Field("Date entrée", info.Date.ToString("dd/MM/yyyy"))}</td><td>{Field("Responsable", info.Technician)}</td></tr>");
-        html.AppendLine($"<tr><td>{Field("Marque / modèle", model)}</td><td>{Field("N° série", bios?.Str("SerialNumber")?.Trim())}</td><td>{Field("Origine", info.Client)}</td></tr>");
+        html.AppendLine($"<tr><td>{Field("Marque / modèle", model)}</td><td>{Field("N° série", MachineIdentity.Serial())}</td><td>{Field("Origine", info.Client)}</td></tr>");
         html.AppendLine($"<tr><td>{Field("CPU", cpu)}<br>{Field("RAM", ram)}</td><td>{Field("SSD / HDD", disks)}</td><td>{Field("GPU", gpus)}</td></tr>");
         html.AppendLine("<tr><td>Accessoires : ☐ Chargeur ☐ Câble ☐ Autre : ________</td><td>État : ☐ Très bon ☐ Bon ☐ Moyen ☐ HS</td><td></td></tr></table>");
 

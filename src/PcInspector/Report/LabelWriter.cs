@@ -39,7 +39,7 @@ public static class LabelWriter
 
         var rows = new List<(string, string?)>
         {
-            ("Modèle", $"{system?.Str("Manufacturer")} {system?.Str("Model")}".Trim()),
+            ("Modèle", MachineIdentity.Model()),
             ("N° de série", serial),
             ("Processeur", Shorten(cpu)),
             ("Mémoire", ram),
