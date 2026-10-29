@@ -111,15 +111,24 @@ internal static class Glary
 
         log.Report("Glary : clic sur « Analyser ».");
         if (!Press(w, ScanButton, log)) return;
-        // L'analyse démarre : attendre qu'elle se termine (Glary ne travaille plus et le bouton vert est revenu).
+        // L'analyse démarre : attendre qu'elle se termine (la fenêtre ne bouge plus et le bouton vert est revenu).
         if (!WaitUntilIdle(w, TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(30), log)) return;
 
-        log.Report("Glary : analyse terminée, clic sur « Réparer les problèmes ».");
-        if (Press(w, RepairButton, log))
+        log.Report("Glary : analyse terminée, clic sur « Réparer ».");
+        var clicked = false;
+        for (var attempt = 1; attempt <= 3 && !clicked; attempt++)
         {
-            if (!WaitUntilIdle(w, TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(30), log)) return;
+            var before = Fingerprint(w.Handle);
+            if (!Press(w, RepairButton, log)) break;
+            clicked = Reacted(w, before);
+            if (!clicked) log.Report($"Glary : le clic sur « Réparer » n'a rien changé (essai {attempt}/3).");
         }
-        else log.Report("Glary : pas de bouton « Réparer » (rien à réparer ?).");
+        if (!clicked)
+        {
+            log.Report("Glary : réparation non lancée, terminer à la main puis fermer la fenêtre.");
+            return;
+        }
+        if (!WaitUntilIdle(w, TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(30), log)) return;
 
         log.Report("Glary : réparation terminée, fermeture de la fenêtre.");
         try { w.Process.CloseMainWindow(); }
@@ -172,9 +181,8 @@ internal static class Glary
             if (!r.IsEmpty) { Click((int)(r.Left + r.Width / 2), (int)(r.Top + r.Height / 2)); return true; }
         }
 
-        if (!GetWindowRect(window.Handle, out var rect)) return false;
-        var x = rect.Left + (int)((rect.Right - rect.Left) * ButtonX);
-        var y = rect.Top + (int)((rect.Bottom - rect.Top) * ButtonY);
+        if (ButtonPoint(window.Handle) is not { } point) return false;
+        var (x, y) = point;
         if (!IsGreen(x, y))
         {
             log.Report("Glary : le bouton vert n'est pas à l'endroit attendu, terminer à la main puis fermer la fenêtre.");
@@ -199,36 +207,79 @@ internal static class Glary
     }
 
     /// <summary>
-    /// Attend que Glary ait fini : presque plus de processeur utilisé pendant 10 secondes et le bouton vert affiché
-    /// (pendant l'analyse, le bouton du bas sert à arrêter : on ne clique pas dessus).
+    /// Attend que Glary ait fini : sa fenêtre ne bouge plus (barre de progression et compteurs arrêtés) depuis
+    /// 8 secondes et le gros bouton vert est affiché. Le processeur ne sert pas de repère : la fenêtre de Glary
+    /// continue d'en consommer une fois l'analyse finie.
     /// </summary>
     private static bool WaitUntilIdle(GlaryWindow window, TimeSpan minimum, TimeSpan timeout, IProgress<string> log)
     {
         var started = DateTime.UtcNow;
-        var lastCpu = Cpu(window.Process);
-        var quietSince = DateTime.UtcNow;
+        var nextNews = started.AddMinutes(1);
+        int[]? last = null;
+        var stableSince = DateTime.UtcNow;
         while (DateTime.UtcNow - started < timeout)
         {
-            Thread.Sleep(2000);
+            Thread.Sleep(1000);
             if (window.Process.HasExited) return false;
-            var cpu = Cpu(window.Process);
-            if ((cpu - lastCpu).TotalMilliseconds > 200) quietSince = DateTime.UtcNow;
-            lastCpu = cpu;
-            if (DateTime.UtcNow - started < minimum || DateTime.UtcNow - quietSince < TimeSpan.FromSeconds(10)) continue;
-            if (!GetWindowRect(window.Handle, out var rect)) return false;
-            var x = rect.Left + (int)((rect.Right - rect.Left) * ButtonX);
-            var y = rect.Top + (int)((rect.Bottom - rect.Top) * ButtonY);
-            if (FindByName(window.Handle, ScanButton) is not null || FindByName(window.Handle, RepairButton) is not null || IsGreen(x, y)) return true;
+            var print = Fingerprint(window.Handle);
+            if (print is null) return false;
+            if (last is null || Differences(last, print) > 3) stableSince = DateTime.UtcNow;
+            last = print;
+            if (DateTime.UtcNow > nextNews)
+            {
+                log.Report($"Glary : en cours ({(int)(DateTime.UtcNow - started).TotalMinutes} min)…");
+                nextNews = nextNews.AddMinutes(1);
+            }
+            if (DateTime.UtcNow - started < minimum || DateTime.UtcNow - stableSince < TimeSpan.FromSeconds(8)) continue;
+            if (ButtonPoint(window.Handle) is { } p && IsGreen(p.X, p.Y)) return true;
         }
         log.Report("Glary : délai dépassé, terminer à la main puis fermer la fenêtre.");
         return false;
     }
 
-    private static TimeSpan Cpu(Process process)
+    /// <summary>Après un clic, vrai si la fenêtre a changé dans les secondes qui suivent (le clic a été pris).</summary>
+    private static bool Reacted(GlaryWindow window, int[]? before)
     {
-        try { process.Refresh(); return process.TotalProcessorTime; }
-        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { return TimeSpan.Zero; }
+        if (before is null) return true;
+        for (var i = 0; i < 6; i++)
+        {
+            Thread.Sleep(1000);
+            if (window.Process.HasExited) return true;
+            if (Fingerprint(window.Handle) is { } now && Differences(before, now) > 3) return true;
+        }
+        return false;
     }
+
+    private static (int X, int Y)? ButtonPoint(IntPtr handle)
+    {
+        if (!GetWindowRect(handle, out var rect)) return null;
+        return (rect.Left + (int)((rect.Right - rect.Left) * ButtonX), rect.Top + (int)((rect.Bottom - rect.Top) * ButtonY));
+    }
+
+    /// <summary>
+    /// Couleurs d'une grille de 32 × 16 points de la fenêtre, pour savoir si elle change encore. Le bas de la
+    /// fenêtre (le bouton, qui change de teinte au survol) est laissé de côté.
+    /// </summary>
+    private static int[]? Fingerprint(IntPtr handle)
+    {
+        if (!GetWindowRect(handle, out var rect) || rect.Right <= rect.Left || rect.Bottom <= rect.Top) return null;
+        var points = new int[32 * 16];
+        var dc = GetDC(IntPtr.Zero);
+        try
+        {
+            for (var row = 0; row < 16; row++)
+            for (var col = 0; col < 32; col++)
+            {
+                var x = rect.Left + (rect.Right - rect.Left) * (2 * col + 1) / 64;
+                var y = rect.Top + (rect.Bottom - rect.Top) * 3 * (2 * row + 1) / (4 * 32);
+                points[row * 32 + col] = (int)GetPixel(dc, x, y);
+            }
+        }
+        finally { ReleaseDC(IntPtr.Zero, dc); }
+        return points;
+    }
+
+    private static int Differences(int[] a, int[] b) => a.Zip(b, (x, y) => x == y ? 0 : 1).Sum();
 
     /// <summary>Vrai si le point de l'écran est du vert franc des boutons de Glary.</summary>
     private static bool IsGreen(int x, int y)
