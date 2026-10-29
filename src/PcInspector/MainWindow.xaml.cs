@@ -305,6 +305,8 @@ public partial class MainWindow : Window
 
     private void LiveMonitor_Click(object sender, RoutedEventArgs e) => new LiveMonitorWindow { Owner = this }.Show();
 
+    private void Listing_Click(object sender, RoutedEventArgs e) => new ListingWindow { Owner = this }.Show();
+
     private async void Label_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new ExportWindow
