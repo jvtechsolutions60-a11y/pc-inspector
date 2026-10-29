@@ -17,6 +17,8 @@
 
   <ItemGroup>
     <Reference Include="System.Management" />
+    <Reference Include="UIAutomationClient" />
+    <Reference Include="UIAutomationTypes" />
   </ItemGroup>
 
   <!-- Code partagé avec PC Inspector : version, dossiers (mode clé USB), mises à jour, rapport client et fenêtre d'export -->

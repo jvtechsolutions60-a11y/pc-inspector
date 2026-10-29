@@ -126,7 +126,7 @@ public partial class MainWindow : Window
         {
             SetCard(GlaryValue, "Installé", "OkBrush");
             GlaryDetail.Text = _glaryFolder;
-            GlaryStatus.Text = "La suite démarre quand la fenêtre de Glary est fermée.";
+            GlaryStatus.Text = "Analyse et réparation lancées toutes seules, puis la fenêtre de Glary se ferme.";
             return;
         }
         SetCard(GlaryValue, "Absent", "WarningBrush");
@@ -249,7 +249,7 @@ public partial class MainWindow : Window
     private async Task RunGlaryAsync()
     {
         if (_glaryFolder is null) return;
-        GlaryStatus.Text = "En cours : fermer la fenêtre de Glary une fois la maintenance terminée.";
+        GlaryStatus.Text = "En cours : Glary analyse puis répare tout seul (sinon, fermer sa fenêtre une fois la maintenance finie).";
         Log("--- Glary Utilities : maintenance 1 clic ---");
         try
         {

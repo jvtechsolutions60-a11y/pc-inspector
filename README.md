@@ -108,9 +108,9 @@ et certaines sondes de température.
 Troisième logiciel, `src/PcMaintenance/`, qui **agit** sur le PC (contrairement à PC Inspector et PC Sécurité,
 qui ne font que des constats et des conseils). Il enchaîne, étape par étape :
 
-1. un **point de restauration** (la protection du système est activée sur C: si elle était coupée) ;
+1. un **point de restauration**, décoché par défaut (la protection du système est activée sur C: si elle était coupée) ;
 2. **AdwCleaner** : dernière version téléchargée chez Malwarebytes (signature vérifiée), nettoyage automatique sans redémarrer ;
-3. la **maintenance 1 clic de Glary Utilities**, si Glary est installé (la suite démarre quand sa fenêtre est fermée) ;
+3. la **maintenance 1 clic de Glary Utilities**, si Glary est installé : l'analyse et la réparation sont lancées toutes seules, puis sa fenêtre est fermée (si une version de Glary n'expose pas ses boutons, la suite démarre quand on ferme sa fenêtre) ;
 4. la **recherche et l'installation des mises à jour Windows** (agent Windows Update, une par une, sans redémarrer) ;
 5. **`winget upgrade --all`** en silencieux (source winget) ;
 6. le **pack logiciels nouveau PC** (Chrome, 7-Zip, VLC, Acrobat Reader… à cocher, liste modifiable dans `pack.ini`).
