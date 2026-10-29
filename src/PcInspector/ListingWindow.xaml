@@ -10,7 +10,7 @@
                 <TextBlock Text="PC INSPECTOR · OUTILS" Style="{StaticResource AppSubtitle}" FontWeight="SemiBold" Margin="0"/>
                 <TextBlock Text="Texte d'annonce" Foreground="White" FontSize="18" FontWeight="SemiBold" Margin="0,2,0,0"/>
                 <TextBlock Foreground="{StaticResource HeaderMutedBrush}" TextWrapping="Wrap" Margin="0,4,0,0"
-                           Text="Les composants sont relevés automatiquement. Compléter ce que le logiciel ne peut pas lire, puis copier le titre et le descriptif dans Leboncoin ou Shopify."/>
+                           Text="Les composants sont relevés automatiquement. Compléter ce que le logiciel ne peut pas lire, puis copier le titre et le descriptif dans Leboncoin ou Shopify, ou enregistrer la fiche technique en PDF."/>
             </StackPanel>
         </Border>
         <Grid Margin="20,16">
@@ -58,6 +58,8 @@
                 </Border>
                 <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
                     <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Copier le descriptif" Click="CopyDescription_Click"/>
+                    <Button DockPanel.Dock="Right" Content="Fiche technique PDF" Margin="0,0,8,0" Click="Pdf_Click"
+                            ToolTip="Fiche A4 avec ton logo, à joindre aux photos de l'annonce ou à remettre à l'acheteur"/>
                     <Button DockPanel.Dock="Right" Content="Relire les composants" Margin="0,0,8,0" Click="Reload_Click"/>
                     <TextBlock x:Name="StatusText" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0"/>
                 </DockPanel>

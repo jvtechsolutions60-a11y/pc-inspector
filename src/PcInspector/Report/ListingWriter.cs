@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using PcInspector.Collectors;
@@ -163,7 +164,14 @@ public sealed class ListingSpecs
     private void ReadBattery()
     {
         if (!IsLaptop) return;
-        Battery = BatteryCollector.WearPercent() is { } wear ? $"{Math.Max(0, Math.Round(100 - wear))} % de sa capacité d'origine" : "";
+        var parts = new List<string>();
+        if (BatteryCollector.WearPercent() is { } wear)
+        {
+            var health = Math.Min(100, Math.Max(0, Math.Round(100 - wear)));
+            parts.Add($"{health} % de sa capacité d'origine" + (health >= 80 ? " (bon état)" : health >= 60 ? " (usure normale)" : " (à remplacer)"));
+        }
+        if (BatteryCollector.Cycles() is { } cycles) parts.Add($"{cycles} cycles de charge");
+        Battery = string.Join(", ", parts);
     }
 
     private void ReadConnectivity()
@@ -203,16 +211,13 @@ public sealed class ListingSpecs
         return string.Join(" · ", parts.Where(p => p.Length > 0));
     }
 
-    public string Description(ListingExtras extras)
+    /// <summary>Les lignes de la configuration, dans l'ordre de l'annonce ; les valeurs vides sont écartées.</summary>
+    public List<(string Label, string Value)> Lines(ListingExtras extras)
     {
-        var sb = new StringBuilder();
-        sb.AppendLine(Title());
-        sb.AppendLine();
-        if (extras.Condition.Trim().Length > 0) { sb.AppendLine("État : " + extras.Condition.Trim()); sb.AppendLine(); }
-        sb.AppendLine("Configuration :");
+        var lines = new List<(string, string)>();
         void Line(string label, string? value)
         {
-            if (!string.IsNullOrWhiteSpace(value)) sb.AppendLine($"- {label} : {value!.Trim()}");
+            if (!string.IsNullOrWhiteSpace(value)) lines.Add((label, value!.Trim()));
         }
         if (!IsCustomBuild) Line("Modèle", Model);
         Line("Processeur", Cpu + (CpuDetail.Length > 0 ? $" ({CpuDetail})" : ""));
@@ -227,6 +232,17 @@ public sealed class ListingSpecs
         Line("Refroidissement", extras.Cooler);
         Line("Connectivité", string.Join(", ", Connectivity));
         Line("Système", Windows);
+        return lines;
+    }
+
+    public string Description(ListingExtras extras, string? title = null)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(title ?? Title());
+        sb.AppendLine();
+        if (extras.Condition.Trim().Length > 0) { sb.AppendLine("État : " + extras.Condition.Trim()); sb.AppendLine(); }
+        sb.AppendLine("Configuration :");
+        foreach (var (label, value) in Lines(extras)) sb.AppendLine($"- {label} : {value}");
         if (extras.Notes.Trim().Length > 0)
         {
             sb.AppendLine();
@@ -235,6 +251,41 @@ public sealed class ListingSpecs
         sb.AppendLine();
         sb.AppendLine("Configuration relevée par PC Inspector, PC contrôlé et préparé par JVTECH Solutions.");
         return sb.ToString();
+    }
+
+    /// <summary>Fiche technique A4 à joindre à l'annonce ou à remettre à l'acheteur, avec le logo et les coordonnées.</summary>
+    public string Html(ListingExtras extras, string title, ReportInfo info)
+    {
+        static string E(string? s) => WebUtility.HtmlEncode(s ?? "");
+        var html = new StringBuilder();
+        html.AppendLine("<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"utf-8\"><title>Fiche technique</title><style>");
+        html.AppendLine(@"@page{size:A4;margin:14mm}
+body{font-family:'Segoe UI',Arial,sans-serif;color:#0f172a;margin:0;font-size:13px}
+header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #2563eb;padding-bottom:10px;margin-bottom:16px}
+header img{max-height:60px;max-width:200px}
+.company{text-align:right;color:#475569;font-size:12px}
+.company b{color:#0f172a;font-size:15px}
+h1{font-size:22px;margin:0 0 6px}
+.condition{display:inline-block;background:#dcfce7;color:#166534;border-radius:12px;padding:3px 12px;font-weight:600;margin-bottom:14px}
+table{width:100%;border-collapse:collapse;margin-top:6px}
+td{padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+td.l{width:28%;color:#475569;font-weight:600}
+tr:nth-child(even) td{background:#f8fafc}
+.notes{margin-top:16px;padding:10px 14px;background:#eff6ff;border-left:4px solid #2563eb;white-space:pre-wrap}
+footer{margin-top:22px;color:#64748b;font-size:11px;border-top:1px solid #e2e8f0;padding-top:8px}");
+        html.AppendLine("</style></head><body>");
+        var logo = ReportWriter.LogoDataUri(info.LogoPath);
+        html.AppendLine("<header><div>" + (logo is null ? $"<b style=\"font-size:20px\">{E(info.Company)}</b>" : $"<img src=\"{logo}\" alt=\"\">") + "</div>");
+        html.AppendLine($"<div class=\"company\"><b>{E(info.Company)}</b><br>{E(info.Contact).Replace("\n", "<br>")}</div></header>");
+        html.AppendLine($"<h1>{E(title)}</h1>");
+        if (extras.Condition.Trim().Length > 0) html.AppendLine($"<div class=\"condition\">{E(extras.Condition.Trim())}</div>");
+        html.AppendLine("<table>");
+        foreach (var (label, value) in Lines(extras)) html.AppendLine($"<tr><td class=\"l\">{E(label)}</td><td>{E(value)}</td></tr>");
+        html.AppendLine("</table>");
+        if (extras.Notes.Trim().Length > 0) html.AppendLine($"<div class=\"notes\">{E(extras.Notes.Trim())}</div>");
+        html.AppendLine($"<footer>Configuration relevée par PC Inspector le {DateTime.Now:dd/MM/yyyy}. PC contrôlé et préparé par {E(info.Company.Length > 0 ? info.Company : "JVTECH Solutions")}.</footer>");
+        html.AppendLine("</body></html>");
+        return html.ToString();
     }
 
     private static string? Clean(string? value)

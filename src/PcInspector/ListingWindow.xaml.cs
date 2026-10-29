@@ -37,17 +37,18 @@ public partial class ListingWindow : Window
     private void Refresh()
     {
         if (_specs is null) return;
-        var extras = new ListingExtras
-        {
-            Case = CaseBox.Text,
-            PowerSupply = PsuBox.Text,
-            Cooler = CoolerBox.Text,
-            Condition = ConditionBox.Text,
-            Notes = NotesBox.Text,
-        };
         if (!_titleEdited) TitleBox.Text = _specs.Title();
-        DescriptionBox.Text = _specs.Description(extras).Replace(_specs.Title(), TitleBox.Text);
+        DescriptionBox.Text = _specs.Description(Extras(), TitleBox.Text);
     }
+
+    private ListingExtras Extras() => new()
+    {
+        Case = CaseBox.Text,
+        PowerSupply = PsuBox.Text,
+        Cooler = CoolerBox.Text,
+        Condition = ConditionBox.Text,
+        Notes = NotesBox.Text,
+    };
 
     private void Field_Changed(object sender, RoutedEventArgs e) => Refresh();
 
@@ -76,6 +77,37 @@ public partial class ListingWindow : Window
             File.WriteAllText(NotesPath, NotesBox.Text);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+    }
+
+    private async void Pdf_Click(object sender, RoutedEventArgs e)
+    {
+        if (_specs is null) return;
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Fiche technique de l'annonce",
+            Filter = "PDF (*.pdf)|*.pdf|Page web (*.html)|*.html",
+            FileName = "Fiche technique " + string.Concat(TitleBox.Text.Split(Path.GetInvalidFileNameChars())).Replace("·", "-"),
+            InitialDirectory = AppPaths.EnsureFolder(AppPaths.ReportsRoot),
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        var path = dialog.FileName;
+        var html = _specs.Html(Extras(), TitleBox.Text, ReportInfo.LoadDefaults());
+        StatusText.Text = "Création du PDF…";
+        try
+        {
+            await Task.Run(() =>
+            {
+                if (Path.GetExtension(path).Equals(".pdf", StringComparison.OrdinalIgnoreCase)) PdfPrinter.FromHtml(html, path);
+                else File.WriteAllText(path, html, new System.Text.UTF8Encoding(true));
+            });
+            StatusText.Text = "Fiche enregistrée : " + path;
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            StatusText.Text = "";
+            MessageBox.Show(this, "Impossible de créer la fiche : " + ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void Copy(string text, string done)
