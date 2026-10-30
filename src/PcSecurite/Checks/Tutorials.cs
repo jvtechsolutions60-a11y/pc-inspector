@@ -135,6 +135,15 @@ public static class Tutorials
             "Redémarrer, lancer une analyse antivirus complète et faire changer les mots de passe du client : ce réglage est souvent posé par un pirate.",
         }, "Ouvrir le Registre", "regedit.exe", clientCanDo: false),
 
+        "Mots de passe des navigateurs" => new(new[]
+        {
+            "Installer Bitwarden (gratuit) ou KeePass, et créer le coffre avec un mot de passe maître long que le client retiendra.",
+            "Dans le navigateur, exporter les mots de passe (Paramètres > Mots de passe > Exporter) puis les importer dans le gestionnaire.",
+            "Supprimer le fichier exporté (il contient tout en clair) et vider la corbeille.",
+            "Effacer les mots de passe du navigateur, puis désactiver « Proposer d'enregistrer les mots de passe ».",
+            "Installer l'extension du gestionnaire dans le navigateur pour le remplissage automatique.",
+        }, "Ouvrir la page Bitwarden", "https://bitwarden.com/fr-fr/download/"),
+
         "Sauvegarde des données" => new(new[]
         {
             "Le plus simple : se connecter à OneDrive, puis Paramètres > Comptes > Sauvegarde Windows > Sauvegarde des dossiers, et cocher Bureau, Documents et Images.",
