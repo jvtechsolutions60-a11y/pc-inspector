@@ -56,10 +56,8 @@
                             Click="GuidedButton_Click" ToolTip="Passe les corrections une par une, avec le pas à pas et une vérification"/>
                     <Button x:Name="ClientGuideButton" Content="Fiche conseils client" Margin="0,0,8,0" Click="ClientGuideButton_Click"
                             ToolTip="Guide simple à imprimer ou à envoyer au client"/>
-                    <Button x:Name="ExportButton" Content="Exporter le rapport" Margin="0,0,8,0" Click="ExportButton_Click"
+                    <Button x:Name="ExportButton" Content="Exporter le rapport" Click="ExportButton_Click"
                             ToolTip="Rapport complet avec l'en-tête de ta société"/>
-                    <Button x:Name="CyberButton" Content="Pour le diagnostic cyber" Click="CyberButton_Click"
-                            ToolTip="Enregistre les résultats de ce poste pour les importer dans JVTECH Diagnostic Cyber"/>
                 </WrapPanel>
             </DockPanel>
         </Border>

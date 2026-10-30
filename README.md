@@ -69,7 +69,7 @@ Il partage le code WMI, le rapport et la fenêtre d'export avec PC Inspector (fi
 ## Communs aux trois logiciels
 
 - **Lanceur JVTECH Outils** (`src/JvtechOutils`, `JvtechOutils.exe`) : un écran d'accueil qui ouvre PC Inspector, PC Sécurité
-  PC Maintenance ou Diagnostic Cyber, rangés dans le même dossier, et le dossier des rapports.
+  ou PC Maintenance, rangés dans le même dossier, et le dossier des rapports.
 - **Dossier client commun** : les rapports sont proposés dans `Documents\JVTECH\Rapports\<client>\<date>`. Le client et le
   n° d'intervention saisis dans un logiciel sont repris dans les autres le même jour.
 - **Mode clé USB** : lancés depuis une clé (ou avec un fichier `portable.txt` à côté des .exe), les logiciels gardent
@@ -145,9 +145,13 @@ Les étapes se règlent dans `options.ini`. Mode d'emploi : `deploy/LISEZMOI.txt
 
 L'action *Build* compile aussi `PcMaintenance.exe` et `JvtechServeur.exe`.
 
-## JVTECH Diagnostic Cyber
+## JVTECH Diagnostic Cyber (archivé)
 
-Quatrième logiciel, `src/JvtechCyber/` (`JvtechCyber.exe`) : la sécurité de **l'entreprise** (le système
+Mis de côté le 30/10/2026 : le code est conservé dans `archive/JvtechCyber/`, mais il n'est plus compilé ni proposé
+dans le lanceur, et le bouton d'export de PC Sécurité est retiré. Pour le réactiver : remettre le dossier dans `src/`,
+rajouter sa compilation dans `build.yml` et son bouton dans le lanceur (voir l'historique git du 28/10/2026).
+
+Quatrième logiciel (`JvtechCyber.exe`) : la sécurité de **l'entreprise** (le système
 d'information), là où PC Sécurité regarde un seul poste. Ne modifie rien sur le PC.
 
 - **Un dossier par entreprise** dans `Rapports\Diagnostic cyber\<entreprise>`, avec l'historique des diagnostics et la

@@ -30,17 +30,14 @@ jobs:
       - name: Compiler le lanceur JVTECH Outils
         run: dotnet build src/JvtechOutils/JvtechOutils.csproj -c Release -o publish/lanceur -p:Version=${{ env.VERSION }}
 
-      - name: Compiler JVTECH Diagnostic Cyber
-        run: dotnet build src/JvtechCyber/JvtechCyber.csproj -c Release -o publish/cyber -p:Version=${{ env.VERSION }}
-
       - name: Compiler JVTECH Serveur PXE
         run: dotnet build src/JvtechServeur/JvtechServeur.csproj -c Release -o publish/serveur-build -p:Version=${{ env.VERSION }}
 
-      - name: Réunir les cinq .exe
+      - name: Réunir les quatre .exe
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force publish/outils | Out-Null
-          Copy-Item publish/inspector/PcInspector.exe, publish/securite/PcSecurite.exe, publish/maintenance/PcMaintenance.exe, publish/cyber/JvtechCyber.exe, publish/lanceur/JvtechOutils.exe publish/outils/
+          Copy-Item publish/inspector/PcInspector.exe, publish/securite/PcSecurite.exe, publish/maintenance/PcMaintenance.exe, publish/lanceur/JvtechOutils.exe publish/outils/
           Compress-Archive -Path publish/outils/* -DestinationPath publish/JVTECH-Outils-v${{ env.VERSION }}.zip
 
       # Serveur PXE du mini PC de l'atelier : le serveur, et à côté le kit qu'il ajoute à l'installation de Windows
@@ -78,7 +75,7 @@ jobs:
           tag_name: v${{ env.VERSION }}
           name: JVTECH Outils v${{ env.VERSION }}
           body: |
-            PC Inspector, PC Sécurité, PC Maintenance, Diagnostic Cyber et le lanceur JVTECH Outils, version v${{ env.VERSION }}.
+            PC Inspector, PC Sécurité, PC Maintenance et le lanceur JVTECH Outils, version v${{ env.VERSION }}.
             Télécharger le .zip, le décompresser (sur une clé USB pour le mode clé USB) et lancer JvtechOutils.exe.
             Préparation revente par le réseau (PXE) : JVTECH-Serveur-PXE, à installer sur le mini PC de l'atelier (voir LISEZMOI.txt).
           files: |
