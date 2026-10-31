@@ -10,7 +10,7 @@ internal static class Warranty
         if (string.IsNullOrWhiteSpace(manufacturer)) return null;
         var m = manufacturer!.ToLowerInvariant();
         var sn = Uri.EscapeDataString((serial ?? "").Trim());
-        var hasSerial = sn.Length > 0 && !IsPlaceholder(serial!);
+        var hasSerial = sn.Length > 0 && !MachineIdentity.IsPlaceholder(serial!);
 
         if (m.Contains("dell"))
             return hasSerial ? $"https://www.dell.com/support/home/fr-fr/product-support/servicetag/{sn}/overview" : "https://www.dell.com/support/home/fr-fr";
@@ -33,12 +33,5 @@ internal static class Warranty
         if (m.Contains("apple"))
             return "https://checkcoverage.apple.com/fr/fr/";
         return null;
-    }
-
-    /// <summary>Les PC montés et certains OEM laissent un texte générique au lieu d'un vrai numéro.</summary>
-    private static bool IsPlaceholder(string serial)
-    {
-        var s = serial.Trim().ToLowerInvariant();
-        return s.Contains("default") || s.Contains("o.e.m") || s.Contains("to be filled") || s == "0" || s.Trim('0').Length == 0 || s == "system serial number";
     }
 }

@@ -51,7 +51,7 @@ public sealed class GpuCollector : ICollector
     /// <summary>
     /// Win32_VideoController plafonne la mémoire à 4 Go : on lit la vraie valeur écrite par le pilote dans le registre.
     /// </summary>
-    private static ulong? VideoMemory(string gpuName)
+    internal static ulong? VideoMemory(string gpuName)
     {
         try
         {

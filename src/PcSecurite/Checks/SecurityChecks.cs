@@ -39,6 +39,7 @@ public static partial class SecurityChecks
         ("Réseaux Wi-Fi enregistrés", WifiProfiles),
         ("Comptes utilisateurs", Accounts),
         ("Connexion automatique", AutoLogon),
+        ("Mots de passe des navigateurs", SavedPasswords),
         ("Navigateurs internet", Browsers),
         ("Logiciels avec failles connues", VulnerableSoftware),
         ("Logiciels abandonnés", ObsoleteSoftware),

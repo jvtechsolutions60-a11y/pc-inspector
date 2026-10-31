@@ -108,9 +108,9 @@ et certaines sondes de température.
 Troisième logiciel, `src/PcMaintenance/`, qui **agit** sur le PC (contrairement à PC Inspector et PC Sécurité,
 qui ne font que des constats et des conseils). Il enchaîne, étape par étape :
 
-1. un **point de restauration** (la protection du système est activée sur C: si elle était coupée) ;
+1. un **point de restauration**, décoché par défaut (la protection du système est activée sur C: si elle était coupée) ;
 2. **AdwCleaner** : dernière version téléchargée chez Malwarebytes (signature vérifiée), nettoyage automatique sans redémarrer ;
-3. la **maintenance 1 clic de Glary Utilities**, si Glary est installé (la suite démarre quand sa fenêtre est fermée) ;
+3. le **nettoyage intégré** (remplace Glary depuis le 31/10/2026) : fichiers temporaires, cache de Windows Update, nettoyage de disque Windows en silencieux, caches des navigateurs, raccourcis cassés mis de côté dans `Rapports\Raccourcis cassés`, analyse rapide Microsoft Defender et liste des programmes au démarrage dans le rapport. Favoris, mots de passe, historique, cookies, corbeille et Téléchargements ne sont jamais touchés, et le registre n'est pas « nettoyé » ;
 4. la **recherche et l'installation des mises à jour Windows** (agent Windows Update, une par une, sans redémarrer) ;
 5. **`winget upgrade --all`** en silencieux (source winget) ;
 6. le **pack logiciels nouveau PC** (Chrome, 7-Zip, VLC, Acrobat Reader… à cocher, liste modifiable dans `pack.ini`).
@@ -119,6 +119,49 @@ Le bouton **Rapport de maintenance** produit la fiche client de ce qui a été f
 installées, logiciels mis à jour, espace disque avant/après, durée.
 
 En haut, un résumé rapide : Windows 11 oui ou non, activation de Windows (résultat de `slmgr /xpr`), mises à jour Windows en attente, logiciels à mettre à jour,
-Glary installé ou non. Chaque étape peut être décochée, et un journal garde la trace de tout ce qui a été fait.
+espace libre sur le disque. Chaque étape peut être décochée, et un journal garde la trace de tout ce qui a été fait.
 
-L'action *Build* compile aussi `PcMaintenance.exe`.
+### Préparation revente (installation automatique par le réseau)
+
+Pour les PC d'achat-revente : on efface tout et on réinstalle propre, sans clé USB et sans rester devant.
+`JVTECH-Serveur-PXE-v1.0.N.zip` (publié avec chaque version) s'installe sur un mini PC Windows de l'atelier :
+
+- **JVTECH Serveur PXE** (`src/JvtechServeur`) prépare tout depuis une ISO de Windows 11 avec les outils de Windows
+  (DISM, bcdedit) : partage en lecture seule des fichiers d'installation, Windows PE modifié pour lancer l'installation
+  depuis ce partage, et démarrage réseau compatible Secure Boot (proxyDHCP et TFTP intégrés, gestionnaire de démarrage
+  signé Microsoft ; la box garde son rôle de DHCP). Les PC ne sont acceptés que pendant 30 minutes après un clic ;
+- chaque jour il cherche la mise à jour cumulative de Windows 11 sur le catalogue Microsoft Update et l'intègre
+  à l'image quand aucun PC n'est en cours ;
+- son écran suit tous les PC (étape, durée, rapport) et compte les PC préparés par mois.
+
+Sur le PC, `deploy/autounattend.xml` efface le disque 0, installe Windows 11 en français sans aucune question et
+démarre en **mode audit**. `PcMaintenance.exe /preparation` enchaîne alors, en reprenant seul après chaque redémarrage :
+nettoyage par [Win11Debloat](https://github.com/Raphire/Win11Debloat) (version figée, mode Sysprep) puis applications des fabricants retirées (`debloat.ini`), publicités et suggestions coupées, pilotes et BIOS du constructeur (Dell Command Update, Lenovo System
+Update, HP Image Assistant, BIOS seulement sur secteur), Windows Update en boucle pilotes compris (partage des
+mises à jour entre PC du réseau), nettoyage, contrôle des pilotes et de l'activation, rapport envoyé au serveur.
+À la fin, Sysprep remet le PC au **premier démarrage** et l'éteint : l'acheteur crée son propre compte.
+
+Les étapes se règlent dans `options.ini`. Mode d'emploi : `deploy/LISEZMOI.txt`.
+
+L'action *Build* compile aussi `PcMaintenance.exe` et `JvtechServeur.exe`.
+
+## JVTECH Diagnostic Cyber (archivé)
+
+Mis de côté le 30/10/2026 : le code est conservé dans `archive/JvtechCyber/`, mais il n'est plus compilé ni proposé
+dans le lanceur, et le bouton d'export de PC Sécurité est retiré. Pour le réactiver : remettre le dossier dans `src/`,
+rajouter sa compilation dans `build.yml` et son bouton dans le lanceur (voir l'historique git du 28/10/2026).
+
+Quatrième logiciel (`JvtechCyber.exe`) : la sécurité de **l'entreprise** (le système
+d'information), là où PC Sécurité regarde un seul poste. Ne modifie rien sur le PC.
+
+- **Un dossier par entreprise** dans `Rapports\Diagnostic cyber\<entreprise>`, avec l'historique des diagnostics et la
+  progression de la note d'un diagnostic à l'autre.
+- **Questionnaire en 9 thèmes**, chacun noté de 0 à 3 : sauvegardes, mises à jour, antivirus, comptes et mots de passe,
+  arnaques, réseau et Wi-Fi, accès à distance et portables, inventaire et prestataires, incident et continuité.
+  Référentiel JVTECH rédigé d'après les recommandations publiques de l'ANSSI et de cybermalveillance.gouv.fr.
+- **Note sur 100** (les thèmes essentiels comptent double) et **6 menaces** (rançongiciel, fraude au virement, piratage de
+  la messagerie, fuite de données, perte de données, faux support) marquées exposée, en partie couverte ou couverte.
+- **Postes** : dans PC Sécurité, le bouton *Pour le diagnostic cyber* enregistre un fichier `.jvsec` par poste, que
+  *Importer les postes* reprend. Les constats s'affichent sous chaque thème concerné.
+- **Plan d'action et rapport PDF** : les prochaines étapes de chaque thème, de la plus urgente à la moins urgente, avec le
+  coût indicatif et le prix JVTECH de la prestation (*Mes tarifs*, fichier `tarifs-cyber.ini`).

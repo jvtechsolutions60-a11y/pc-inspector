@@ -38,8 +38,12 @@
                         ToolTip="Écran, clavier, haut-parleurs, micro, webcam"/>
                 <Button Style="{StaticResource DarkButton}" Content="Suivi en direct" Margin="0,0,0,6" Click="LiveMonitor_Click"
                         ToolTip="Charge et températures en courbes, pendant un test"/>
-                <Button Style="{StaticResource DarkButton}" Content="Étiquette PC" Click="Label_Click"
+                <Button Style="{StaticResource DarkButton}" Content="Étiquette PC" Margin="0,0,0,6" Click="Label_Click"
                         ToolTip="Petite fiche à coller sous le PC : config, date, coordonnées"/>
+                <Button Style="{StaticResource DarkButton}" Content="Texte d'annonce" Margin="0,0,0,6" Click="Listing_Click"
+                        ToolTip="Titre et descriptif des composants, prêts à coller dans Leboncoin ou Shopify"/>
+                <Button Style="{StaticResource DarkButton}" Content="Fiche de suivi (PDF)" Click="TrackingSheet_Click"
+                        ToolTip="Fiche de suivi JVDESTOCK pré-remplie : identification, configuration, contrôles du bilan"/>
             </StackPanel>
             <ListBox x:Name="SectionList" Background="Transparent" BorderThickness="0"
                      SelectionChanged="SectionList_SelectionChanged"

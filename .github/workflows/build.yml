@@ -14,6 +14,7 @@ jobs:
     env:
       # Le numéro de run sert de version commune aux quatre .exe : v1.0.N, affichée dans les logiciels et les rapports.
       VERSION: 1.0.${{ github.run_number }}
+      WIN11DEBLOAT: 2026.08.24
     steps:
       - uses: actions/checkout@v4
 
@@ -29,6 +30,9 @@ jobs:
       - name: Compiler le lanceur JVTECH Outils
         run: dotnet build src/JvtechOutils/JvtechOutils.csproj -c Release -o publish/lanceur -p:Version=${{ env.VERSION }}
 
+      - name: Compiler JVTECH Serveur PXE
+        run: dotnet build src/JvtechServeur/JvtechServeur.csproj -c Release -o publish/serveur-build -p:Version=${{ env.VERSION }}
+
       - name: Réunir les quatre .exe
         shell: pwsh
         run: |
@@ -36,10 +40,32 @@ jobs:
           Copy-Item publish/inspector/PcInspector.exe, publish/securite/PcSecurite.exe, publish/maintenance/PcMaintenance.exe, publish/lanceur/JvtechOutils.exe publish/outils/
           Compress-Archive -Path publish/outils/* -DestinationPath publish/JVTECH-Outils-v${{ env.VERSION }}.zip
 
+      # Serveur PXE du mini PC de l'atelier : le serveur, et à côté le kit qu'il ajoute à l'installation de Windows
+      # (autounattend.xml, PC Maintenance et ses réglages, recopiés par Windows dans C:\JVTECH).
+      - name: Préparer le serveur PXE
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path publish/serveur/Kit/JVTECH | Out-Null
+          Copy-Item publish/serveur-build/JvtechServeur.exe, deploy/LISEZMOI.txt publish/serveur/
+          Copy-Item deploy/autounattend.xml publish/serveur/Kit/
+          Copy-Item publish/maintenance/PcMaintenance.exe, deploy/options.ini, deploy/debloat.ini -Destination publish/serveur/Kit/JVTECH
+          # Win11Debloat (MIT), version figée : changer WIN11DEBLOAT pour passer à une version plus récente.
+          $tag = '${{ env.WIN11DEBLOAT }}'
+          Invoke-WebRequest "https://github.com/Raphire/Win11Debloat/archive/refs/tags/$tag.zip" -OutFile publish/win11debloat.zip
+          Expand-Archive publish/win11debloat.zip publish/win11debloat
+          Copy-Item "publish/win11debloat/Win11Debloat-$tag" -Destination publish/serveur/Kit/JVTECH/Win11Debloat -Recurse
+          if (-not (Test-Path publish/serveur/Kit/JVTECH/Win11Debloat/Win11Debloat.ps1)) { throw 'Win11Debloat.ps1 introuvable' }
+          Compress-Archive -Path publish/serveur/* -DestinationPath publish/JVTECH-Serveur-PXE-v${{ env.VERSION }}.zip
+
       - uses: actions/upload-artifact@v4
         with:
           name: JVTECH-Outils-v${{ env.VERSION }}
           path: publish/outils/*.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JVTECH-Serveur-PXE-v${{ env.VERSION }}
+          path: publish/serveur/
 
       # Sur main : une version publiée par compilation, que les logiciels consultent pour signaler une mise à jour.
       - name: Publier la version
@@ -51,6 +77,8 @@ jobs:
           body: |
             PC Inspector, PC Sécurité, PC Maintenance et le lanceur JVTECH Outils, version v${{ env.VERSION }}.
             Télécharger le .zip, le décompresser (sur une clé USB pour le mode clé USB) et lancer JvtechOutils.exe.
+            Préparation revente par le réseau (PXE) : JVTECH-Serveur-PXE, à installer sur le mini PC de l'atelier (voir LISEZMOI.txt).
           files: |
             publish/JVTECH-Outils-v${{ env.VERSION }}.zip
+            publish/JVTECH-Serveur-PXE-v${{ env.VERSION }}.zip
             publish/outils/*.exe
