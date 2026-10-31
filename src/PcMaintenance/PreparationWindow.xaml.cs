@@ -118,6 +118,8 @@ public partial class PreparationWindow : Window
 
     private void Log(string text)
     {
+        // Appelé d'un autre fil : on repasse par celui de la fenêtre au lieu de planter.
+        if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(() => Log(text))); return; }
         CrashGuard.Trace(text);
         LogBox.AppendText($"[{DateTime.Now:dd/MM HH:mm:ss}] {text}{Environment.NewLine}");
         LogBox.ScrollToEnd();

@@ -233,7 +233,10 @@ public partial class MainWindow : Window
     {
         CleanStatus.Text = "En cours (voir le journal)…";
         Log("--- Nettoyage du PC ---");
-        var result = await Task.Run(() => Cleanup.Run(new Progress<string>(Log)));
+        // Le Progress doit être créé ici, sur le fil de la fenêtre : créé dans Task.Run, il appelait Log depuis un
+        // autre fil et Windows fermait le logiciel.
+        var log = new Progress<string>(Log);
+        var result = await Task.Run(() => Cleanup.Run(log));
         CleanStatus.Text = $"Terminé : {Cleanup.Size(result.Freed)} libérés.";
         Log($"Nettoyage : {Cleanup.Size(result.Freed)} libérés.");
         _report.Step("Nettoyage du PC", $"{Cleanup.Size(result.Freed)} libérés");
@@ -352,7 +355,8 @@ public partial class MainWindow : Window
     {
         Log("--- Point de restauration ---");
         RestoreStatus.Text = "Création en cours…";
-        var result = await Task.Run(() => RestorePoint.Create(new Progress<string>(Log)));
+        var log = new Progress<string>(Log);
+        var result = await Task.Run(() => RestorePoint.Create(log));
         RestoreStatus.Text = result;
         Log("Point de restauration : " + result);
         _report.Step("Point de restauration", result);
@@ -513,6 +517,8 @@ public partial class MainWindow : Window
 
     private void Log(string text)
     {
+        // Appelé d'un autre fil : on repasse par celui de la fenêtre au lieu de planter.
+        if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(() => Log(text))); return; }
         CrashGuard.Trace(text);
         LogBox.AppendText($"[{DateTime.Now:HH:mm:ss}] {text}{Environment.NewLine}");
         LogBox.ScrollToEnd();
