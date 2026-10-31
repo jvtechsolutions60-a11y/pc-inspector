@@ -10,6 +10,8 @@ public partial class App : Application
     // Une seule préparation à la fois : la clé Run et un lancement manuel ne doivent pas se croiser.
     private Mutex? _preparationLock;
 
+    public App() => PcInspector.CrashGuard.Install(this, "PC Maintenance");
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);

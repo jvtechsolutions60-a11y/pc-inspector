@@ -24,6 +24,7 @@
     <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
     <Page Include="..\PcInspector\Theme.xaml" Link="Theme.xaml" />
     <Compile Include="..\PcInspector\AppInfo.cs" Link="Shared\AppInfo.cs" />
+    <Compile Include="..\PcInspector\CrashGuard.cs" Link="Shared\CrashGuard.cs" />
     <Compile Include="..\PcInspector\Collectors\Wmi.cs" Link="Shared\Wmi.cs" />
     <Compile Include="..\PcInspector\Collectors\Firmware.cs" Link="Shared\Firmware.cs" />
     <Compile Include="..\PcInspector\Models\InfoSection.cs" Link="Shared\InfoSection.cs" />

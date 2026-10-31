@@ -52,10 +52,13 @@ internal static class Cleanup
         Step(result, log, "Cache de Windows Update", l => WindowsUpdateCache(l));
         Step(result, log, "Nettoyage de disque Windows", DiskCleanup);
         Step(result, log, "Caches des navigateurs", BrowserCaches);
-        BrokenShortcuts(result, log);
-        DefenderQuickScan(result, log);
-        result.Startup.AddRange(StartupPrograms());
-        log.Report($"Programmes lancés au démarrage : {result.Startup.Count} (listés dans le rapport, rien n'est désactivé).");
+        Guard(result, log, "Raccourcis cassés", () => BrokenShortcuts(result, log));
+        Guard(result, log, "Analyse Microsoft Defender", () => DefenderQuickScan(result, log));
+        Guard(result, log, "Programmes lancés au démarrage", () =>
+        {
+            result.Startup.AddRange(StartupPrograms());
+            log.Report($"Programmes lancés au démarrage : {result.Startup.Count} (listés dans le rapport, rien n'est désactivé).");
+        });
         return result;
     }
 
@@ -70,12 +73,24 @@ internal static class Cleanup
             result.Done.Add(line);
             log.Report("    " + line);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException
-                                       or System.ComponentModel.Win32Exception or System.Security.SecurityException)
+        catch (Exception ex)
         {
-            result.Done.Add($"{title} : non fait ({ex.Message})");
-            log.Report($"    {title} : non fait ({ex.Message})");
+            NotDone(result, log, title, ex);
         }
+    }
+
+    /// <summary>Une étape qui plante est notée « non faite » et le nettoyage continue : rien ne doit fermer le logiciel.</summary>
+    private static void Guard(CleanupResult result, IProgress<string> log, string title, Action run)
+    {
+        try { run(); }
+        catch (Exception ex) { NotDone(result, log, title, ex); }
+    }
+
+    private static void NotDone(CleanupResult result, IProgress<string> log, string title, Exception ex)
+    {
+        if (ex is TargetInvocationException { InnerException: { } inner }) ex = inner;
+        result.Done.Add($"{title} : non fait ({ex.Message})");
+        log.Report($"    {title} : non fait ({ex.GetType().Name} : {ex.Message})");
     }
 
     // ---------- Fichiers ----------
@@ -300,7 +315,8 @@ internal static class Cleanup
                 info.Delete();
                 freed += size;
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException
+                                           or System.Security.SecurityException) { }
         }
         try
         {
@@ -311,11 +327,18 @@ internal static class Cleanup
         return freed;
     }
 
-    private static bool IsRunning(string process) => Process.GetProcessesByName(process).Length > 0;
+    private static bool IsRunning(string process)
+    {
+        try { return Process.GetProcessesByName(process).Length > 0; }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { return true; }
+    }
 
     private static int? RunHidden(string file, string arguments, TimeSpan timeout)
     {
-        using var process = Process.Start(new ProcessStartInfo(file, arguments) { UseShellExecute = false, CreateNoWindow = true });
+        Process? started;
+        try { started = Process.Start(new ProcessStartInfo(file, arguments) { UseShellExecute = false, CreateNoWindow = true }); }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { return -1; }
+        using var process = started;
         if (process is null) return -1;
         if (process.WaitForExit((int)timeout.TotalMilliseconds)) return process.ExitCode;
         try { process.Kill(); } catch (InvalidOperationException) { }

@@ -191,12 +191,12 @@ public partial class MainWindow : Window
         Log("===== Début de la maintenance =====");
         try
         {
-            if (RestoreCheck.IsChecked == true && !_stopRequested) await RunRestorePointAsync();
-            if (AdwCheck.IsChecked == true && !_stopRequested) await RunAdwCleanerAsync();
-            if (CleanCheck.IsChecked == true && !_stopRequested) await RunCleanupAsync();
-            if (WuCheck.IsChecked == true && !_stopRequested) await RunWindowsUpdateAsync();
-            if (WingetCheck.IsChecked == true && !_stopRequested) await RunWingetAsync();
-            if (PackCheck.IsChecked == true && !_stopRequested) await RunPackAsync();
+            if (RestoreCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("Point de restauration", RunRestorePointAsync);
+            if (AdwCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("AdwCleaner", RunAdwCleanerAsync);
+            if (CleanCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("Nettoyage du PC", RunCleanupAsync);
+            if (WuCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("Mises à jour Windows", RunWindowsUpdateAsync);
+            if (WingetCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("Mise à jour des logiciels", RunWingetAsync);
+            if (PackCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("Installation des logiciels", RunPackAsync);
             Log(_stopRequested ? "===== Maintenance arrêtée =====" : "===== Maintenance terminée =====");
         }
         finally
@@ -213,6 +213,19 @@ public partial class MainWindow : Window
                 Title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
             if (answer == MessageBoxResult.Yes)
                 Process.Start(new ProcessStartInfo("shutdown.exe", "/r /t 5") { UseShellExecute = false, CreateNoWindow = true });
+        }
+    }
+
+    /// <summary>Une étape qui plante est notée dans le journal et le rapport, puis la maintenance passe à la suivante.</summary>
+    private async Task SafeStepAsync(string title, Func<Task> step)
+    {
+        try { await step(); }
+        catch (Exception ex)
+        {
+            var file = CrashGuard.Write(ex, fatal: false);
+            Log($"{title} : erreur imprévue ({ex.Message}), étape suivante.");
+            if (file is not null) Log("    Détail enregistré dans " + file);
+            _report.Step(title, "Non fait : erreur imprévue (" + ex.Message + ")");
         }
     }
 
