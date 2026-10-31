@@ -118,6 +118,7 @@ public partial class PreparationWindow : Window
 
     private void Log(string text)
     {
+        CrashGuard.Trace(text);
         LogBox.AppendText($"[{DateTime.Now:dd/MM HH:mm:ss}] {text}{Environment.NewLine}");
         LogBox.ScrollToEnd();
     }
