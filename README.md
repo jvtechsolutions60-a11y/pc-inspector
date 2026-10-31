@@ -110,7 +110,7 @@ qui ne font que des constats et des conseils). Il enchaîne, étape par étape :
 
 1. un **point de restauration**, décoché par défaut (la protection du système est activée sur C: si elle était coupée) ;
 2. **AdwCleaner** : dernière version téléchargée chez Malwarebytes (signature vérifiée), nettoyage automatique sans redémarrer ;
-3. la **maintenance 1 clic de Glary Utilities**, si Glary est installé : l'analyse et la réparation sont lancées toutes seules, puis sa fenêtre est fermée (si une version de Glary n'expose pas ses boutons, la suite démarre quand on ferme sa fenêtre) ;
+3. le **nettoyage intégré** (remplace Glary depuis le 31/10/2026) : fichiers temporaires, cache de Windows Update, nettoyage de disque Windows en silencieux, caches des navigateurs, raccourcis cassés mis de côté dans `Rapports\Raccourcis cassés`, analyse rapide Microsoft Defender et liste des programmes au démarrage dans le rapport. Favoris, mots de passe, historique, cookies, corbeille et Téléchargements ne sont jamais touchés, et le registre n'est pas « nettoyé » ;
 4. la **recherche et l'installation des mises à jour Windows** (agent Windows Update, une par une, sans redémarrer) ;
 5. **`winget upgrade --all`** en silencieux (source winget) ;
 6. le **pack logiciels nouveau PC** (Chrome, 7-Zip, VLC, Acrobat Reader… à cocher, liste modifiable dans `pack.ini`).
@@ -119,7 +119,7 @@ Le bouton **Rapport de maintenance** produit la fiche client de ce qui a été f
 installées, logiciels mis à jour, espace disque avant/après, durée.
 
 En haut, un résumé rapide : Windows 11 oui ou non, activation de Windows (résultat de `slmgr /xpr`), mises à jour Windows en attente, logiciels à mettre à jour,
-Glary installé ou non. Chaque étape peut être décochée, et un journal garde la trace de tout ce qui a été fait.
+espace libre sur le disque. Chaque étape peut être décochée, et un journal garde la trace de tout ce qui a été fait.
 
 ### Préparation revente (installation automatique par le réseau)
 

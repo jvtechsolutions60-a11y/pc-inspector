@@ -24,7 +24,7 @@
                             <Hyperlink x:Name="UpdateLink" Foreground="{StaticResource UpdateBrush}" Click="UpdateLink_Click"><Run x:Name="UpdateText"/></Hyperlink>
                         </TextBlock>
                     </StackPanel>
-                    <TextBlock Text="Point de restauration, AdwCleaner, Glary, mises à jour Windows et logiciels, en une seule fois" Style="{StaticResource AppSubtitle}"/>
+                    <TextBlock Text="Point de restauration, AdwCleaner, nettoyage, mises à jour Windows et logiciels, en une seule fois" Style="{StaticResource AppSubtitle}"/>
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -68,9 +68,9 @@
                 </Border>
                 <Border Style="{StaticResource SummaryCard}">
                     <StackPanel>
-                        <TextBlock Text="Glary Utilities" Style="{StaticResource CardTitle}"/>
-                        <TextBlock x:Name="GlaryValue" Text="…" Style="{StaticResource CardValue}"/>
-                        <TextBlock x:Name="GlaryDetail" Style="{StaticResource CardDetail}"/>
+                        <TextBlock Text="Espace libre" Style="{StaticResource CardTitle}"/>
+                        <TextBlock x:Name="SpaceValue" Text="…" Style="{StaticResource CardValue}"/>
+                        <TextBlock x:Name="SpaceDetail" Style="{StaticResource CardDetail}"/>
                     </StackPanel>
                 </Border>
             </UniformGrid>
@@ -102,12 +102,10 @@
                         <TextBlock x:Name="AdwStatus" Style="{StaticResource StepStatus}"
                                    Text="Dernière version téléchargée chez Malwarebytes, nettoyage automatique, sans redémarrer."/>
 
-                        <CheckBox x:Name="GlaryCheck" IsChecked="True" FontSize="14" Margin="0,10,0,0"
-                                  Content="3. Maintenance 1 clic de Glary Utilities"/>
-                        <TextBlock x:Name="GlaryStatus" Style="{StaticResource StepStatus}"
-                                   Text="Analyse et réparation lancées toutes seules, puis la fenêtre de Glary se ferme."/>
-                        <Button x:Name="InstallGlaryButton" Content="Installer Glary Utilities (winget)" Visibility="Collapsed"
-                                Style="{StaticResource LinkButton}" HorizontalAlignment="Left" Margin="24,6,0,0" Click="InstallGlary_Click"/>
+                        <CheckBox x:Name="CleanCheck" IsChecked="True" FontSize="14" Margin="0,10,0,0"
+                                  Content="3. Nettoyer et alléger le PC"/>
+                        <TextBlock x:Name="CleanStatus" Style="{StaticResource StepStatus}"
+                                   Text="Temporaires, cache de Windows Update, nettoyage de disque, caches des navigateurs, raccourcis cassés, analyse Defender. Favoris, mots de passe, historique et sessions ne sont jamais touchés."/>
 
                         <CheckBox x:Name="WuCheck" IsChecked="True" FontSize="14" Margin="0,10,0,0"
                                   Content="4. Rechercher et installer les mises à jour Windows"/>

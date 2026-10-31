@@ -17,7 +17,6 @@ public partial class MainWindow : Window
     // « Aucun package installé ne correspond » : rien à mettre à jour.
     private const int WingetNothingToUpgrade = unchecked((int)0x8A150014);
 
-    private string? _glaryFolder;
     private bool _running;
     private volatile bool _stopRequested;
     private volatile bool _rebootRequired;
@@ -68,7 +67,7 @@ public partial class MainWindow : Window
         try
         {
             ShowWindowsVersion();
-            ShowGlary();
+            ShowFreeSpace();
             await Task.WhenAll(ShowActivationAsync(), RefreshWindowsUpdateAsync(), RefreshWingetAsync());
         }
         finally
@@ -111,49 +110,20 @@ public partial class MainWindow : Window
         ActivationDetail.Text = activation.Text;
     }
 
-    private const string GlaryWingetId = "Glarysoft.GlaryUtilities";
-
-    private void ShowGlary()
+    private void ShowFreeSpace()
     {
-        _glaryFolder = Glary.FindFolder();
-        var found = _glaryFolder is not null;
-        InstallGlaryButton.Visibility = found ? Visibility.Collapsed : Visibility.Visible;
-        // Ne recoche l'étape que si Glary vient d'apparaître : un décochage volontaire est conservé.
-        if (!found) GlaryCheck.IsChecked = false;
-        else if (!GlaryCheck.IsEnabled) GlaryCheck.IsChecked = true;
-        GlaryCheck.IsEnabled = found && !_running;
-        if (found)
-        {
-            SetCard(GlaryValue, "Installé", "OkBrush");
-            GlaryDetail.Text = _glaryFolder;
-            GlaryStatus.Text = "Analyse et réparation lancées toutes seules, puis la fenêtre de Glary se ferme.";
-            return;
-        }
-        SetCard(GlaryValue, "Absent", "WarningBrush");
-        GlaryDetail.Text = "Non installé sur ce PC.";
-        GlaryStatus.Text = $"Glary Utilities n'est pas installé : étape ignorée. Pour l'installer : winget install -e --id {GlaryWingetId}";
-    }
-
-    private async void InstallGlary_Click(object sender, RoutedEventArgs e)
-    {
-        if (_running) return;
-        SetRunning(true);
-        GlaryStatus.Text = "Installation de Glary Utilities en cours (voir le journal)…";
-        Log($"--- Installation de Glary Utilities : winget install -e --id {GlaryWingetId} ---");
         try
         {
-            var code = await Winget.InstallAsync(GlaryWingetId, new Progress<string>(Log));
-            Log(code switch
-            {
-                null => "winget n'est pas installé sur ce PC.",
-                0 => "Glary Utilities : installé.",
-                var other => $"Glary Utilities : échec de l'installation (code 0x{other:X8}).",
-            });
+            var drive = new System.IO.DriveInfo(System.IO.Path.GetPathRoot(Environment.SystemDirectory)!);
+            var free = (ulong)drive.AvailableFreeSpace;
+            var percent = 100.0 * free / drive.TotalSize;
+            SetCard(SpaceValue, Cleanup.Size(free), percent < 10 ? "DangerBrush" : percent < 20 ? "WarningBrush" : "OkBrush");
+            SpaceDetail.Text = $"sur {Cleanup.Size((ulong)drive.TotalSize)} ({drive.Name.TrimEnd('\\')}, {percent:0} % libre)";
         }
-        finally
+        catch (Exception ex) when (ex is System.IO.IOException or ArgumentException or UnauthorizedAccessException)
         {
-            SetRunning(false);
-            ShowGlary();
+            SetCard(SpaceValue, "?", null);
+            SpaceDetail.Text = ex.Message;
         }
     }
 
@@ -210,7 +180,7 @@ public partial class MainWindow : Window
     private async void StartButton_Click(object sender, RoutedEventArgs e)
     {
         if (_running) return;
-        if (new[] { RestoreCheck, AdwCheck, GlaryCheck, WuCheck, WingetCheck, PackCheck }.All(c => c.IsChecked != true))
+        if (new[] { RestoreCheck, AdwCheck, CleanCheck, WuCheck, WingetCheck, PackCheck }.All(c => c.IsChecked != true))
         {
             MessageBox.Show(this, "Cocher au moins une étape.", Title, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
@@ -223,7 +193,7 @@ public partial class MainWindow : Window
         {
             if (RestoreCheck.IsChecked == true && !_stopRequested) await RunRestorePointAsync();
             if (AdwCheck.IsChecked == true && !_stopRequested) await RunAdwCleanerAsync();
-            if (GlaryCheck.IsChecked == true && !_stopRequested) await RunGlaryAsync();
+            if (CleanCheck.IsChecked == true && !_stopRequested) await RunCleanupAsync();
             if (WuCheck.IsChecked == true && !_stopRequested) await RunWindowsUpdateAsync();
             if (WingetCheck.IsChecked == true && !_stopRequested) await RunWingetAsync();
             if (PackCheck.IsChecked == true && !_stopRequested) await RunPackAsync();
@@ -246,30 +216,18 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task RunGlaryAsync()
+    private async Task RunCleanupAsync()
     {
-        if (_glaryFolder is null) return;
-        GlaryStatus.Text = "En cours : Glary analyse puis répare tout seul (sinon, fermer sa fenêtre une fois la maintenance finie).";
-        Log("--- Glary Utilities : maintenance 1 clic ---");
-        try
-        {
-            var waited = await Glary.RunOneClickAsync(_glaryFolder, new Progress<string>(Log));
-            if (!waited)
-            {
-                // Glary a rendu la main tout de suite (déjà ouvert, ou lancé dans une autre fenêtre).
-                MessageBox.Show(this, "Glary Utilities est ouvert.\n\nCliquer sur OK quand la maintenance 1 clic est terminée pour passer à la suite.",
-                    Title, MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            GlaryStatus.Text = "Terminé.";
-            Log("Glary Utilities : terminé.");
-            _report.Step("Glary Utilities (maintenance 1 clic)", "Fait");
-        }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
-        {
-            GlaryStatus.Text = "Lancement impossible : " + ex.Message;
-            _report.Step("Glary Utilities (maintenance 1 clic)", GlaryStatus.Text);
-            Log("Glary Utilities : lancement impossible : " + ex.Message);
-        }
+        CleanStatus.Text = "En cours (voir le journal)…";
+        Log("--- Nettoyage du PC ---");
+        var result = await Task.Run(() => Cleanup.Run(new Progress<string>(Log)));
+        CleanStatus.Text = $"Terminé : {Cleanup.Size(result.Freed)} libérés.";
+        Log($"Nettoyage : {Cleanup.Size(result.Freed)} libérés.");
+        _report.Step("Nettoyage du PC", $"{Cleanup.Size(result.Freed)} libérés");
+        _report.Detail("Nettoyage", result.Done);
+        _report.Detail("Raccourcis cassés mis de côté", result.MovedShortcuts);
+        _report.Detail("Programmes lancés au démarrage (à désactiver s'ils sont inutiles)", result.Startup);
+        ShowFreeSpace();
     }
 
     private async Task RunWindowsUpdateAsync()
@@ -369,8 +327,7 @@ public partial class MainWindow : Window
         PackList.IsEnabled = !running;
         StopButton.IsEnabled = running;
         StopButton.Content = "Arrêter après l'étape";
-        GlaryCheck.IsEnabled = !running && _glaryFolder is not null;
-        InstallGlaryButton.IsEnabled = !running;
+        CleanCheck.IsEnabled = !running;
         RefreshButton.IsEnabled = !running;
         WuCheck.IsEnabled = !running;
         WingetCheck.IsEnabled = !running;
