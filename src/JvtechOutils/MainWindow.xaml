@@ -61,6 +61,17 @@
                     </StackPanel>
                 </DockPanel>
             </Button>
+            <Button Style="{StaticResource ToolButton}" Tag="PcMigration.exe" Click="Tool_Click">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Left" Text="&#xE8AB;" FontFamily="Segoe MDL2 Assets" FontSize="28"
+                               Foreground="{StaticResource AccentBrush}" Width="48" VerticalAlignment="Center"/>
+                    <StackPanel>
+                        <TextBlock Text="PC Migration" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
+                        <TextBlock Text="Ancien PC vers nouveau PC par un disque externe : dossiers, navigateurs, mots de passe, applications, Wi-Fi, Outlook."
+                                   TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </DockPanel>
+            </Button>
 
             <DockPanel Margin="2,4,2,0">
                 <TextBlock DockPanel.Dock="Right">

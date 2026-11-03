@@ -145,6 +145,29 @@ Les étapes se règlent dans `options.ini`. Mode d'emploi : `deploy/LISEZMOI.txt
 
 L'action *Build* compile aussi `PcMaintenance.exe` et `JvtechServeur.exe`.
 
+## PC Migration
+
+Passage d'un client de son ancien PC à un nouveau, par un disque externe (`PcMigration.exe`, administrateur).
+Rien n'est supprimé, ni sur l'ancien PC ni sur le nouveau.
+
+1. **Sauvegarder l'ancien PC** : compte Windows du client (celui ouvert à l'écran par défaut), disque de destination
+   (place libre et FAT32 vérifiés), éléments à copier avec leur taille. Le tout va dans `X:\JVTECH Migration\Client - PC - date`.
+2. **Restaurer sur le nouveau PC** : la sauvegarde est retrouvée sur le disque branché ; on coche ce qu'on remet.
+
+| Élément | Sauvegarde | Restauration |
+|---|---|---|
+| Bureau, Documents, Images, Vidéos, Musique, Téléchargements | copie robocopy vérifiée (dossiers OneDrive suivis) | remis dans les dossiers du compte, un fichier plus récent déjà présent est gardé |
+| Navigateurs (Chrome, Edge, Brave, Vivaldi, Opera, Firefox) | profil complet sans les caches : favoris, historique, extensions, onglets | profil existant renommé « avant migration », puis profil restauré |
+| Mots de passe des navigateurs | export CSV guidé (Chrome/Edge les chiffrent avec le compte Windows), chiffré aussitôt | import guidé, fichier déchiffré effacé juste après ; Firefox : avec son profil |
+| Applications | `winget export` + liste de tous les programmes | réinstallation silencieuse de celles cochées ; liste des autres dans le rapport |
+| Wi-Fi | profils et clés (`netsh`), chiffrés | ajoutés pour tous les comptes |
+| Outlook | signatures et `.pst` hors Documents | `Documents\Fichiers Outlook`, à ouvrir dans Outlook |
+| Fond d'écran, imprimantes | image ; liste des imprimantes | image remise ; imprimantes dans le rapport (pilotes du fabricant) |
+
+Mots de passe et clés Wi-Fi sont chiffrés avec le **mot de passe de la sauvegarde** (AES-256 + HMAC, PBKDF2) ; les
+documents ne le sont pas. Un rapport « ce qui a été transféré » est enregistré d'office (dans la sauvegarde, puis dans
+le dossier du client) et peut être exporté en PDF.
+
 ## JVTECH Diagnostic Cyber (archivé)
 
 Mis de côté le 30/10/2026 : le code est conservé dans `archive/JvtechCyber/`, mais il n'est plus compilé ni proposé

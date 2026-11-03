@@ -7,7 +7,7 @@ using PcInspector;
 
 namespace JvtechOutils;
 
-/// <summary>Écran d'accueil : ouvre PC Inspector, PC Sécurité ou PC Maintenance, rangés dans le même dossier.</summary>
+/// <summary>Écran d'accueil : ouvre PC Inspector, PC Sécurité, PC Maintenance ou PC Migration, rangés dans le même dossier.</summary>
 public partial class MainWindow : Window
 {
     private string _updateUrl = Updater.ReleasesPage;
