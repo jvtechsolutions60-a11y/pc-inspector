@@ -43,7 +43,6 @@ public partial class MainWindow : Window
         VersionText.Text = AppInfo.Version;
         Title = "PC Migration " + AppInfo.Version;
         PortableText.Visibility = AppPaths.IsPortable ? Visibility.Visible : Visibility.Collapsed;
-        UpdateLink.Visibility = Visibility.Collapsed;
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -68,7 +67,7 @@ public partial class MainWindow : Window
         if (await Updater.CheckAsync() is not { } update) return;
         _updateUrl = update.Url;
         UpdateText.Text = $"Nouvelle version {update.Tag} : télécharger";
-        UpdateLink.Visibility = Visibility.Visible;
+        UpdateArea.Visibility = Visibility.Visible;
     }
 
     // ===================== Sauvegarde =====================

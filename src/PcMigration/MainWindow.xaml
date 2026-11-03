@@ -17,7 +17,7 @@
                                 ToolTip="Lancé depuis une clé USB : réglages et rapports sont enregistrés sur la clé.">
                             <TextBlock Text="Mode clé USB" Foreground="White" FontSize="11"/>
                         </Border>
-                        <TextBlock VerticalAlignment="Bottom" Margin="10,0,0,3" FontSize="12">
+                        <TextBlock x:Name="UpdateArea" VerticalAlignment="Bottom" Margin="10,0,0,3" FontSize="12" Visibility="Collapsed">
                             <Hyperlink x:Name="UpdateLink" Foreground="{StaticResource UpdateBrush}" Click="UpdateLink_Click"><Run x:Name="UpdateText"/></Hyperlink>
                         </TextBlock>
                     </StackPanel>
