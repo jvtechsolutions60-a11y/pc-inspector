@@ -230,10 +230,14 @@ public static partial class SecurityChecks
     }
 
     private static List<(string Name, string? Version)>? _programs;
+    private static readonly object ProgramsLock = new();
 
     /// <summary>Logiciels installés (mêmes clés que « Applications et fonctionnalités »), lus une seule fois par analyse.</summary>
     private static List<(string Name, string? Version)> InstalledPrograms()
     {
+        // Plusieurs contrôles tournent en même temps : la liste n'est lue qu'une fois.
+        lock (ProgramsLock)
+        {
         if (_programs is not null) return _programs;
         var list = new List<(string, string?)>();
         foreach (var (hive, view) in new[]
@@ -255,8 +259,9 @@ public static partial class SecurityChecks
             }
         }
         return _programs = list.Distinct().ToList();
+        }
     }
 
     /// <summary>À appeler avant chaque analyse pour relire la liste des logiciels (le technicien a pu en désinstaller).</summary>
-    public static void ResetCache() => _programs = null;
+    public static void ResetCache() { lock (ProgramsLock) _programs = null; }
 }
