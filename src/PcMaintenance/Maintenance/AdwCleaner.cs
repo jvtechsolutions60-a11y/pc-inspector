@@ -62,18 +62,8 @@ internal static class AdwCleaner
         return new Result(summary, removed, logPath);
     }
 
-    private static bool SignedByMalwarebytes(string path)
-    {
-        try
-        {
-            var certificate = X509Certificate.CreateFromSignedFile(path);
-            return certificate.Subject.IndexOf("Malwarebytes", StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-        catch (System.Security.Cryptography.CryptographicException)
-        {
-            return false;
-        }
-    }
+    /// <summary>Signature valide (fichier intact, certificat reconnu par Windows) et signataire Malwarebytes.</summary>
+    private static bool SignedByMalwarebytes(string path) => PcInspector.Authenticode.IsSignedBy(path, "Malwarebytes");
 
     private static string? LatestLog(DateTime since)
     {

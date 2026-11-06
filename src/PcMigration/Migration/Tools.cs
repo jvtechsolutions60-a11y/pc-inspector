@@ -101,7 +101,7 @@ internal static class Tools
         Process? process;
         try
         {
-            process = Process.Start(new ProcessStartInfo(file, arguments)
+            process = Process.Start(new ProcessStartInfo(PcInspector.AppPaths.SystemTool(file), arguments)
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,

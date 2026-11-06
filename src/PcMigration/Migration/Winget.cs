@@ -39,7 +39,10 @@ internal static class Winget
         try
         {
             return Regex.Matches(File.ReadAllText(file), "\"PackageIdentifier\"\\s*:\\s*\"([^\"]+)\"")
-                .Cast<Match>().Select(m => m.Groups[1].Value).Distinct(StringComparer.OrdinalIgnoreCase)
+                .Cast<Match>().Select(m => m.Groups[1].Value)
+                // Un identifiant winget n'a que lettres, chiffres et . _ + - : le reste (fichier modifié) est ignoré.
+                .Where(id => Regex.IsMatch(id, "^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$"))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return new List<string>(); }

@@ -381,7 +381,7 @@ internal sealed class PreparationRunner
             "\"%WINDIR%\\System32\\Sysprep\\sysprep.exe\" /oobe /shutdown /quiet",
             "del \"%~f0\""), Encoding.ASCII);
         _log.Report("Remise au premier démarrage (Sysprep) : le PC va s'éteindre.");
-        Process.Start(new ProcessStartInfo("cmd.exe", $"/c \"{script}\"") { UseShellExecute = false, CreateNoWindow = true });
+        Process.Start(new ProcessStartInfo(PcInspector.AppPaths.SystemTool("cmd.exe"), $"/c \"{script}\"") { UseShellExecute = false, CreateNoWindow = true });
     }
 
     // ---------- Outils ----------
@@ -432,7 +432,7 @@ internal sealed class PreparationRunner
     {
         try
         {
-            using var process = Process.Start(new ProcessStartInfo(exe, arguments) { UseShellExecute = false, CreateNoWindow = true })!;
+            using var process = Process.Start(new ProcessStartInfo(PcInspector.AppPaths.SystemTool(exe), arguments) { UseShellExecute = false, CreateNoWindow = true })!;
             if (!process.WaitForExit((int)timeout.TotalMilliseconds)) _log.Report($"{exe} ne répond plus : on continue.");
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)

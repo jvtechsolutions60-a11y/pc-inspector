@@ -30,7 +30,8 @@ internal sealed class TftpServer : IDisposable
     public TftpServer(IPAddress server, string root, Action<string> log, Action<IPAddress, string> sent)
     {
         _server = server;
-        _root = Path.GetFullPath(root);
+        // Avec le \ final : « C:\PXE » ne doit pas laisser passer « C:\PXE-autre ».
+        _root = Path.GetFullPath(root).TrimEnd('\\') + "\\";
         _log = log;
         _sent = sent;
     }

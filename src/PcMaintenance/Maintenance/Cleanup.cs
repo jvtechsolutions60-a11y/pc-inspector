@@ -336,7 +336,7 @@ internal static class Cleanup
     private static int? RunHidden(string file, string arguments, TimeSpan timeout)
     {
         Process? started;
-        try { started = Process.Start(new ProcessStartInfo(file, arguments) { UseShellExecute = false, CreateNoWindow = true }); }
+        try { started = Process.Start(new ProcessStartInfo(PcInspector.AppPaths.SystemTool(file), arguments) { UseShellExecute = false, CreateNoWindow = true }); }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { return -1; }
         using var process = started;
         if (process is null) return -1;

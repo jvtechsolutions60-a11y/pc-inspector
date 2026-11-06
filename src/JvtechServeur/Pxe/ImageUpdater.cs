@@ -87,7 +87,14 @@ internal static class ImageUpdater
             {
                 var name = Path.GetFileName(new Uri(url).LocalPath);
                 log("Téléchargement de " + name);
-                web.DownloadFile(url, Path.Combine(folder, name));
+                var file = Path.Combine(folder, name);
+                web.DownloadFile(url, file);
+                // Certains liens du catalogue sont en http : on n'intègre que des fichiers signés par Microsoft, intacts.
+                if (!PcInspector.Authenticode.IsSignedBy(file, "Microsoft"))
+                {
+                    File.Delete(file);
+                    return $"{name} n'a pas une signature Microsoft valide : mise à jour non intégrée.";
+                }
             }
         }
         catch (WebException ex)

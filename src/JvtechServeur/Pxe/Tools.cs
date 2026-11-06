@@ -17,7 +17,7 @@ internal static class Tools
     public static (int? Code, List<string> Lines) Run(string exe, string arguments, Action<string>? log, TimeSpan timeout, Encoding? encoding = null)
     {
         var lines = new List<string>();
-        var start = new ProcessStartInfo(exe, arguments)
+        var start = new ProcessStartInfo(PcInspector.AppPaths.SystemTool(exe), arguments)
         {
             UseShellExecute = false,
             CreateNoWindow = true,

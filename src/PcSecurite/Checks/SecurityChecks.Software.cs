@@ -85,7 +85,7 @@ public static partial class SecurityChecks
         Directory.CreateDirectory(folder);
         try
         {
-            var start = new ProcessStartInfo("netsh", $"wlan export profile folder=\"{folder}\"")
+            var start = new ProcessStartInfo(PcInspector.AppPaths.SystemTool("netsh.exe"), $"wlan export profile folder=\"{folder}\"")
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,

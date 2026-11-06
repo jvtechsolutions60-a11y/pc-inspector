@@ -408,7 +408,7 @@ public partial class MainWindow : Window
             try
             {
                 var file = Prices.EnsureFile();
-                Process.Start(new ProcessStartInfo("notepad.exe", $"\"{file}\"") { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo(AppPaths.SystemTool("notepad.exe"), $"\"{file}\"") { UseShellExecute = true });
                 ShowStatus("Après avoir enregistré les prix, actualiser l'onglet (F5).");
             }
             catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)

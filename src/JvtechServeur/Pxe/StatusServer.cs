@@ -41,6 +41,12 @@ internal sealed class StatusServer : IDisposable
 
             try
             {
+                // Rapport d'un poste : quelques centaines de Ko. Au-delà, on refuse (rien à remplir le disque).
+                if (context.Request.ContentLength64 > MaxBody || context.Request.ContentLength64 < 0 && context.Request.HttpMethod == "POST")
+                {
+                    context.Response.StatusCode = 413;
+                    continue;
+                }
                 using var reader = new StreamReader(context.Request.InputStream, Encoding.UTF8);
                 var body = reader.ReadToEnd();
                 var path = context.Request.Url.AbsolutePath.TrimEnd('/').ToLowerInvariant();
@@ -68,6 +74,8 @@ internal sealed class StatusServer : IDisposable
             }
         }
     }
+
+    private const long MaxBody = 10L * 1024 * 1024;
 
     private void SaveReport(string serial, string name, string html)
     {

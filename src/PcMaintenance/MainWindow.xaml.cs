@@ -203,7 +203,7 @@ public partial class MainWindow : Window
             var answer = MessageBox.Show(this, "Un redémarrage est nécessaire pour finir les mises à jour.\n\nRedémarrer le PC maintenant ?",
                 Title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
             if (answer == MessageBoxResult.Yes)
-                Process.Start(new ProcessStartInfo("shutdown.exe", "/r /t 5") { UseShellExecute = false, CreateNoWindow = true });
+                Process.Start(new ProcessStartInfo(PcInspector.AppPaths.SystemTool("shutdown.exe"), "/r /t 5") { UseShellExecute = false, CreateNoWindow = true });
         }
     }
 

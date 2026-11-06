@@ -13,7 +13,7 @@ internal static class PowerShell
     public static List<string> Run(string script, TimeSpan timeout)
     {
         var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes("$ProgressPreference='SilentlyContinue'\n" + script));
-        var start = new ProcessStartInfo("powershell.exe", "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + encoded)
+        var start = new ProcessStartInfo(PcInspector.AppPaths.SystemTool("powershell.exe"), "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + encoded)
         {
             UseShellExecute = false,
             CreateNoWindow = true,
