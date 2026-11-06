@@ -33,21 +33,12 @@ public partial class MainWindow : Window
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
         ComputerText.Text = Environment.MachineName;
-        VersionText.Text = AppVersion();
+        VersionText.Text = AppInfo.Version;  // même affichage que les autres logiciels
         Title = "PC Maintenance " + VersionText.Text;
         PortableText.Visibility = AppPaths.IsPortable ? Visibility.Visible : Visibility.Collapsed;
         LoadPack();
         _ = AnalyzeAsync();
         _ = CheckUpdateAsync();
-    }
-
-    /// <summary>« v1.0.12 · 20/10/2026 » : numéro de compilation GitHub Actions et date du .exe.</summary>
-    private static string AppVersion()
-    {
-        var assembly = typeof(MainWindow).Assembly;
-        var version = assembly.GetName().Version;
-        var built = System.IO.File.GetLastWriteTime(assembly.Location);
-        return $"v{version.Major}.{version.Minor}.{version.Build} · {built:dd/MM/yyyy}";
     }
 
     private async Task CheckUpdateAsync()

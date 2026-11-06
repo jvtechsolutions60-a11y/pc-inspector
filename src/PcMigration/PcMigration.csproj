@@ -12,6 +12,8 @@
     <Product>PC Migration</Product>
     <Company>JVTECH Solutions</Company>
     <Version>1.0.0</Version>
+    <!-- Même style d'icône pour tous les logiciels JVTECH, une couleur par logiciel -->
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <!-- Administrateur : profils des autres comptes, clés Wi-Fi, ajout des profils Wi-Fi pour tous les utilisateurs -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>

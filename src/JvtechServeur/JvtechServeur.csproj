@@ -12,6 +12,8 @@
     <Product>JVTECH Serveur PXE</Product>
     <Company>JVTECH Solutions</Company>
     <Version>1.0.0</Version>
+    <!-- Même style d'icône pour tous les logiciels JVTECH, une couleur par logiciel -->
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 

@@ -1,7 +1,7 @@
 <Window x:Class="PcMaintenance.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="PC Maintenance" Height="880" Width="980" MinHeight="520" MinWidth="760"
+        Title="PC Maintenance" Height="820" Width="1140" MinHeight="560" MinWidth="860"
         WindowStartupLocation="CenterScreen" Background="{StaticResource ContentBrush}" FontFamily="Segoe UI"
         Loaded="Window_Loaded" Closing="Window_Closing">
     <DockPanel>

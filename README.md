@@ -1,9 +1,29 @@
-# PC Inspector
+# JVTECH Outils : diagnostic, sécurité, maintenance et migration de PC Windows
 
-Petit logiciel Windows façon Speccy : il affiche toutes les informations matérielles du PC
-(puis logicielles plus tard) et permet d'exporter un rapport.
+Boîte à outils gratuite d'un dépanneur informatique pour Windows 10 et 11 : un `.exe` léger par tâche, sans installation,
+utilisable depuis une clé USB, avec un rapport client en HTML, PDF ou texte.
 
-## Avancement
+| Logiciel | À quoi il sert | Modifie le PC ? |
+|---|---|---|
+| **PC Inspector** | Matériel et logiciel du PC (façon Speccy), santé des disques (SMART), bilan sur 100, devis d'upgrade, fiche de suivi, texte d'annonce | Non |
+| **PC Sécurité** | Contrôle de sécurité (antivirus, mises à jour, BitLocker, TPM, mots de passe…) avec une note et un pas à pas par point | Non |
+| **PC Maintenance** | Nettoyage, AdwCleaner, mises à jour Windows et logiciels (winget), pack logiciels, passage à Windows 11, préparation revente | Oui |
+| **PC Migration** | Ancien PC → disque externe → nouveau PC : dossiers, navigateurs, mots de passe, applications, Wi-Fi, Outlook | Oui (rien n'est supprimé) |
+| **JVTECH Outils** | Lanceur des quatre logiciels | Non |
+| **JVTECH Serveur PXE** | Préparation automatique des PC par le réseau, à l'atelier | Oui (PC acceptés seulement) |
+
+**Télécharger** : page [Releases](https://github.com/jvtechsolutions60-a11y/pc-inspector/releases/latest), fichier
+`JVTECH-Outils-v1.0.N.zip`, à décompresser puis lancer `JvtechOutils.exe`.
+
+Mots-clés : diagnostic PC, dépannage informatique, Speccy, SMART, test disque dur, sécurité Windows, nettoyage PC,
+winget, mise à jour Windows 11, migration de données, transfert de PC, rapport client.
+
+## PC Inspector
+
+Petit logiciel Windows façon Speccy : il affiche toutes les informations matérielles et logicielles du PC
+et permet d'exporter un rapport.
+
+### Avancement
 
 1. **Cadrage** : projet C# / WPF sur .NET Framework 4.8, un seul `.exe` léger. ✅
 2. **Hardware** : un onglet par composant (CPU, carte mère/BIOS, RAM, GPU + écrans, disques + SMART, réseau, températures). ✅
@@ -66,7 +86,7 @@ Le bouton « Exporter le rapport » produit le même rapport client que PC Inspe
 
 Il partage le code WMI, le rapport et la fenêtre d'export avec PC Inspector (fichiers liés dans le `.csproj`).
 
-## Communs aux trois logiciels
+## Communs à tous les logiciels
 
 - **Lanceur JVTECH Outils** (`src/JvtechOutils`, `JvtechOutils.exe`) : un écran d'accueil qui ouvre PC Inspector, PC Sécurité
   ou PC Maintenance, rangés dans le même dossier, et le dossier des rapports.

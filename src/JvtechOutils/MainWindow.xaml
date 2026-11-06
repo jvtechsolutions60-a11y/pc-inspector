@@ -30,8 +30,7 @@
         <StackPanel Margin="24,20,24,16">
             <Button Style="{StaticResource ToolButton}" Tag="PcInspector.exe" Click="Tool_Click">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Left" Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="28"
-                               Foreground="{StaticResource AccentBrush}" Width="48" VerticalAlignment="Center"/>
+                    <Image DockPanel.Dock="Left" Source="Icons/PcInspector.ico" Width="40" Height="40" Margin="0,0,12,0" VerticalAlignment="Center"/>
                     <StackPanel>
                         <TextBlock Text="PC Inspector" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
                         <TextBlock Text="Tout le matériel et le logiciel du PC, le bilan sur 100, les tests et le rapport client. Ne modifie rien."
@@ -41,8 +40,7 @@
             </Button>
             <Button Style="{StaticResource ToolButton}" Tag="PcSecurite.exe" Click="Tool_Click">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Left" Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="28"
-                               Foreground="{StaticResource OkBrush}" Width="48" VerticalAlignment="Center"/>
+                    <Image DockPanel.Dock="Left" Source="Icons/PcSecurite.ico" Width="40" Height="40" Margin="0,0,12,0" VerticalAlignment="Center"/>
                     <StackPanel>
                         <TextBlock Text="PC Sécurité" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
                         <TextBlock Text="Contrôle de la sécurité avec une note et un pas à pas pour chaque point. Ne modifie rien."
@@ -52,8 +50,7 @@
             </Button>
             <Button Style="{StaticResource ToolButton}" Tag="PcMaintenance.exe" Click="Tool_Click">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Left" Text="&#xE90F;" FontFamily="Segoe MDL2 Assets" FontSize="28"
-                               Foreground="{StaticResource WarningBrush}" Width="48" VerticalAlignment="Center"/>
+                    <Image DockPanel.Dock="Left" Source="Icons/PcMaintenance.ico" Width="40" Height="40" Margin="0,0,12,0" VerticalAlignment="Center"/>
                     <StackPanel>
                         <TextBlock Text="PC Maintenance" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
                         <TextBlock Text="Nettoyage, mises à jour, AdwCleaner et logiciels de base. Agit sur le PC."
@@ -63,8 +60,7 @@
             </Button>
             <Button Style="{StaticResource ToolButton}" Tag="PcMigration.exe" Click="Tool_Click">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Left" Text="&#xE8AB;" FontFamily="Segoe MDL2 Assets" FontSize="28"
-                               Foreground="{StaticResource AccentBrush}" Width="48" VerticalAlignment="Center"/>
+                    <Image DockPanel.Dock="Left" Source="Icons/PcMigration.ico" Width="40" Height="40" Margin="0,0,12,0" VerticalAlignment="Center"/>
                     <StackPanel>
                         <TextBlock Text="PC Migration" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
                         <TextBlock Text="Ancien PC vers nouveau PC par un disque externe : dossiers, navigateurs, mots de passe, applications, Wi-Fi, Outlook."
