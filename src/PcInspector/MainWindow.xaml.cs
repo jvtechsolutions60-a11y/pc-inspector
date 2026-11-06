@@ -65,6 +65,15 @@ public partial class MainWindow : Window
     // Chaque onglet n'est collecté qu'une fois : WMI peut prendre plusieurs secondes.
     private readonly Dictionary<ICollector, InfoSection> _cache = new();
 
+    // Collectes lancées (ou finies) : un onglet déjà en cours de lecture en arrière-plan n'est pas relancé au clic.
+    private readonly Dictionary<ICollector, Task<InfoSection>> _tasks = new();
+
+    // Lecture des onglets en arrière-plan pendant que le technicien regarde le bilan : trois à la fois, pour ne pas
+    // saturer WMI ni ralentir le PC. Un onglet cliqué n'attend pas son tour.
+    private readonly System.Threading.SemaphoreSlim _prefetchGate = new(3);
+    private bool _prefetched;
+    private readonly HashSet<ICollector> _queued = new();
+
     /// <summary>Un onglet de la barre latérale, rangé dans sa catégorie.</summary>
     public sealed record SidebarItem(ICollector Collector, string Category)
     {
@@ -109,7 +118,7 @@ public partial class MainWindow : Window
         if (isHealth)
         {
             // Après une intervention, tous les onglets sont relus, pas seulement le bilan.
-            if (refresh) _cache.Clear();
+            if (refresh) { _cache.Clear(); _tasks.Clear(); lock (_queued) _queued.Clear(); _prefetched = false; }
             await ShowHealth();
             return;
         }
@@ -122,7 +131,7 @@ public partial class MainWindow : Window
             ShowStatus("Analyse en cours…");
             LoadingBar.Visibility = Visibility.Visible;
             RefreshButton.IsEnabled = false;
-            section = await Task.Run(() => CollectSafely(collector));
+            section = await SectionAsync(collector, refresh);
             _cache[collector] = section;
             LoadingBar.Visibility = Visibility.Collapsed;
             RefreshButton.IsEnabled = true;
@@ -214,9 +223,10 @@ public partial class MainWindow : Window
             CountsText.Text = "Vérification des disques, de la mémoire, de la batterie, des plantages, de la sécurité et des mises à jour.";
             FindingList.ItemsSource = null;
             HealthRefreshButton.IsEnabled = false;
-            section = await Task.Run(() => CollectSafely(_health));
+            section = await SectionAsync(_health, refresh: false);
             _cache[_health] = section;
             HealthRefreshButton.IsEnabled = true;
+            Prefetch();
             if (SelectedCollector != _health) return;
         }
 
@@ -259,16 +269,10 @@ public partial class MainWindow : Window
         try
         {
             // Le rapport contient tous les onglets, y compris ceux pas encore ouverts.
-            var sections = new List<InfoSection>();
-            foreach (var collector in _collectors)
-            {
-                if (!_cache.TryGetValue(collector, out var section))
-                {
-                    section = await Task.Run(() => CollectSafely(collector));
-                    _cache[collector] = section;
-                }
-                sections.Add(section);
-            }
+            // Tous en même temps : ceux déjà lus en arrière-plan sont immédiats.
+            var sections = (await Task.WhenAll(_collectors.Select(c => _cache.TryGetValue(c, out var cached)
+                ? Task.FromResult(cached) : SectionAsync(c, refresh: false)))).ToList();
+            for (var i = 0; i < _collectors.Count; i++) _cache[_collectors[i]] = sections[i];
 
             var info = dialog.Info;
             var path = dialog.FilePath;
@@ -289,6 +293,46 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>La collecte d'un onglet : reprise si elle est déjà lancée, relancée si on demande d'actualiser.</summary>
+    private Task<InfoSection> SectionAsync(ICollector collector, bool refresh)
+    {
+        bool waiting;
+        lock (_queued) waiting = _queued.Remove(collector);
+        // Encore en file d'attente derrière les autres onglets : on le lit tout de suite à part.
+        if (refresh || waiting || !_tasks.TryGetValue(collector, out var task))
+        {
+            task = Task.Run(() => CollectSafely(collector));
+            _tasks[collector] = task;
+        }
+        return task;
+    }
+
+    /// <summary>
+    /// Une fois le bilan affiché, les autres onglets sont lus en arrière-plan : au clic, ils s'affichent tout de suite.
+    /// Le test de débit (réseau) n'est lancé qu'à la demande.
+    /// </summary>
+    private void Prefetch()
+    {
+        if (_prefetched) return;
+        _prefetched = true;
+        foreach (var collector in _collectors.Where(c => c != _health && c is not SpeedTestCollector))
+        {
+            if (_tasks.ContainsKey(collector)) continue;
+            lock (_queued) _queued.Add(collector);
+            _tasks[collector] = Task.Run(async () =>
+            {
+                await _prefetchGate.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    // Déjà lu à part parce que le technicien a cliqué dessus : rien à faire.
+                    lock (_queued) if (!_queued.Remove(collector)) return new InfoSection(collector.Title);
+                    return CollectSafely(collector);
+                }
+                finally { _prefetchGate.Release(); }
+            });
+        }
+    }
+
     private static InfoSection CollectSafely(ICollector collector)
     {
         try
@@ -304,6 +348,8 @@ public partial class MainWindow : Window
     private void PeripheralTest_Click(object sender, RoutedEventArgs e) => new PeripheralTestWindow { Owner = this }.Show();
 
     private void LiveMonitor_Click(object sender, RoutedEventArgs e) => new LiveMonitorWindow { Owner = this }.Show();
+
+    private void Listing_Click(object sender, RoutedEventArgs e) => new ListingWindow { Owner = this }.Show();
 
     private async void Label_Click(object sender, RoutedEventArgs e)
     {
@@ -327,6 +373,30 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void TrackingSheet_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ExportWindow
+        {
+            Owner = this,
+            FilePrefix = "Fiche-suivi",
+            Filter = "PDF (*.pdf)|*.pdf|Page web (*.html)|*.html",
+        };
+        if (dialog.ShowDialog() != true || dialog.Info is null || dialog.FilePath is null) return;
+        var info = dialog.Info;
+        var path = dialog.FilePath;
+        ShowStatus("Fiche de suivi : bilan du PC en cours…");
+        try
+        {
+            await Task.Run(() => TrackingSheetWriter.Write(path, info));
+            ShowStatus("Fiche de suivi enregistrée.");
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, "Impossible d'enregistrer la fiche de suivi : " + ex.Message, "Fiche de suivi", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void UpdateLink_Click(object sender, RoutedEventArgs e) =>
         Process.Start(new ProcessStartInfo(_updateUrl) { UseShellExecute = true });
 
@@ -338,7 +408,7 @@ public partial class MainWindow : Window
             try
             {
                 var file = Prices.EnsureFile();
-                Process.Start(new ProcessStartInfo("notepad.exe", $"\"{file}\"") { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo(AppPaths.SystemTool("notepad.exe"), $"\"{file}\"") { UseShellExecute = true });
                 ShowStatus("Après avoir enregistré les prix, actualiser l'onglet (F5).");
             }
             catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)

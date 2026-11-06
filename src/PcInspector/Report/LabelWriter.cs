@@ -39,7 +39,7 @@ public static class LabelWriter
 
         var rows = new List<(string, string?)>
         {
-            ("Modèle", $"{system?.Str("Manufacturer")} {system?.Str("Model")}".Trim()),
+            ("Modèle", MachineIdentity.Model()),
             ("N° de série", serial),
             ("Processeur", Shorten(cpu)),
             ("Mémoire", ram),
@@ -77,7 +77,7 @@ td{word-break:break-word}
     }
 
     /// <summary>« Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz » devient « Intel Core i5-8250U ».</summary>
-    private static string? Shorten(string? cpu) => cpu?
+    internal static string? Shorten(string? cpu) => cpu?
         .Replace("(R)", "").Replace("(TM)", "").Replace(" CPU", "").Split('@')[0]
         .Replace("  ", " ").Trim();
 

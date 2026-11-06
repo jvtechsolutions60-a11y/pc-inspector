@@ -30,6 +30,24 @@ public static class AppInfo
 /// </summary>
 public static class AppPaths
 {
+    /// <summary>
+    /// Chemin complet d'un outil de Windows (« netsh.exe » → C:\Windows\System32\netsh.exe). Lancés en administrateur,
+    /// les logiciels ne doivent pas prendre un programme du même nom posé dans le dossier courant ou dans le PATH.
+    /// Un nom avec un dossier, ou un outil absent de System32 (winget…), est rendu tel quel.
+    /// </summary>
+    public static string SystemTool(string exe)
+    {
+        if (exe.IndexOfAny(new[] { '\\', '/' }) >= 0) return exe;
+        var name = exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? exe : exe + ".exe";
+        foreach (var candidate in new[]
+                 {
+                     Path.Combine(Environment.SystemDirectory, name),
+                     Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", name),
+                 })
+            if (File.Exists(candidate)) return candidate;
+        return exe;
+    }
+
     public static string ExeFolder => Path.GetDirectoryName(AppInfo.Entry.Location) ?? Environment.CurrentDirectory;
 
     public static bool IsPortable { get; } = DetectPortable();

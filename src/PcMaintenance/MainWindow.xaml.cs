@@ -17,7 +17,6 @@ public partial class MainWindow : Window
     // « Aucun package installé ne correspond » : rien à mettre à jour.
     private const int WingetNothingToUpgrade = unchecked((int)0x8A150014);
 
-    private string? _glaryFolder;
     private bool _running;
     private volatile bool _stopRequested;
     private volatile bool _rebootRequired;
@@ -34,21 +33,12 @@ public partial class MainWindow : Window
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
         ComputerText.Text = Environment.MachineName;
-        VersionText.Text = AppVersion();
+        VersionText.Text = AppInfo.Version;  // même affichage que les autres logiciels
         Title = "PC Maintenance " + VersionText.Text;
         PortableText.Visibility = AppPaths.IsPortable ? Visibility.Visible : Visibility.Collapsed;
         LoadPack();
         _ = AnalyzeAsync();
         _ = CheckUpdateAsync();
-    }
-
-    /// <summary>« v1.0.12 · 20/10/2026 » : numéro de compilation GitHub Actions et date du .exe.</summary>
-    private static string AppVersion()
-    {
-        var assembly = typeof(MainWindow).Assembly;
-        var version = assembly.GetName().Version;
-        var built = System.IO.File.GetLastWriteTime(assembly.Location);
-        return $"v{version.Major}.{version.Minor}.{version.Build} · {built:dd/MM/yyyy}";
     }
 
     private async Task CheckUpdateAsync()
@@ -68,7 +58,7 @@ public partial class MainWindow : Window
         try
         {
             ShowWindowsVersion();
-            ShowGlary();
+            ShowFreeSpace();
             await Task.WhenAll(ShowActivationAsync(), RefreshWindowsUpdateAsync(), RefreshWingetAsync());
         }
         finally
@@ -111,49 +101,20 @@ public partial class MainWindow : Window
         ActivationDetail.Text = activation.Text;
     }
 
-    private const string GlaryWingetId = "Glarysoft.GlaryUtilities";
-
-    private void ShowGlary()
+    private void ShowFreeSpace()
     {
-        _glaryFolder = Glary.FindFolder();
-        var found = _glaryFolder is not null;
-        InstallGlaryButton.Visibility = found ? Visibility.Collapsed : Visibility.Visible;
-        // Ne recoche l'étape que si Glary vient d'apparaître : un décochage volontaire est conservé.
-        if (!found) GlaryCheck.IsChecked = false;
-        else if (!GlaryCheck.IsEnabled) GlaryCheck.IsChecked = true;
-        GlaryCheck.IsEnabled = found && !_running;
-        if (found)
-        {
-            SetCard(GlaryValue, "Installé", "OkBrush");
-            GlaryDetail.Text = _glaryFolder;
-            GlaryStatus.Text = "La suite démarre quand la fenêtre de Glary est fermée.";
-            return;
-        }
-        SetCard(GlaryValue, "Absent", "WarningBrush");
-        GlaryDetail.Text = "Non installé sur ce PC.";
-        GlaryStatus.Text = $"Glary Utilities n'est pas installé : étape ignorée. Pour l'installer : winget install -e --id {GlaryWingetId}";
-    }
-
-    private async void InstallGlary_Click(object sender, RoutedEventArgs e)
-    {
-        if (_running) return;
-        SetRunning(true);
-        GlaryStatus.Text = "Installation de Glary Utilities en cours (voir le journal)…";
-        Log($"--- Installation de Glary Utilities : winget install -e --id {GlaryWingetId} ---");
         try
         {
-            var code = await Winget.InstallAsync(GlaryWingetId, new Progress<string>(Log));
-            Log(code switch
-            {
-                null => "winget n'est pas installé sur ce PC.",
-                0 => "Glary Utilities : installé.",
-                var other => $"Glary Utilities : échec de l'installation (code 0x{other:X8}).",
-            });
+            var drive = new System.IO.DriveInfo(System.IO.Path.GetPathRoot(Environment.SystemDirectory)!);
+            var free = (ulong)drive.AvailableFreeSpace;
+            var percent = 100.0 * free / drive.TotalSize;
+            SetCard(SpaceValue, Cleanup.Size(free), percent < 10 ? "DangerBrush" : percent < 20 ? "WarningBrush" : "OkBrush");
+            SpaceDetail.Text = $"sur {Cleanup.Size((ulong)drive.TotalSize)} ({drive.Name.TrimEnd('\\')}, {percent:0} % libre)";
         }
-        finally
+        catch (Exception ex) when (ex is System.IO.IOException or ArgumentException or UnauthorizedAccessException)
         {
-            SetRunning(false);
-            ShowGlary();
+            SetCard(SpaceValue, "?", null);
+            SpaceDetail.Text = ex.Message;
         }
     }
 
@@ -210,7 +171,7 @@ public partial class MainWindow : Window
     private async void StartButton_Click(object sender, RoutedEventArgs e)
     {
         if (_running) return;
-        if (new[] { RestoreCheck, AdwCheck, GlaryCheck, WuCheck, WingetCheck, PackCheck }.All(c => c.IsChecked != true))
+        if (new[] { RestoreCheck, AdwCheck, CleanCheck, WuCheck, WingetCheck, PackCheck }.All(c => c.IsChecked != true))
         {
             MessageBox.Show(this, "Cocher au moins une étape.", Title, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
@@ -221,12 +182,12 @@ public partial class MainWindow : Window
         Log("===== Début de la maintenance =====");
         try
         {
-            if (RestoreCheck.IsChecked == true && !_stopRequested) await RunRestorePointAsync();
-            if (AdwCheck.IsChecked == true && !_stopRequested) await RunAdwCleanerAsync();
-            if (GlaryCheck.IsChecked == true && !_stopRequested) await RunGlaryAsync();
-            if (WuCheck.IsChecked == true && !_stopRequested) await RunWindowsUpdateAsync();
-            if (WingetCheck.IsChecked == true && !_stopRequested) await RunWingetAsync();
-            if (PackCheck.IsChecked == true && !_stopRequested) await RunPackAsync();
+            if (RestoreCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("Point de restauration", RunRestorePointAsync);
+            if (AdwCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("AdwCleaner", RunAdwCleanerAsync);
+            if (CleanCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("Nettoyage du PC", RunCleanupAsync);
+            if (WuCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("Mises à jour Windows", RunWindowsUpdateAsync);
+            if (WingetCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("Mise à jour des logiciels", RunWingetAsync);
+            if (PackCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("Installation des logiciels", RunPackAsync);
             Log(_stopRequested ? "===== Maintenance arrêtée =====" : "===== Maintenance terminée =====");
         }
         finally
@@ -242,34 +203,38 @@ public partial class MainWindow : Window
             var answer = MessageBox.Show(this, "Un redémarrage est nécessaire pour finir les mises à jour.\n\nRedémarrer le PC maintenant ?",
                 Title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
             if (answer == MessageBoxResult.Yes)
-                Process.Start(new ProcessStartInfo("shutdown.exe", "/r /t 5") { UseShellExecute = false, CreateNoWindow = true });
+                Process.Start(new ProcessStartInfo(PcInspector.AppPaths.SystemTool("shutdown.exe"), "/r /t 5") { UseShellExecute = false, CreateNoWindow = true });
         }
     }
 
-    private async Task RunGlaryAsync()
+    /// <summary>Une étape qui plante est notée dans le journal et le rapport, puis la maintenance passe à la suivante.</summary>
+    private async Task SafeStepAsync(string title, Func<Task> step)
     {
-        if (_glaryFolder is null) return;
-        GlaryStatus.Text = "En cours : fermer la fenêtre de Glary une fois la maintenance terminée.";
-        Log("--- Glary Utilities : maintenance 1 clic ---");
-        try
+        try { await step(); }
+        catch (Exception ex)
         {
-            var waited = await Glary.RunOneClickAsync(_glaryFolder, new Progress<string>(Log));
-            if (!waited)
-            {
-                // Glary a rendu la main tout de suite (déjà ouvert, ou lancé dans une autre fenêtre).
-                MessageBox.Show(this, "Glary Utilities est ouvert.\n\nCliquer sur OK quand la maintenance 1 clic est terminée pour passer à la suite.",
-                    Title, MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            GlaryStatus.Text = "Terminé.";
-            Log("Glary Utilities : terminé.");
-            _report.Step("Glary Utilities (maintenance 1 clic)", "Fait");
+            var file = CrashGuard.Write(ex, fatal: false);
+            Log($"{title} : erreur imprévue ({ex.Message}), étape suivante.");
+            if (file is not null) Log("    Détail enregistré dans " + file);
+            _report.Step(title, "Non fait : erreur imprévue (" + ex.Message + ")");
         }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
-        {
-            GlaryStatus.Text = "Lancement impossible : " + ex.Message;
-            _report.Step("Glary Utilities (maintenance 1 clic)", GlaryStatus.Text);
-            Log("Glary Utilities : lancement impossible : " + ex.Message);
-        }
+    }
+
+    private async Task RunCleanupAsync()
+    {
+        CleanStatus.Text = "En cours (voir le journal)…";
+        Log("--- Nettoyage du PC ---");
+        // Le Progress doit être créé ici, sur le fil de la fenêtre : créé dans Task.Run, il appelait Log depuis un
+        // autre fil et Windows fermait le logiciel.
+        var log = new Progress<string>(Log);
+        var result = await Task.Run(() => Cleanup.Run(log));
+        CleanStatus.Text = $"Terminé : {Cleanup.Size(result.Freed)} libérés.";
+        Log($"Nettoyage : {Cleanup.Size(result.Freed)} libérés.");
+        _report.Step("Nettoyage du PC", $"{Cleanup.Size(result.Freed)} libérés");
+        _report.Detail("Nettoyage", result.Done);
+        _report.Detail("Raccourcis cassés mis de côté", result.MovedShortcuts);
+        _report.Detail("Programmes lancés au démarrage (à désactiver s'ils sont inutiles)", result.Startup);
+        ShowFreeSpace();
     }
 
     private async Task RunWindowsUpdateAsync()
@@ -369,8 +334,7 @@ public partial class MainWindow : Window
         PackList.IsEnabled = !running;
         StopButton.IsEnabled = running;
         StopButton.Content = "Arrêter après l'étape";
-        GlaryCheck.IsEnabled = !running && _glaryFolder is not null;
-        InstallGlaryButton.IsEnabled = !running;
+        CleanCheck.IsEnabled = !running;
         RefreshButton.IsEnabled = !running;
         WuCheck.IsEnabled = !running;
         WingetCheck.IsEnabled = !running;
@@ -382,7 +346,8 @@ public partial class MainWindow : Window
     {
         Log("--- Point de restauration ---");
         RestoreStatus.Text = "Création en cours…";
-        var result = await Task.Run(() => RestorePoint.Create(new Progress<string>(Log)));
+        var log = new Progress<string>(Log);
+        var result = await Task.Run(() => RestorePoint.Create(log));
         RestoreStatus.Text = result;
         Log("Point de restauration : " + result);
         _report.Step("Point de restauration", result);
@@ -480,6 +445,59 @@ public partial class MainWindow : Window
         Log("Arrêt demandé : la maintenance s'arrête à la fin de l'étape en cours.");
     }
 
+    private void Win11Upgrade_Click(object sender, RoutedEventArgs e)
+    {
+        const string title = "Passer à Windows 11";
+        if (_running) return;
+        var version = WindowsVersion.Read();
+        if (version.IsWindows11 && MessageBox.Show(this,
+                $"Ce PC est déjà sous {version.Name} {version.DisplayVersion}. Lancer quand même l'installation depuis une ISO (passage à une version plus récente, ou réparation en gardant les fichiers) ?",
+                title, MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+
+        var blockers = Windows11Upgrade.Blockers();
+        if (blockers.Count > 0)
+        {
+            Log("Passage à Windows 11 impossible : " + string.Join(" ", blockers));
+            MessageBox.Show(this, string.Join("\n\n", blockers), title, MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "ISO de Windows 11 (téléchargée sur le site de Microsoft)",
+            Filter = "Image ISO (*.iso)|*.iso",
+            InitialDirectory = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"),
+        };
+        if (dialog.ShowDialog(this) != true) return;
+
+        var warnings = Windows11Upgrade.Warnings();
+        var message = "Windows 11 va être installé par-dessus Windows, en gardant les fichiers, les logiciels et les réglages.\n\n"
+            + "• Ce PC n'est pas officiellement compatible : Microsoft ne garantit pas les mises à jour, et chaque nouvelle version annuelle "
+            + "devra peut-être être installée de la même façon.\n"
+            + "• Un filigrane « Configuration requise non remplie » peut apparaître.\n"
+            + "• Le PC redémarre plusieurs fois (30 à 90 minutes). Brancher le chargeur.\n"
+            + "• Une sauvegarde des données du client est conseillée avant de lancer.\n"
+            + string.Concat(warnings.Select(w => "• " + w + "\n"))
+            + "\nLancer la mise à niveau ?";
+        if (MessageBox.Show(this, message, title, MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+
+        var iso = dialog.FileName;
+        var log = new Progress<string>(Log);
+        Win11Button.IsEnabled = false;
+        Task.Run(() => Windows11Upgrade.Start(iso, log)).ContinueWith(t =>
+        {
+            Win11Button.IsEnabled = true;
+            var error = t.Exception?.GetBaseException().Message ?? t.Result;
+            if (error is null)
+            {
+                _report.Step("Passage à Windows 11", "Mise à niveau lancée depuis l'ISO (PC non compatible), fichiers et logiciels gardés.");
+                return;
+            }
+            Log("Passage à Windows 11 : " + error);
+            MessageBox.Show(this, error, title, MessageBoxButton.OK, MessageBoxImage.Error);
+        }, TaskScheduler.FromCurrentSynchronizationContext());
+    }
+
     private void OpenWindowsUpdate_Click(object sender, RoutedEventArgs e) =>
         Process.Start(new ProcessStartInfo("ms-settings:windowsupdate") { UseShellExecute = true });
 
@@ -490,6 +508,9 @@ public partial class MainWindow : Window
 
     private void Log(string text)
     {
+        // Appelé d'un autre fil : on repasse par celui de la fenêtre au lieu de planter.
+        if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(() => Log(text))); return; }
+        CrashGuard.Trace(text);
         LogBox.AppendText($"[{DateTime.Now:HH:mm:ss}] {text}{Environment.NewLine}");
         LogBox.ScrollToEnd();
     }

@@ -1,0 +1,18 @@
+<Application x:Class="PcMigration.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="MainWindow.xaml">
+    <!-- Charte commune aux logiciels JVTECH (src/PcInspector/Theme.xaml) -->
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Theme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Texte sous chaque élément à transférer -->
+            <Style x:Key="ItemStatus" TargetType="TextBlock" BasedOn="{StaticResource Hint}">
+                <Setter Property="Margin" Value="24,1,0,6"/>
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

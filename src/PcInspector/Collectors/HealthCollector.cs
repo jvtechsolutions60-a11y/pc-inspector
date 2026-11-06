@@ -54,21 +54,21 @@ public sealed class HealthCollector : ICollector
                                           or InvalidOperationException) { }
         }
 
-        void Add(Severity severity, string area, string message, string tab) =>
-            findings.Add(new Finding(severity, area, message, tab));
-
-        Run(() => Disks(Add));
-        Run(() => SystemDriveSpace(Add));
-        Run(() => Memory(Add));
-        Run(() => Battery(Add));
-        Run(() => Devices(Add));
-        Run(() => Crashes(Add));
-        Run(() => Antivirus(Add));
-        Run(() => Firewall(Add));
-        Run(() => Activation(Add));
-        Run(() => Updates(Add));
-        Run(() => WindowsVersion(Add));
-        SoftwareUpdates(winget.Result, Add);
+        // Les contrôles sont indépendants : ils tournent en même temps (WMI, journaux, Windows Update), puis leurs
+        // résultats sont remis dans l'ordre habituel.
+        var checks = new Action<AddFinding>[]
+        {
+            Disks, SystemDriveSpace, Memory, Battery, Devices, Crashes, Antivirus, Firewall, Activation, Updates, WindowsVersion,
+        };
+        var results = new List<Finding>[checks.Length];
+        System.Threading.Tasks.Parallel.For(0, checks.Length, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = 6 }, i =>
+        {
+            var local = new List<Finding>();
+            Run(() => checks[i]((severity, area, message, tab) => local.Add(new Finding(severity, area, message, tab))));
+            results[i] = local;
+        });
+        foreach (var list in results) findings.AddRange(list);
+        SoftwareUpdates(winget.Result, (severity, area, message, tab) => findings.Add(new Finding(severity, area, message, tab)));
 
         return new HealthReport(findings);
     }

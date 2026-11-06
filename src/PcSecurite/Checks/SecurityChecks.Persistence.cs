@@ -122,7 +122,7 @@ public static partial class SecurityChecks
     {
         try
         {
-            using var process = Process.Start(new ProcessStartInfo("schtasks.exe", "/query /fo csv /v /nh")
+            using var process = Process.Start(new ProcessStartInfo(PcInspector.AppPaths.SystemTool("schtasks.exe"), "/query /fo csv /v /nh")
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,

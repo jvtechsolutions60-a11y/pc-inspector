@@ -1,0 +1,69 @@
+JVTECH SERVEUR PXE · PRÉPARATION REVENTE
+========================================
+
+À quoi ça sert
+--------------
+Préparer les PC d'achat-revente par le réseau, sans clé USB et sans rester devant.
+On démarre le PC sur le réseau (touche F12), et il
+  1. efface le disque et installe Windows 11 en français, sans aucune question ;
+  2. nettoie Windows avec Win11Debloat (applications, Copilot, Recall, Bing, widgets, publicités, télémétrie)
+     puis retire les applications des fabricants (liste dans Kit\JVTECH\debloat.ini) ;
+  3. installe les pilotes et le BIOS du constructeur (Dell, Lenovo, HP) ;
+  4. passe Windows Update en boucle, pilotes compris, jusqu'à ce qu'il n'y ait plus rien ;
+  5. vérifie les pilotes manquants et l'activation, et envoie son rapport au serveur ;
+  6. se remet au premier démarrage et s'éteint : l'acheteur choisit sa langue et crée son propre compte.
+Le serveur affiche tous les PC en cours, leur étape, et garde les rapports et les statistiques.
+
+ATTENTION : un PC accepté par le serveur est entièrement effacé (disque 0).
+Le serveur n'accepte les PC que pendant 30 minutes après un clic sur « Accepter les PC ».
+
+Installer le serveur sur le mini PC (une seule fois)
+---------------------------------------------------
+1. Mini PC sous Windows 10 ou 11, branché en câble sur le réseau de l'atelier (même réseau que les PC à préparer),
+   avec 40 Go de libre sur C:. Lui donner une adresse IP fixe (ou une réservation dans la box) est conseillé.
+2. Décompresser ce .zip dans un dossier du mini PC, par exemple C:\JVTECH-Serveur
+   (garder le dossier Kit à côté de JvtechServeur.exe).
+3. Télécharger l'ISO de Windows 11 en français sur le site de Microsoft :
+   https://www.microsoft.com/fr-fr/software-download/windows11 (rubrique « Télécharger l'image disque (ISO) »).
+4. Lancer JvtechServeur.exe (il demande les droits administrateur), choisir la carte réseau,
+   puis « Préparer depuis une ISO… » : 30 à 45 minutes. Le serveur crée tout seul :
+   - C:\JVTECH-PXE (fichiers d'installation, démarrage réseau, rapports) ;
+   - le partage en lecture seule JVTECH-Install et le compte caché « jvtechpxe » qui le lit ;
+   - les règles du pare-feu (ports 67, 69, 4011, 8081 et partage de fichiers).
+5. Laisser le serveur ouvert. Il vérifie chaque jour la mise à jour cumulative de Windows 11 et l'intègre
+   à l'image quand aucun PC n'est en cours (case à cocher) : les PC installés sont déjà à jour du mois.
+
+Rien à changer sur la box : elle continue de donner les adresses IP. Le serveur répond seulement
+aux PC qui démarrent sur le réseau, pour leur dire où démarrer.
+
+Préparer un PC
+--------------
+1. Brancher le PC en câble réseau, et sur secteur pour un portable (le BIOS ne se met à jour que sur secteur).
+2. Dans le BIOS du PC : mode UEFI, et démarrage réseau (PXE IPv4) activé. Secure Boot peut rester actif.
+3. Sur le serveur : « Accepter les PC (30 min) ».
+4. Allumer le PC, touche F12 (Dell, Lenovo), F9 (HP) ou Échap, puis choisir le démarrage réseau IPv4.
+   Ne pas mettre le réseau en premier dans le BIOS.
+5. Le PC apparaît sur l'écran du serveur. Tout est automatique ensuite, avec plusieurs redémarrages :
+   compter 1 à 2 heures. Plusieurs PC peuvent être préparés en même temps ; ils s'échangent
+   les mises à jour sur le réseau au lieu de toutes les télécharger.
+6. Quand le PC s'est éteint, il est prêt. Le rapport est sur le serveur (bouton « Rapport »,
+   ou C:\JVTECH-PXE\Rapports).
+
+Le PC a plusieurs disques ? Windows est installé sur le disque 0 : débrancher le disque en trop
+si ce n'est pas le bon, ou vérifier après coup dans le rapport.
+
+Réglages
+--------
+- Kit\JVTECH\options.ini : activer ou couper une étape (BIOS, constructeur, premier démarrage…).
+- Kit\JVTECH\debloat.ini : applications à retirer.
+Les changements s'appliquent aux PC démarrés après le prochain démarrage du serveur.
+
+En cas de souci
+---------------
+- Le PC ne trouve pas le serveur : vérifier que le serveur est démarré, que « Accepter les PC » est actif,
+  que le PC est en UEFI, et regarder le journal du serveur (C:\JVTECH-PXE\journal.log).
+- Un autre serveur PXE ou DHCP sur le mini PC (partage de connexion, WDS…) bloque les ports : le fermer.
+- Pendant la préparation, le journal du PC est dans C:\JVTECH\preparation.log.
+- « Arrêter la préparation » en haut de l'écran du PC : il reste en mode audit, à finir à la main.
+  Pour reprendre : C:\JVTECH\PcMaintenance.exe /preparation
+- Si Windows demande l'édition à installer : ce PC n'a pas de licence dans son BIOS, choisir Famille ou Pro.

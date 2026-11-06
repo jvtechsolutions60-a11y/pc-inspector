@@ -49,6 +49,9 @@ public sealed class BatteryCollector : ICollector
         return (designed, full, cycles);
     }
 
+    /// <summary>Nombre de cycles de charge, quand la batterie le donne.</summary>
+    public static ulong? Cycles() => Wear().Cycles is > 0 and var cycles ? cycles : null;
+
     /// <summary>Pourcentage d'usure, utilisé aussi par les conseils.</summary>
     public static double? WearPercent()
     {

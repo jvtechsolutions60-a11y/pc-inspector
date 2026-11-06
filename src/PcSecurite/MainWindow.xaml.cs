@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Data;
@@ -66,11 +67,27 @@ public partial class MainWindow : Window
 
         SecurityChecks.ResetCache();
         var all = SecurityChecks.All;
-        for (int i = 0; i < all.Count; i++)
+        // Six contrôles à la fois (ils sont indépendants et ne font que lire) ; le plus long, les mises à jour en
+        // attente, part en premier. Chaque feu apparaît dès que son contrôle est fini, la liste reste triée.
+        using var gate = new SemaphoreSlim(6);
+        var order = new[] { all.Count - 1 }.Concat(Enumerable.Range(0, all.Count - 1));
+        var pending = order.Select(async i =>
         {
-            ProgressText.Text = $"Contrôle {i + 1} sur {all.Count} : {all[i].Name}…";
-            _checks.Add(await RunCheckAsync(i));
-            ScoreBar.Value = (i + 1) * 100.0 / all.Count;
+            await gate.WaitAsync();
+            try { return await RunCheckAsync(i); }
+            finally { gate.Release(); }
+        }).ToList();
+        var done = 0;
+        ProgressText.Text = $"Contrôle 0 sur {all.Count}…";
+        while (pending.Count > 0)
+        {
+            var finished = await Task.WhenAny(pending);
+            pending.Remove(finished);
+            var check = await finished;
+            _checks.Add(check);
+            done++;
+            ProgressText.Text = $"Contrôle {done} sur {all.Count} : {check.Name}";
+            ScoreBar.Value = done * 100.0 / all.Count;
             UpdateCounters();
         }
 

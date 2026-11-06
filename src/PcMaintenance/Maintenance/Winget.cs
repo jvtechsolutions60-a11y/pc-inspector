@@ -63,7 +63,7 @@ internal static class Winget
     public static Task<int?> UpgradeAllAsync(IProgress<string> log) =>
         RunAsync("upgrade --all --source winget --silent --accept-source-agreements --accept-package-agreements --disable-interactivity", log);
 
-    /// <summary>Installe un logiciel par son identifiant winget exact (ex. Glarysoft.GlaryUtilities).</summary>
+    /// <summary>Installe un logiciel par son identifiant winget exact (ex. VideoLAN.VLC).</summary>
     public static Task<int?> InstallAsync(string id, IProgress<string> log) =>
         RunAsync($"install --exact --id {id} --source winget --silent --accept-source-agreements --accept-package-agreements --disable-interactivity", log);
 
