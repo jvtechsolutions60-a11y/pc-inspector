@@ -34,9 +34,10 @@ public static class TrackingSheetWriter
         var system = Wmi.Query("SELECT Manufacturer, Model, TotalPhysicalMemory FROM Win32_ComputerSystem").FirstOrDefault();
         var bios = Wmi.QueryOptional("SELECT SerialNumber, SMBIOSBIOSVersion, ReleaseDate FROM Win32_BIOS").FirstOrDefault();
         var cpu = LabelWriter.Shorten(Wmi.Query("SELECT Name FROM Win32_Processor").FirstOrDefault()?.Str("Name"));
-        var ram = system?.ULong("TotalPhysicalMemory") is { } bytes ? $"{Math.Round(bytes / (double)Gb)} Go" : null;
-        var disks = string.Join(" + ", Wmi.QueryOptional("SELECT Size, MediaType FROM MSFT_PhysicalDisk", Wmi.StorageScope)
-            .Select(d => $"{(d.ULong("MediaType") == 3 ? "HDD" : "SSD")} {Size(d.ULong("Size") ?? 0)}"));
+        var ram = MemoryDetail() ?? (system?.ULong("TotalPhysicalMemory") is { } bytes ? $"{Math.Round(bytes / (double)Gb)} Go" : null);
+        // Marque et modèle de chaque disque : « SSD NVMe Samsung MZVL2512HCJQ 512 Go ».
+        var disks = string.Join(" + ", Wmi.QueryOptional("SELECT FriendlyName, Size, MediaType, BusType FROM MSFT_PhysicalDisk", Wmi.StorageScope)
+            .Select(d => $"{StorageCollector.MediaType(d.ULong("MediaType"), d.ULong("BusType")) ?? "Disque"} {d.Str("FriendlyName")} {Size(d.ULong("Size") ?? 0)}".Replace("  ", " ")));
         var gpus = string.Join(" + ", Wmi.Query("SELECT Name FROM Win32_VideoController")
             .Select(g => g.Str("Name")?.Replace("(R)", "").Replace("(TM)", "").Trim())
             .Where(n => !string.IsNullOrEmpty(n) && !n!.Contains("Basic") && !n.Contains("Remote")));
@@ -122,6 +123,30 @@ small{display:block;color:#475569;font-size:7pt;margin-top:1px;line-height:1.2}
         html.AppendLine($"<p class=\"foot\">En bleu : relevé automatiquement par PC Inspector (bilan {health.Score}/100, {E(health.Counts)}). Les cases ☑ sont vérifiées par le logiciel ; ☐ : point à revoir, détaillé en dessous.</p>");
         html.AppendLine("</body></html>");
         return html.ToString();
+    }
+
+    /// <summary>« 32 Go : 2 × 16 Go DDR4 3200 MT/s (Samsung) · 2/2 emplacements, aucun libre ».</summary>
+    private static string? MemoryDetail()
+    {
+        var modules = Wmi.Query("SELECT Capacity, Manufacturer, SMBIOSMemoryType, Speed, ConfiguredClockSpeed FROM Win32_PhysicalMemory");
+        if (modules.Count == 0) return null;
+        var total = modules.Aggregate(0UL, (sum, m) => sum + (m.ULong("Capacity") ?? 0));
+        var sticks = string.Join(" + ", modules.GroupBy(m => Math.Round((m.ULong("Capacity") ?? 0) / (double)Gb))
+            .Select(g => $"{g.Count()} × {g.Key} Go"));
+        var first = modules[0];
+        var type = MemoryCollector.MemoryType(first.ULong("SMBIOSMemoryType"));
+        var speed = first.ULong("ConfiguredClockSpeed") is > 0 and var c ? c : first.ULong("Speed");
+        var maker = modules.Select(m => m.Str("Manufacturer")?.Trim()).FirstOrDefault(m => !string.IsNullOrEmpty(m) && !m!.StartsWith("Unknown", StringComparison.OrdinalIgnoreCase) && !m.All(ch => ch == '0' || ch == ' '));
+        var text = $"{Math.Round(total / (double)Gb)} Go : {sticks}"
+                   + (type is null ? "" : " " + type) + (speed is > 0 ? $" {speed} MT/s" : "") + (maker is null ? "" : $" ({maker})");
+        if (type is not null && type.StartsWith("LP")) return text + " · soudée, pas d'ajout possible";
+        var slots = Wmi.QueryOptional("SELECT MemoryDevices FROM Win32_PhysicalMemoryArray").FirstOrDefault()?.ULong("MemoryDevices");
+        if (slots is { } n && n >= (ulong)modules.Count)
+        {
+            var free = n - (ulong)modules.Count;
+            text += $" · {modules.Count}/{n} emplacements, " + (free == 0 ? "aucun libre" : $"{free} libre{(free > 1 ? "s" : "")}");
+        }
+        return text;
     }
 
     private static string Size(ulong bytes) => bytes >= 1_000_000_000_000 ? $"{Math.Round(bytes / 1e12, 1)} To" : $"{Math.Round(bytes / 1e9)} Go";
