@@ -27,7 +27,10 @@ et permet d'exporter un rapport.
 
 1. **Cadrage** : projet C# / WPF sur .NET Framework 4.8, un seul `.exe` léger. ✅
 2. **Hardware** : un onglet par composant (CPU, carte mère/BIOS, RAM, GPU + écrans, disques + SMART, réseau, températures). ✅
-3. **Diagnostic métier** : périphériques en erreur, plantages, batterie, compatibilité Windows 11, licence et sécurité, conseils d'upgrade, lien garantie. ✅
+3. **Diagnostic métier** : périphériques en erreur, plantages, batterie, compatibilité Windows 11, licences (et BitLocker), conseils d'upgrade, lien garantie. ✅
+   Depuis novembre 2026, la sécurité détaillée (antivirus, pare-feu, mises à jour en attente…) n'est plus en double ici :
+   le bilan garde les points essentiels et son bouton « Ouvrir PC Sécurité » mène au contrôle complet. Les anciens
+   « Conseils » sont fondus dans le bilan.
 4. **Export** : rapport client HTML et TXT (logo, client, n° d'intervention). ✅
 5. **Logiciel** : système, logiciels installés, pilotes, services, démarrage. ✅
 6. **Bilan en 1 clic** : écran d'accueil avec une note sur 100, les points rouges en tête et l'export du rapport client. ✅

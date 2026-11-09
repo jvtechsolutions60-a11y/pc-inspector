@@ -44,9 +44,7 @@ public partial class MainWindow : Window
             new BootPerformanceCollector(),
             new BatteryCollector(),
             new Windows11Collector(),
-            new SecurityCollector(),
             new LicenseCollector(),
-            new AdviceCollector(),
             new UpgradeQuoteCollector(),
         }),
         ("LOGICIEL", new ICollector[]
@@ -254,8 +252,27 @@ public partial class MainWindow : Window
     private void FindingDetail_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.Tag is not string tab) return;
+        if (tab == Finding.SecurityApp)
+        {
+            OpenSecurityApp();
+            return;
+        }
         var target = (SectionList.ItemsSource as ListCollectionView)?.Cast<SidebarItem>().FirstOrDefault(i => i.Title == tab);
         if (target is not null) SectionList.SelectedItem = target;
+    }
+
+    /// <summary>Le détail de la sécurité est dans PC Sécurité, posé à côté de PC Inspector par le lanceur.</summary>
+    private void OpenSecurityApp()
+    {
+        var path = System.IO.Path.Combine(AppPaths.ExeFolder, "PcSecurite.exe");
+        if (!System.IO.File.Exists(path))
+        {
+            MessageBox.Show(this, "PcSecurite.exe est introuvable : le mettre dans le même dossier que PcInspector.exe (comme dans le dossier JVTECH Outils).",
+                "PC Sécurité", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true, WorkingDirectory = AppPaths.ExeFolder }); }
+        catch (System.ComponentModel.Win32Exception) { /* droits administrateur refusés */ }
     }
 
     private async void ExportButton_Click(object sender, RoutedEventArgs e)

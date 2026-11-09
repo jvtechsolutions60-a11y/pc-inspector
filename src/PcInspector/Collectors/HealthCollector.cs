@@ -167,9 +167,17 @@ public sealed class HealthCollector : ICollector
         if (ram == 0) return;
         var text = Wmi.FormatBytes(ram);
         // La mémoire réservée au matériel fait afficher un peu moins que la quantité installée.
-        if (ram < 3.5 * Gb) add(Severity.Critical, "Mémoire", $"{text} seulement : insuffisant pour Windows, passer à 8 Go minimum.", "Mémoire");
-        else if (ram < 7.5 * Gb) add(Severity.Warning, "Mémoire", $"{text} : passer à 8 ou 16 Go pour un usage confortable.", "Mémoire");
+        if (ram < 3.5 * Gb) add(Severity.Critical, "Mémoire", $"{text} seulement : insuffisant pour Windows, passer à 8 Go minimum{FreeSlots()}.", "Mémoire");
+        else if (ram < 7.5 * Gb) add(Severity.Warning, "Mémoire", $"{text} : passer à 8 ou 16 Go pour un usage confortable{FreeSlots()}.", "Mémoire");
         else add(Severity.Ok, "Mémoire", $"{text} de mémoire.", "Mémoire");
+    }
+
+    /// <summary>« (2 emplacements libres) » ou « (aucun emplacement libre : remplacer les barrettes) ».</summary>
+    private static string FreeSlots()
+    {
+        var used = (ulong)Wmi.Query("SELECT Capacity FROM Win32_PhysicalMemory").Count;
+        if (Wmi.QueryOptional("SELECT MemoryDevices FROM Win32_PhysicalMemoryArray").FirstOrDefault()?.ULong("MemoryDevices") is not { } slots) return "";
+        return slots > used ? $" ({slots - used} emplacement(s) libre(s))" : " (aucun emplacement libre : remplacer les barrettes)";
     }
 
     private static void Battery(AddFinding add)
@@ -205,7 +213,7 @@ public sealed class HealthCollector : ICollector
         var products = Wmi.QueryOptional("SELECT displayName, productState FROM AntiVirusProduct", @"root\SecurityCenter2");
         if (products.Count == 0)
         {
-            add(Severity.Critical, "Antivirus", "Aucun antivirus détecté : réactiver Windows Defender ou installer une protection.", "Sécurité");
+            add(Severity.Critical, "Antivirus", "Aucun antivirus détecté : réactiver Windows Defender ou installer une protection.", Finding.SecurityApp);
             return;
         }
 
@@ -213,43 +221,46 @@ public sealed class HealthCollector : ICollector
         var active = products.Where(av => (((av.ULong("productState") ?? 0) >> 8) & 0xFF) is 0x10 or 0x11).ToList();
         if (active.Count == 0)
         {
-            add(Severity.Critical, "Antivirus", "Aucun antivirus actif : réactiver Windows Defender ou installer une protection.", "Sécurité");
+            add(Severity.Critical, "Antivirus", "Aucun antivirus actif : réactiver Windows Defender ou installer une protection.", Finding.SecurityApp);
             return;
         }
 
         var outdated = active.Where(av => ((av.ULong("productState") ?? 0) & 0xFF) != 0x00).ToList();
         var name = (outdated.Count > 0 ? outdated : active)[0].Str("displayName") ?? "L'antivirus";
-        if (outdated.Count > 0) add(Severity.Warning, "Antivirus", $"{name} est activé mais ses définitions sont périmées : lancer une mise à jour.", "Sécurité");
-        else add(Severity.Ok, "Antivirus", $"{name} activé et à jour.", "Sécurité");
+        if (outdated.Count > 0) add(Severity.Warning, "Antivirus", $"{name} est activé mais ses définitions sont périmées : lancer une mise à jour.", Finding.SecurityApp);
+        else add(Severity.Ok, "Antivirus", $"{name} activé et à jour.", Finding.SecurityApp);
     }
 
     private static void Firewall(AddFinding add)
     {
-        var off = SecurityCollector.DisabledFirewallProfiles();
+        var off = WindowsState.DisabledFirewallProfiles();
         if (off.Count == 0)
         {
-            add(Severity.Ok, "Pare-feu", "Pare-feu Windows activé.", "Sécurité");
+            add(Severity.Ok, "Pare-feu", "Pare-feu Windows activé.", Finding.SecurityApp);
             return;
         }
         var thirdParty = Wmi.QueryOptional("SELECT displayName FROM FirewallProduct", @"root\SecurityCenter2").FirstOrDefault()?.Str("displayName");
-        if (thirdParty is not null) add(Severity.Ok, "Pare-feu", $"Pare-feu {thirdParty} en place.", "Sécurité");
-        else add(Severity.Critical, "Pare-feu", "Pare-feu Windows désactivé pour : " + string.Join(", ", off) + ". Le réactiver.", "Sécurité");
+        if (thirdParty is not null) add(Severity.Ok, "Pare-feu", $"Pare-feu {thirdParty} en place.", Finding.SecurityApp);
+        else add(Severity.Critical, "Pare-feu", "Pare-feu Windows désactivé pour : " + string.Join(", ", off) + ". Le réactiver.", Finding.SecurityApp);
     }
 
     private static void Activation(AddFinding add)
     {
-        switch (SecurityCollector.IsWindowsActivated())
+        switch (WindowsState.IsActivated())
         {
-            case true: add(Severity.Ok, "Licence", "Windows est activé.", "Sécurité"); break;
-            case false: add(Severity.Warning, "Licence", "Windows n'est pas activé.", "Sécurité"); break;
+            case true: add(Severity.Ok, "Licence", "Windows est activé.", "Licences"); break;
+            case false: add(Severity.Warning, "Licence", "Windows n'est pas activé.", "Licences"); break;
         }
     }
 
     private static void Updates(AddFinding add)
     {
-        // La liste des mises à jour en attente (longue à obtenir) reste dans l'onglet Sécurité.
-        if (SecurityCollector.IsRebootPending())
-            add(Severity.Warning, "Mises à jour", "Un redémarrage est nécessaire pour terminer des mises à jour.", "Sécurité");
+        // Le détail des mises à jour en attente est dans PC Sécurité (et PC Maintenance les installe).
+        if (WindowsState.IsRebootPending())
+            add(Severity.Warning, "Mises à jour", "Un redémarrage est nécessaire pour terminer des mises à jour.", "Diagnostic");
+        var boot = Wmi.Query("SELECT LastBootUpTime FROM Win32_OperatingSystem").FirstOrDefault()?.Str("LastBootUpTime");
+        if (!string.IsNullOrEmpty(boot) && DateTime.Now - System.Management.ManagementDateTimeConverter.ToDateTime(boot) > TimeSpan.FromDays(7))
+            add(Severity.Warning, "Redémarrage", "Le PC n'a pas redémarré depuis plus d'une semaine (le démarrage rapide de Windows peut en être la cause).", "Diagnostic");
     }
 
     private static void SoftwareUpdates(Winget.Result result, AddFinding add)

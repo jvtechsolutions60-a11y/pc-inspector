@@ -430,15 +430,9 @@ internal sealed class PreparationRunner
 
     private void Run(string exe, string arguments, TimeSpan timeout)
     {
-        try
-        {
-            using var process = Process.Start(new ProcessStartInfo(PcInspector.AppPaths.SystemTool(exe), arguments) { UseShellExecute = false, CreateNoWindow = true })!;
-            if (!process.WaitForExit((int)timeout.TotalMilliseconds)) _log.Report($"{exe} ne répond plus : on continue.");
-        }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
-        {
-            _log.Report($"{exe} : {ex.Message}");
-        }
+        var result = PcInspector.ProcessRunner.Run(exe, arguments, null, timeout);
+        if (!result.Started) _log.Report($"{exe} introuvable.");
+        else if (result.TimedOut) _log.Report($"{exe} ne répond plus : on continue.");
     }
 
     private static List<string> MissingDrivers()

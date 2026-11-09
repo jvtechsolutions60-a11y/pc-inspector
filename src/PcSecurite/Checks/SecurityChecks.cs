@@ -127,12 +127,7 @@ public static partial class SecurityChecks
         if (thirdParty.Count > 0)
             return SecurityCheck.Ok(name, string.Join(", ", thirdParty) + " actif");
 
-        var off = new List<string>();
-        foreach (var (key, label) in new[] { ("DomainProfile", "domaine"), ("StandardProfile", "privé"), ("PublicProfile", "public") })
-        {
-            using var reg = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\{key}");
-            if (reg?.GetValue("EnableFirewall") is int enabled && enabled == 0) off.Add(label);
-        }
+        var off = PcInspector.WindowsState.DisabledFirewallProfiles();
         if (off.Count == 0) return SecurityCheck.Ok(name, "Pare-feu Windows activé sur tous les réseaux");
         var detail = "Pare-feu Windows désactivé pour le réseau " + string.Join(", ", off);
         return off.Contains("public")
@@ -170,10 +165,7 @@ public static partial class SecurityChecks
     private static SecurityCheck Activation()
     {
         const string name = "Activation de Windows";
-        var product = Wmi.QueryOptional(
-                "SELECT LicenseStatus FROM SoftwareLicensingProduct WHERE ApplicationID = '55c92734-d682-4d71-983e-d6ec3f16059f' AND PartialProductKey IS NOT NULL")
-            .FirstOrDefault();
-        return product?.ULong("LicenseStatus") switch
+        return PcInspector.WindowsState.LicenseStatus() switch
         {
             1 => SecurityCheck.Ok(name, "Windows est activé"),
             null => SecurityCheck.Info(name, "État inconnu"),

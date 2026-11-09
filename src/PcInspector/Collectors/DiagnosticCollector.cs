@@ -23,7 +23,7 @@ public sealed class DiagnosticCollector : ICollector
         section.Groups.Add(new InfoGroup("Démarrage")
             .Add("Dernier démarrage", boot?.ToString("dd/MM/yyyy HH:mm"))
             .Add("Allumé depuis", boot is { } b ? Duration(DateTime.Now - b) : null)
-            .Add("Redémarrage en attente", Wmi.YesNo(SecurityCollector.IsRebootPending())));
+            .Add("Redémarrage en attente", Wmi.YesNo(WindowsState.IsRebootPending())));
 
         var devices = new InfoGroup("Périphériques en erreur");
         foreach (var device in Wmi.Query("SELECT Name, PNPClass, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE ConfigManagerErrorCode <> 0"))

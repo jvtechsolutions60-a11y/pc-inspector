@@ -75,21 +75,7 @@ internal sealed class WindowsUpdate
         return IsSuccess(installed);
     }
 
-    /// <summary>Windows note dans ces clés qu'un redémarrage est nécessaire pour finir une installation.</summary>
-    public static bool IsRebootPending()
-    {
-        string[] keys =
-        {
-            @"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending",
-            @"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired",
-        };
-        foreach (var path in keys)
-        {
-            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(path);
-            if (key is not null) return true;
-        }
-        return false;
-    }
+    public static bool IsRebootPending() => PcInspector.WindowsState.IsRebootPending();
 
     private static bool IsSuccess(object? result) =>
         Convert.ToInt32(Get(result, "ResultCode")) is Succeeded or SucceededWithErrors;

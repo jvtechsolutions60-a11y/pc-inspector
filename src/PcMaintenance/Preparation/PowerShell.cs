@@ -1,9 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.IO;
-using System.Text;
 
 namespace PcMaintenance.Preparation;
 
@@ -12,38 +8,17 @@ internal static class PowerShell
 {
     public static List<string> Run(string script, TimeSpan timeout)
     {
-        var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes("$ProgressPreference='SilentlyContinue'\n" + script));
-        var start = new ProcessStartInfo(PcInspector.AppPaths.SystemTool("powershell.exe"), "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + encoded)
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8,
-        };
         var lines = new List<string>();
-        try
+        // Les erreurs de PowerShell sont ignorées : les scripts écrivent eux-mêmes « ERREUR|… » quand il le faut.
+        var result = PcInspector.ProcessRunner.PowerShell(script, line =>
         {
-            using var process = Process.Start(start)!;
-            process.ErrorDataReceived += (_, _) => { };
-            process.BeginErrorReadLine();
-            var output = process.StandardOutput.ReadToEndAsync();
-            if (!process.WaitForExit((int)timeout.TotalMilliseconds))
-            {
-                try { process.Kill(); } catch (InvalidOperationException) { }
-                lines.Add("ERREUR|PowerShell|pas de réponse");
-                return lines;
-            }
-            foreach (var line in output.Result.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
-                lines.Add(line.Trim());
-        }
-        catch (Exception ex) when (ex is Win32Exception or IOException or InvalidOperationException)
-        {
-            lines.Add("ERREUR|PowerShell|" + ex.Message);
-        }
+            if (line.Trim().Length > 0) lines.Add(line.Trim());
+        }, timeout, includeErrors: false);
+        if (!result.Started) lines.Add("ERREUR|PowerShell|introuvable");
+        else if (result.TimedOut) lines.Add("ERREUR|PowerShell|pas de réponse");
         return lines;
     }
 
     /// <summary>Met une chaîne entre apostrophes pour PowerShell.</summary>
-    public static string Quote(string text) => "'" + text.Replace("'", "''") + "'";
+    public static string Quote(string text) => PcInspector.ProcessRunner.PowerShellQuote(text);
 }

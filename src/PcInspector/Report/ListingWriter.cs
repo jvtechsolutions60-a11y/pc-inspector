@@ -195,7 +195,7 @@ public sealed class ListingSpecs
     private void ReadWindows()
     {
         var caption = Wmi.Query("SELECT Caption FROM Win32_OperatingSystem").FirstOrDefault()?.Str("Caption")?.Replace("Microsoft ", "").Trim() ?? "";
-        Windows = caption + (SecurityCollector.IsWindowsActivated() == true ? " activé" : "");
+        Windows = caption + (WindowsState.IsActivated() == true ? " activé" : "");
     }
 
     // ---------- Texte ----------

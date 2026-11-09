@@ -333,16 +333,11 @@ internal static class Cleanup
         catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { return true; }
     }
 
+    /// <summary>Code de sortie ; -1 si le programme n'a pas démarré, null s'il ne répondait plus.</summary>
     private static int? RunHidden(string file, string arguments, TimeSpan timeout)
     {
-        Process? started;
-        try { started = Process.Start(new ProcessStartInfo(PcInspector.AppPaths.SystemTool(file), arguments) { UseShellExecute = false, CreateNoWindow = true }); }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { return -1; }
-        using var process = started;
-        if (process is null) return -1;
-        if (process.WaitForExit((int)timeout.TotalMilliseconds)) return process.ExitCode;
-        try { process.Kill(); } catch (InvalidOperationException) { }
-        return null;
+        var result = PcInspector.ProcessRunner.Run(file, arguments, null, timeout);
+        return result.Started ? result.ExitCode : -1;
     }
 
     private static ulong FreeSpace()

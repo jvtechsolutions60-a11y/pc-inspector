@@ -15,23 +15,16 @@ internal static class Winget
 
     public static int? Run(string arguments, List<string> output, TimeSpan timeout)
     {
-        foreach (var exe in Candidates())
+        foreach (var exe in PcInspector.WingetShell.Candidates())
         {
             var lines = new List<string>();
             var code = Tools.Run(exe, arguments, lines, timeout, Encoding.UTF8);
             if (code is null && lines.Any(l => l.Contains("introuvable"))) continue;
-            output.AddRange(lines.Select(Visible).Where(l => l.Length > 0 && !IsProgress(l)));
+            output.AddRange(lines.Select(l => PcInspector.WingetShell.Visible(l).Trim()).Where(l => l.Length > 0 && !PcInspector.WingetShell.IsProgress(l)));
             return code;
         }
-        output.Add("winget est introuvable sur ce PC (installer « Programme d'installation d'application » depuis le Microsoft Store).");
+        output.Add(PcInspector.WingetShell.MissingMessage);
         return null;
-    }
-
-    private static IEnumerable<string> Candidates()
-    {
-        yield return "winget.exe";
-        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        if (!string.IsNullOrEmpty(local)) yield return Path.Combine(local, @"Microsoft\WindowsApps\winget.exe");
     }
 
     public static List<string> ReadIds(string file)
@@ -63,10 +56,4 @@ internal static class Winget
             _ => $"échec (code 0x{code.Value:X8})",
         };
     }
-
-    private static string Visible(string line) => line.Substring(line.LastIndexOf('\r') + 1).Trim();
-
-    /// <summary>Barres de progression et petit moulinet « - \ | / » : inutiles dans le journal.</summary>
-    private static bool IsProgress(string text) =>
-        text.Length <= 2 || text.Contains("█") || text.Contains("▒") || Regex.IsMatch(text, @"^[\d.,]+\s*(KB|MB|GB|Ko|Mo|Go)\s*/");
 }

@@ -98,40 +98,8 @@ internal static class Tools
     /// <summary>Lance un programme sans fenêtre et récupère ce qu'il affiche. Null : introuvable ou trop long.</summary>
     public static int? Run(string file, string arguments, List<string>? output, TimeSpan timeout, Encoding? encoding = null)
     {
-        Process? process;
-        try
-        {
-            process = Process.Start(new ProcessStartInfo(PcInspector.AppPaths.SystemTool(file), arguments)
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                StandardOutputEncoding = encoding ?? Encoding.GetEncoding(850),
-                StandardErrorEncoding = encoding ?? Encoding.GetEncoding(850),
-            });
-        }
-        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
-        {
-            output?.Add($"{file} introuvable : {ex.Message}");
-            return null;
-        }
-        if (process is null) return null;
-        using (process)
-        {
-            var lines = output ?? new List<string>();
-            process.OutputDataReceived += (_, e) => { if (e.Data is not null) lock (lines) lines.Add(e.Data); };
-            process.ErrorDataReceived += (_, e) => { if (e.Data is not null) lock (lines) lines.Add(e.Data); };
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            if (!process.WaitForExit((int)Math.Min(int.MaxValue, timeout.TotalMilliseconds)))
-            {
-                try { process.Kill(); } catch (InvalidOperationException) { }
-                return null;
-            }
-            process.WaitForExit();
-            return process.ExitCode;
-        }
+        var lines = output ?? new List<string>();
+        return PcInspector.ProcessRunner.Run(file, arguments, lines.Add, timeout, encoding).ExitCode;
     }
 
     public static bool IsRunning(string process)

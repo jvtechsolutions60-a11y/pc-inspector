@@ -9,6 +9,11 @@ public enum Severity { Critical, Warning, Ok }
 /// <summary>Un point du bilan : ce qui a été vérifié, le résultat, et l'onglet où voir le détail.</summary>
 public sealed record Finding(Severity Severity, string Area, string Message, string Tab)
 {
+    /// <summary>Le détail de ce point est dans PC Sécurité, pas dans un onglet de PC Inspector.</summary>
+    public const string SecurityApp = "PC Sécurité";
+
+    public string DetailText => Tab == SecurityApp ? "Ouvrir PC Sécurité" : "Voir le détail";
+
     public string Mark => Severity switch
     {
         Severity.Critical => "✘",
