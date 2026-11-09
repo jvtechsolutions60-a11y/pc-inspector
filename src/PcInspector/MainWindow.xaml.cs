@@ -277,8 +277,14 @@ public partial class MainWindow : Window
 
     private async void ExportButton_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new ExportWindow { Owner = this };
-        if (dialog.ShowDialog() != true || dialog.Info is null || dialog.FilePath is null) return;
+        // Plus de fenêtre à remplir : société, technicien et logo mémorisés, client du jour s'il y en a un, sinon le PC.
+        var info = ReportInfo.LoadDefaults();
+        info.Date = DateTime.Now;
+        var pcName = $"{MachineIdentity.Model()} {MachineIdentity.Serial()}".Trim();
+        var folder = AppPaths.ClientFolder(string.IsNullOrWhiteSpace(info.Client) ? pcName : info.Client, info.Date);
+        var baseName = string.Join("_", new[] { "Rapport", info.JobNumber, pcName, info.Date.ToString("yyyy-MM-dd HH-mm") }
+            .Where(p => !string.IsNullOrWhiteSpace(p)));
+        foreach (var c in System.IO.Path.GetInvalidFileNameChars()) baseName = baseName.Replace(c, '-');
 
         ExportButton.IsEnabled = false;
         HealthExportButton.IsEnabled = false;
@@ -291,9 +297,14 @@ public partial class MainWindow : Window
                 ? Task.FromResult(cached) : SectionAsync(c, refresh: false)))).ToList();
             for (var i = 0; i < _collectors.Count; i++) _cache[_collectors[i]] = sections[i];
 
-            var info = dialog.Info;
-            var path = dialog.FilePath;
-            await Task.Run(() => ReportWriter.Write(path, info, sections));
+            // PDF d'abord ; sans Edge ni Chrome, la page web (même contenu, imprimable depuis le navigateur).
+            var path = System.IO.Path.Combine(folder, baseName + ".pdf");
+            try { await Task.Run(() => ReportWriter.Write(path, info, sections)); }
+            catch (System.IO.IOException)
+            {
+                path = System.IO.Path.Combine(folder, baseName + ".html");
+                await Task.Run(() => ReportWriter.Write(path, info, sections));
+            }
             ShowStatus(null);
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
         }
@@ -368,25 +379,15 @@ public partial class MainWindow : Window
 
     private void Listing_Click(object sender, RoutedEventArgs e) => new ListingWindow { Owner = this }.Show();
 
-    private async void Label_Click(object sender, RoutedEventArgs e)
+    /// <summary>Impression directe sur l'étiqueteuse choisie dans la fenêtre d'impression de Windows.</summary>
+    private void Label_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new ExportWindow
+        var info = ReportInfo.LoadDefaults();
+        info.Date = DateTime.Now;
+        try { LabelPrinter.Print(this, info); }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Printing.PrintSystemException or System.IO.IOException)
         {
-            Owner = this,
-            FilePrefix = "Etiquette",
-            Filter = "Étiquette à imprimer (*.html)|*.html|PDF (*.pdf)|*.pdf",
-        };
-        if (dialog.ShowDialog() != true || dialog.Info is null || dialog.FilePath is null) return;
-        var info = dialog.Info;
-        var path = dialog.FilePath;
-        try
-        {
-            await Task.Run(() => LabelWriter.Write(path, info));
-            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
-        }
-        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
-        {
-            MessageBox.Show(this, "Impossible d'enregistrer l'étiquette : " + ex.Message, "Étiquette PC", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(this, "Impression impossible : " + ex.Message, "Étiquette PC", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

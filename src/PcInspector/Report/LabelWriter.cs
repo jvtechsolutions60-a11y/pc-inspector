@@ -24,10 +24,9 @@ public static class LabelWriter
         else File.WriteAllText(path, html, new UTF8Encoding(true));
     }
 
-    public static string Html(ReportInfo info)
+    /// <summary>Les lignes de l'étiquette (libellé, valeur), vides retirées. Communes à la page HTML et à l'impression directe.</summary>
+    public static List<(string Label, string Value)> Rows(ReportInfo info)
     {
-        static string E(string? s) => WebUtility.HtmlEncode(s ?? "");
-
         var system = Wmi.Query("SELECT Manufacturer, Model, TotalPhysicalMemory FROM Win32_ComputerSystem").FirstOrDefault();
         var serial = Wmi.QueryOptional("SELECT SerialNumber FROM Win32_BIOS").FirstOrDefault()?.Str("SerialNumber");
         var cpu = Wmi.Query("SELECT Name FROM Win32_Processor").FirstOrDefault()?.Str("Name");
@@ -48,6 +47,13 @@ public static class LabelWriter
             ("Intervention", info.Date.ToString("dd/MM/yyyy") + (string.IsNullOrWhiteSpace(info.JobNumber) ? "" : " · n° " + info.JobNumber)),
             ("Prochain entretien", info.Date.AddYears(1).ToString("MM/yyyy")),
         };
+        return rows.Where(r => !string.IsNullOrWhiteSpace(r.Item2)).Select(r => (r.Item1, r.Item2!)).ToList();
+    }
+
+    public static string Html(ReportInfo info)
+    {
+        static string E(string? s) => WebUtility.HtmlEncode(s ?? "");
+        var rows = Rows(info);
 
         var sb = new StringBuilder();
         sb.AppendLine("<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"utf-8\"><title>Étiquette PC</title><style>");
@@ -70,7 +76,7 @@ td{word-break:break-word}
         sb.AppendLine($"<div><b>{E(string.IsNullOrWhiteSpace(info.Company) ? "Fiche du PC" : info.Company)}</b>");
         if (!string.IsNullOrWhiteSpace(info.Contact)) sb.AppendLine($"<span>{E(info.Contact)}</span>");
         sb.AppendLine("</div></div><table>");
-        foreach (var (label, value) in rows.Where(r => !string.IsNullOrWhiteSpace(r.Item2)))
+        foreach (var (label, value) in rows)
             sb.AppendLine($"<tr><th>{E(label)}</th><td>{E(value)}</td></tr>");
         sb.AppendLine("</table></div></body></html>");
         return sb.ToString();

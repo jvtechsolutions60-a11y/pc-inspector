@@ -92,7 +92,7 @@ public sealed class StorageCollector : ICollector
         }
     }
 
-    private static string? MediaType(ulong? media, ulong? bus) => (media, bus) switch
+    internal static string? MediaType(ulong? media, ulong? bus) => (media, bus) switch
     {
         (_, 17) => "SSD NVMe",
         (4, _) => "SSD",

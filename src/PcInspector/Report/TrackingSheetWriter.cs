@@ -69,13 +69,15 @@ public static class TrackingSheetWriter
             new Box("Effacement données"),
             new Box("Windows installé", Verified("Windows"), Note("Windows")),
             new Box("Activation vérifiée", Verified("Licence"), Note("Licence")),
-            new Box("Pilotes / mises à jour", Verified("Périphériques") && !health.Findings.Any(f => f.Area == "Mises à jour" && f.Severity != Severity.Ok),
-                Note("Mises à jour")),
+            new Box("Pilotes / mises à jour", Verified("Périphériques") && !health.Findings.Any(f => f.Area is "Mises à jour" or "Logiciels" && f.Severity != Severity.Ok),
+                Note("Mises à jour", "Logiciels")),
             new Box("Logiciels de base"),
             new Box("Tests finaux OK"),
             new Box("PC prêt à vendre"),
         };
-        var defects = health.Findings.Where(f => f.Severity != Severity.Ok).Select(f => $"{f.Area} : {f.Message}").ToList();
+        // Défauts du matériel seulement : logiciels à mettre à jour, antivirus ou licence relèvent de la préparation.
+        var hardware = new[] { "Disque", "Disque système", "Espace disque", "Mémoire", "Batterie", "Périphériques", "Plantages" };
+        var defects = health.Findings.Where(f => f.Severity != Severity.Ok && hardware.Contains(f.Area)).Select(f => $"{f.Area} : {f.Message}").ToList();
 
         string Field(string label, string? value, string blank = "__________________") =>
             $"{E(label)} : " + (string.IsNullOrWhiteSpace(value) ? blank : $"<span class=\"v\">{E(value)}</span>");

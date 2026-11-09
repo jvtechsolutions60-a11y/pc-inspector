@@ -46,7 +46,7 @@ public sealed class MemoryCollector : ICollector
         return section;
     }
 
-    private static string? MemoryType(ulong? smbiosType) => smbiosType switch
+    internal static string? MemoryType(ulong? smbiosType) => smbiosType switch
     {
         20 => "DDR",
         21 => "DDR2",

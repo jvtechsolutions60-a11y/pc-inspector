@@ -163,7 +163,9 @@ public sealed class HealthCollector : ICollector
 
     private static void Memory(AddFinding add)
     {
-        var ram = Wmi.Query("SELECT TotalPhysicalMemory FROM Win32_ComputerSystem").FirstOrDefault()?.ULong("TotalPhysicalMemory") ?? 0;
+        // Quantité installée (barrettes) : « 16 Go » plutôt que les 15,7 Go laissés à Windows.
+        var ram = Wmi.Query("SELECT Capacity FROM Win32_PhysicalMemory").Aggregate(0UL, (sum, m) => sum + (m.ULong("Capacity") ?? 0));
+        if (ram == 0) ram = Wmi.Query("SELECT TotalPhysicalMemory FROM Win32_ComputerSystem").FirstOrDefault()?.ULong("TotalPhysicalMemory") ?? 0;
         if (ram == 0) return;
         var text = Wmi.FormatBytes(ram);
         // La mémoire réservée au matériel fait afficher un peu moins que la quantité installée.

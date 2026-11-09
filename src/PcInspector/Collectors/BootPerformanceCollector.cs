@@ -55,6 +55,18 @@ public sealed class BootPerformanceCollector : ICollector
 
         if (boots.Count > 0)
         {
+            // Graphique : la moyenne en bleu en tête, puis chaque démarrage (vert rapide, orange lent, rouge très lent).
+            var average = boots.Average(b => b.Ms("BootTime") ?? 0);
+            var max = Math.Max(average, boots.Max(b => b.Ms("BootTime") ?? 0));
+            var chart = new InfoGroup("Graphique des démarrages");
+            chart.AddBar("MOYENNE", $"{Seconds(average)} · {Verdict(average)}", average / max, "accent");
+            foreach (var boot in boots.AsEnumerable().Reverse())
+            {
+                var ms = boot.Ms("BootTime") ?? 0;
+                chart.AddBar(boot.When, Seconds(ms), ms / max, (ms / 1000) switch { < 60 => "ok", < 120 => "warning", _ => "critical" });
+            }
+            section.Groups.Add(chart);
+
             var list = new InfoGroup("Derniers démarrages");
             foreach (var boot in boots)
             {

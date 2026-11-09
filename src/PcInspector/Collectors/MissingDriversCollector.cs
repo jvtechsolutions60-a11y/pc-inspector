@@ -16,7 +16,7 @@ public sealed class MissingDriversCollector : ICollector
     private static readonly ulong[] NotDriverProblems = { 22, 45 };
 
     public string Title => "Pilotes manquants";
-    public string Icon => "";
+    public string Icon => "\uE7BA";
 
     public InfoSection Collect()
     {
