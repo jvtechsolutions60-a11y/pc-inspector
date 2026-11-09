@@ -393,19 +393,23 @@ public partial class MainWindow : Window
 
     private async void TrackingSheet_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new ExportWindow
-        {
-            Owner = this,
-            FilePrefix = "Fiche-suivi",
-            Filter = "PDF (*.pdf)|*.pdf|Page web (*.html)|*.html",
-        };
-        if (dialog.ShowDialog() != true || dialog.Info is null || dialog.FilePath is null) return;
-        var info = dialog.Info;
-        var path = dialog.FilePath;
+        // Plus de fenêtre : la fiche part en PDF (HTML si le PDF échoue) dans le dossier du PC.
+        var info = ReportInfo.LoadDefaults();
+        info.Date = DateTime.Now;
+        var pcName = $"{MachineIdentity.Model()} {MachineIdentity.Serial()}".Trim();
+        var folder = AppPaths.ClientFolder(string.IsNullOrWhiteSpace(info.Client) ? pcName : info.Client, info.Date);
+        var baseName = $"Fiche-suivi_{pcName}_{info.Date:yyyy-MM-dd HH-mm}";
+        foreach (var c in System.IO.Path.GetInvalidFileNameChars()) baseName = baseName.Replace(c, '-');
+        var path = System.IO.Path.Combine(folder, baseName + ".pdf");
         ShowStatus("Fiche de suivi : bilan du PC en cours…");
         try
         {
-            await Task.Run(() => TrackingSheetWriter.Write(path, info));
+            try { await Task.Run(() => TrackingSheetWriter.Write(path, info)); }
+            catch (System.IO.IOException)
+            {
+                path = System.IO.Path.Combine(folder, baseName + ".html");
+                await Task.Run(() => TrackingSheetWriter.Write(path, info));
+            }
             ShowStatus("Fiche de suivi enregistrée.");
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
         }
