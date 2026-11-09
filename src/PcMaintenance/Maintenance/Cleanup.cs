@@ -30,7 +30,9 @@ internal static class Cleanup
     private static readonly string[] DiskCleanupCategories =
     {
         "Temporary Files", "Temporary Setup Files", "Thumbnail Cache", "Delivery Optimization Files",
-        "Windows Error Reporting Files", "Update Cleanup", "Windows Upgrade Log Files", "Setup Log Files",
+        // « Update Cleanup » (anciennes versions des mises à jour, WinSxS) est retiré : à lui seul il prenait 10 à 30 minutes.
+        // La préparation revente le fait avec DISM, au moment où le temps compte moins.
+        "Windows Error Reporting Files", "Windows Upgrade Log Files", "Setup Log Files",
         "D3D Shader Cache", "Old ChkDsk Files", "System error memory dump files", "System error minidump files",
         "Downloaded Program Files", "Internet Cache Files",
     };
@@ -133,8 +135,10 @@ internal static class Cleanup
         }
         try
         {
-            log.Report("    cleanmgr /sagerun (jusqu'à 30 minutes si les anciennes mises à jour sont nettoyées)…");
-            RunHidden("cleanmgr.exe", "/sagerun:" + int.Parse(SageSet), TimeSpan.FromMinutes(30));
+            log.Report("    cleanmgr /sagerun (en général 1 à 3 minutes)…");
+            // Au-delà de 10 minutes, on arrête cleanmgr : ce qui est déjà nettoyé reste nettoyé.
+            if (RunHidden("cleanmgr.exe", "/sagerun:" + int.Parse(SageSet), TimeSpan.FromMinutes(10)) is null)
+                log.Report("    cleanmgr arrêté après 10 minutes.");
         }
         finally
         {
