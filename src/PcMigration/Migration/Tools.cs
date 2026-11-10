@@ -27,21 +27,59 @@ internal sealed class CopyResult
     /// <summary>Fichiers en échec selon robocopy (ouverts, refusés, chemin invalide…).</summary>
     public long Failed { get; set; }
     public int ExitCode { get; set; }
+    /// <summary>Chemins des fichiers en erreur relevés dans la sortie de robocopy (50 au plus).</summary>
+    public List<string> FailedFiles { get; } = new();
     /// <summary>Robocopy : 8 et plus = au moins un fichier non copié (ouvert, refusé, chemin invalide…).</summary>
     public bool HasFailures => ExitCode >= 8 || ExitCode < 0;
+    /// <summary>16 = erreur grave (source introuvable, destination inaccessible) ; négatif = robocopy absent ou arrêté.</summary>
+    public bool Fatal => ExitCode >= 16 || ExitCode < 0;
     public long Missing => Math.Max(Failed, Math.Max(0, Source.Files - Copied.Files));
+    /// <summary>Tout est arrivé : aucun échec signalé et autant de fichiers à l'arrivée qu'au départ.</summary>
+    public bool IsComplete => !HasFailures && Missing == 0 && !Unverified;
+    /// <summary>Résumé de robocopy absent et recomptage impossible à interpréter (restauration dans un dossier déjà rempli).</summary>
+    public bool Unverified { get; set; }
 
     public string Summary(string verb = "copiés")
     {
+        if (Fatal) return $"ÉCHEC : {Tools.RobocopyMeaning(ExitCode)}";
         var text = $"{Copied.Files} fichiers ({Tools.Size(Copied.Bytes)}) {verb}";
-        if (Missing > 0) text += $", {Missing} non copiés (ouverts ou refusés, voir le journal)";
-        else if (HasFailures) text += ", des erreurs (voir le journal)";
+        if (Missing > 0) text += $", INCOMPLET : {Missing} non copiés (ouverts ou refusés, liste dans le rapport)";
+        else if (HasFailures) text += ", INCOMPLET : des erreurs (voir le journal)";
+        else if (Unverified) text += ", NON VÉRIFIÉ : robocopy s'est arrêté avant son résumé (relancer pour contrôler)";
         return text;
     }
 }
 
 internal static class Tools
 {
+    /// <summary>
+    /// Code de sortie de robocopy (bits) : 1 = fichiers copiés, 2 = fichiers en plus à l'arrivée, 4 = différences,
+    /// 8 = des fichiers n'ont pas pu être copiés, 16 = erreur grave, rien de fiable n'a été copié.
+    /// </summary>
+    internal static string RobocopyMeaning(int code)
+    {
+        if (code < 0) return "robocopy n'a pas pu s'exécuter jusqu'au bout (absent, arrêté ou délai dépassé)";
+        if ((code & 16) != 0) return $"erreur grave de robocopy (code {code}) : source ou destination inaccessible";
+        if ((code & 8) != 0) return $"des fichiers n'ont pas pu être copiés (code {code})";
+        if (code == 0) return "rien à copier : tout était déjà identique";
+        var parts = new List<string>();
+        if ((code & 1) != 0) parts.Add("fichiers copiés");
+        if ((code & 2) != 0) parts.Add("fichiers en plus à l'arrivée (gardés)");
+        if ((code & 4) != 0) parts.Add("différences à l'arrivée (fichier plus récent gardé)");
+        return string.Join(", ", parts) + $" (code {code})";
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex ErrorLine = new(
+        @"\(0x[0-9A-Fa-f]{8}\).*?(?<path>[A-Za-z]:\\.+|\\\\.+)$");
+
+    /// <summary>
+    /// Lignes d'erreur de robocopy (« ERREUR 32 (0x00000020) Copie du fichier C:\… », quelle que soit la langue :
+    /// le code hexadécimal entre parenthèses et le chemin en fin de ligne ne changent pas).
+    /// </summary>
+    internal static List<string> FailedPaths(IEnumerable<string> output) =>
+        output.Select(l => ErrorLine.Match(l.Trim())).Where(m => m.Success).Select(m => m.Groups["path"].Value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase).Take(50).ToList();
+
     public static string Size(ulong bytes) => bytes >= 1UL << 30
         ? $"{bytes / (double)(1UL << 30):0.0} Go"
         : bytes >= 1UL << 20 ? $"{bytes / (double)(1UL << 20):0} Mo" : $"{Math.Max(1, bytes / 1024)} Ko";
@@ -95,11 +133,14 @@ internal static class Tools
         foreach (var line in output.Where(l => l.Trim().Length > 0 && (l.Contains("ERR") || l.Contains("ERREUR") || l.Contains(":"))).Take(30))
             log.Report("      " + line.Trim());
 
+        result.FailedFiles.AddRange(FailedPaths(output));
         if (!ReadSummary(output, result))
         {
             // Résumé introuvable (robocopy arrêté avant la fin) : on recompte, plus lent mais exact.
             result.Source = Measure(source, excludeDirs?.ToList());
             result.Copied = Measure(destination, excludeDirs?.ToList());
+            // En restauration, la destination contenait déjà des fichiers : le recomptage ne prouve rien.
+            if (keepNewer) result.Unverified = true;
         }
         return result;
     }

@@ -109,14 +109,39 @@ internal static class Cleanup
     {
         var download = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), @"SoftwareDistribution\Download");
         if (!Directory.Exists(download)) return 0;
+        var wasRunning = new[] { "wuauserv", "bits" }.Where(s => ServiceState(s) == "Running").ToList();
         RunHidden("net.exe", "stop wuauserv /y", TimeSpan.FromMinutes(2));
         RunHidden("net.exe", "stop bits /y", TimeSpan.FromMinutes(2));
-        try { return CleanFolder(download, DateTime.MaxValue); }
+        try
+        {
+            // Service encore en marche : on ne vide pas le cache sous ses pieds.
+            if (ServiceState("wuauserv") == "Running")
+            {
+                log.Report("    Service Windows Update impossible à arrêter : cache non vidé.");
+                return 0;
+            }
+            return CleanFolder(download, DateTime.MaxValue);
+        }
         finally
         {
+            // Remis en route, puis vérifié : un service qui tournait avant l'intervention doit tourner après.
             RunHidden("net.exe", "start bits", TimeSpan.FromMinutes(2));
             RunHidden("net.exe", "start wuauserv", TimeSpan.FromMinutes(2));
+            foreach (var service in wasRunning.Where(s => ServiceState(s) != "Running"))
+                log.Report($"    ATTENTION : le service {service} n'a pas redémarré. Le relancer (services.msc) ou redémarrer le PC.");
         }
+    }
+
+    /// <summary>État d'un service lu par WMI (Running, Stopped…), null si illisible.</summary>
+    private static string? ServiceState(string name)
+    {
+        try
+        {
+            using var searcher = new System.Management.ManagementObjectSearcher($"SELECT State FROM Win32_Service WHERE Name = '{name}'");
+            foreach (var service in searcher.Get()) return service["State"] as string;
+        }
+        catch (Exception ex) when (ex is System.Management.ManagementException or System.Runtime.InteropServices.COMException or UnauthorizedAccessException) { }
+        return null;
     }
 
     /// <summary>Le nettoyage de disque de Windows, en silencieux, sur les catégories sans risque.</summary>

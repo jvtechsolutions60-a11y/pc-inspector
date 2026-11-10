@@ -23,6 +23,18 @@ public sealed class DiskHealthResult
 
     internal void Problem(Severity severity, string message) => Problems.Add((severity, message));
 
+    /// <summary>
+    /// Raison pour laquelle l'état de santé n'a pas pu être lu (délai dépassé, pilote incompatible), sinon null.
+    /// Ce n'est pas une panne : rien n'est ajouté aux problèmes ni retiré de la note.
+    /// </summary>
+    public string? Unavailable { get; private set; }
+
+    internal void Unchecked(string label, string reason)
+    {
+        Unavailable = reason;
+        Lines.Add((label, "? Contrôle impossible : " + reason));
+    }
+
     private static string Mark(Severity s) => s switch
     {
         Severity.Critical => "✘",
@@ -38,8 +50,25 @@ public sealed class DiskHealthResult
 /// </summary>
 internal static class DiskHealth
 {
-    /// <summary>Résultats indexés par numéro de disque (Win32_DiskDrive.Index = MSFT_PhysicalDisk.DeviceId).</summary>
+    private static readonly object CacheLock = new();
+    private static (DateTime When, Dictionary<string, DiskHealthResult> Results)? _cache;
+
+    /// <summary>
+    /// Résultats indexés par numéro de disque (Win32_DiskDrive.Index = MSFT_PhysicalDisk.DeviceId).
+    /// Gardés une minute : le bilan et l'onglet Stockage ne réinterrogent pas deux fois un disque lent.
+    /// </summary>
     public static Dictionary<string, DiskHealthResult> ReadAll()
+    {
+        lock (CacheLock)
+        {
+            if (_cache is { } cached && DateTime.Now - cached.When < TimeSpan.FromMinutes(1)) return cached.Results;
+            var results = ReadAllNow();
+            _cache = (DateTime.Now, results);
+            return results;
+        }
+    }
+
+    private static Dictionary<string, DiskHealthResult> ReadAllNow()
     {
         var results = new Dictionary<string, DiskHealthResult>();
         try { ReadAta(results); }
@@ -48,20 +77,37 @@ internal static class DiskHealth
         foreach (var disk in Wmi.QueryOptional("SELECT DeviceId, BusType FROM MSFT_PhysicalDisk", Wmi.StorageScope))
         {
             if (disk.ULong("BusType") != 17 || disk.Str("DeviceId") is not { } id || results.ContainsKey(id)) continue;
-            try
-            {
-                if (ReadNvmeLog(id) is { } log) results[id] = JudgeNvme(log);
-            }
-            catch (TimeoutException)
-            {
-                // Un SSD qui ne répond pas en 3 secondes à une simple lecture de son journal est déjà un signe de panne.
-                var dead = new DiskHealthResult();
-                dead.Line("Journal de santé NVMe", $"pas de réponse en {NvmeTimeoutMs / 1000} secondes", Severity.Critical);
-                dead.Problem(Severity.Critical, $"ne répond pas en {NvmeTimeoutMs / 1000} secondes à la lecture de son état de santé : sauvegarder les données sans attendre");
-                results[id] = dead;
-            }
+            results[id] = ReadNvme(id);
         }
         return results;
+    }
+
+    /// <summary>
+    /// Un délai dépassé ou un journal illisible n'est pas une panne prouvée : contrôleur RAID ou Intel RST, pilote du
+    /// constructeur, boîtier USB, ou disque occupé. Le résultat dit « contrôle impossible », sans pénalité dans la note.
+    /// Seuls les indicateurs lus dans le journal du SSD (alerte critique, réserve, erreurs média…) comptent comme problèmes.
+    /// </summary>
+    internal static DiskHealthResult ReadNvme(string id)
+    {
+        try
+        {
+            if (ReadNvmeLog(id) is { } log) return JudgeNvme(log);
+            var unread = new DiskHealthResult();
+            unread.Unchecked("Journal de santé NVMe", "Windows ne transmet pas le journal de ce SSD (pilote du constructeur, contrôleur RAID ou boîtier USB). Vérifier avec l'outil du fabricant.");
+            return unread;
+        }
+        catch (TimeoutException)
+        {
+            var slow = new DiskHealthResult();
+            slow.Unchecked("Journal de santé NVMe", $"pas de réponse en {NvmeTimeoutMs / 1000} secondes. Ce n'est pas à lui seul un signe de panne : relancer l'analyse, puis vérifier avec l'outil du fabricant si cela se répète.");
+            return slow;
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or System.ComponentModel.Win32Exception or ArgumentException)
+        {
+            var denied = new DiskHealthResult();
+            denied.Unchecked("Journal de santé NVMe", "accès refusé (lancer PC Inspector en administrateur).");
+            return denied;
+        }
     }
 
     // ---------- Disques SATA / ATA : attributs SMART via WMI ----------
@@ -69,7 +115,7 @@ internal static class DiskHealth
     private const byte Reallocated = 5, SpinRetry = 10, PowerOnHours = 9, ReportedUncorrectable = 187,
                         Temperature = 194, Pending = 197, Uncorrectable = 198, CrcErrors = 199;
 
-    private sealed record SmartAttribute(byte Id, byte Current, ulong Raw);
+    internal sealed record SmartAttribute(byte Id, byte Current, ulong Raw);
 
     private static void ReadAta(Dictionary<string, DiskHealthResult> results)
     {
@@ -105,7 +151,7 @@ internal static class DiskHealth
     }
 
     /// <summary>Table SMART ATA : 2 octets d'en-tête puis 30 entrées de 12 octets (id, drapeaux, valeur, pire, 6 octets bruts).</summary>
-    private static Dictionary<byte, SmartAttribute> ParseAttributes(byte[] raw)
+    internal static Dictionary<byte, SmartAttribute> ParseAttributes(byte[] raw)
     {
         var attributes = new Dictionary<byte, SmartAttribute>();
         for (int o = 2; o + 12 <= raw.Length && o < 2 + 30 * 12; o += 12)
@@ -119,7 +165,7 @@ internal static class DiskHealth
         return attributes;
     }
 
-    private static Dictionary<byte, byte> ParseThresholds(byte[]? raw)
+    internal static Dictionary<byte, byte> ParseThresholds(byte[]? raw)
     {
         var limits = new Dictionary<byte, byte>();
         if (raw is null) return limits;
@@ -128,7 +174,7 @@ internal static class DiskHealth
         return limits;
     }
 
-    private static DiskHealthResult JudgeAta(Dictionary<byte, SmartAttribute> attrs, Dictionary<byte, byte> limits, bool predictFailure)
+    internal static DiskHealthResult JudgeAta(Dictionary<byte, SmartAttribute> attrs, Dictionary<byte, byte> limits, bool predictFailure)
     {
         var r = new DiskHealthResult();
 
@@ -325,7 +371,7 @@ internal static class DiskHealth
         }
     }
 
-    private static DiskHealthResult JudgeNvme(byte[] log)
+    internal static DiskHealthResult JudgeNvme(byte[] log)
     {
         var r = new DiskHealthResult();
         ulong U64(int offset) => BitConverter.ToUInt64(log, offset);   // les compteurs font 16 octets, les 8 premiers suffisent

@@ -28,6 +28,16 @@ internal sealed class JobContext
     public MigrationReport Report { get; } = new();
     /// <summary>Lignes à remettre dans l'état de la fenêtre : élément → résumé.</summary>
     public Dictionary<string, string> Results { get; } = new();
+    /// <summary>Éléments incomplets ou non faits : la fin de la sauvegarde ne peut pas être annoncée comme réussie.</summary>
+    public List<string> Problems { get; } = new();
+
+    /// <summary>Note une copie incomplète (fichiers manquants listés dans le rapport).</summary>
+    public void Check(string title, CopyResult result)
+    {
+        if (result.IsComplete) return;
+        lock (Problems) Problems.Add($"{title} : {result.Summary()}");
+        if (result.FailedFiles.Count > 0) Report.Detail($"Fichiers non copiés : {title}", result.FailedFiles);
+    }
 
     /// <summary>Lance une étape : une erreur imprévue la note « non faite » et on passe à la suivante.</summary>
     public void Run(string key, string title, Func<string> step)
@@ -42,6 +52,7 @@ internal sealed class JobContext
             result = $"Non fait : erreur imprévue ({ex.Message})";
         }
         Log.Report($"{title} : {result}");
+        if (result.StartsWith("Non fait", StringComparison.Ordinal)) lock (Problems) Problems.Add($"{title} : {result}");
         Report.Step(title, result);
         Results[key] = result;
     }
@@ -82,6 +93,7 @@ internal static class Backup
             ctx.Log.Report("    Dossier synchronisé avec OneDrive : les fichiers « en ligne seulement » sont téléchargés pendant la copie.");
         ctx.Log.Report($"    {folder.Path} → {Path.Combine(ctx.Layout.Folders, folder.Key)}");
         var result = Tools.Robocopy(folder.Path, Path.Combine(ctx.Layout.Folders, folder.Key), ctx.Log);
+        ctx.Check(folder.Label, result);
         return result.Summary();
     }
 
@@ -97,6 +109,7 @@ internal static class Backup
             ctx.Log.Report($"    {browser.Name}…");
             var result = Tools.Robocopy(browser.PathIn(ctx.Profile), Path.Combine(ctx.Layout.Browsers, browser.Key), ctx.Log,
                 excludeDirs: Browser.CacheFolders);
+            ctx.Check("Navigateur " + browser.Name, result);
             done.Add($"{browser.Name} : {result.Summary()}");
         }
         ctx.Report.Detail("Navigateurs sauvegardés", done);

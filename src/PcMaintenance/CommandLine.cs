@@ -168,7 +168,7 @@ internal static class CommandLine
             {
                 var result = await Task.Run(() => Repair.Run(log));
                 report.Detail("Réparation de Windows", result.Details);
-                return (result.Summary, result.Ok, false);
+                return (result.Summary, result.Ok, result.RebootRequired);
             }
             case "windowsupdate":
                 return await Task.Run(() => InstallUpdates(report, log));

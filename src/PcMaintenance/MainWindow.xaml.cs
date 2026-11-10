@@ -380,6 +380,7 @@ public partial class MainWindow : Window
         var log = new Progress<string>(Log);
         var result = await Task.Run(() => Repair.Run(log));
         RepairStatus.Text = result.Summary;
+        if (result.RebootRequired) _rebootRequired = true;
         _report.Step("Réparer Windows (DISM + SFC)", result.Summary);
         _report.Detail("Réparation de Windows", result.Details);
     }

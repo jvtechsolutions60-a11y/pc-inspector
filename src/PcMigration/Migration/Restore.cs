@@ -77,8 +77,9 @@ internal static class Restore
         ctx.Log.Report($"    {source} → {folder.Path}");
         // Un fichier plus récent déjà présent sur le nouveau PC est gardé ; rien n'est supprimé.
         var result = Tools.Robocopy(source, folder.Path, ctx.Log, keepNewer: true);
-        var restored = result.Source;
-        return $"{restored.Files} fichiers ({Tools.Size(restored.Bytes)}) remis dans {folder.Path}" + (result.HasFailures ? ", des erreurs (voir le journal)" : "");
+        ctx.Check(folder.Label, result);
+        // « Présents » : copiés maintenant, ou déjà là (identiques ou plus récents sur le nouveau PC, gardés).
+        return result.Summary("présents") + $" dans {folder.Path}";
     }
 
     // ---------- Navigateurs ----------
@@ -105,7 +106,8 @@ internal static class Restore
             }
             var result = Tools.Robocopy(dir, target, ctx.Log);
             var note = browser.Chromium ? " ; se reconnecter aux sites, mots de passe à l'étape suivante" : "";
-            done.Add($"{browser.Name} : {result.Copied.Files} fichiers{note}");
+            ctx.Check("Navigateur " + browser.Name, result);
+            done.Add($"{browser.Name} : {result.Summary("restaurés")}{note}");
         }
         ctx.Report.Detail("Navigateurs restaurés", done);
         return done.Count == 0 ? "Aucun navigateur dans la sauvegarde" : string.Join(" ; ", done.Select(d => d.Split(':')[0].Trim()));

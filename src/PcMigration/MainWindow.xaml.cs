@@ -260,15 +260,21 @@ public partial class MainWindow : Window
         }
         finally
         {
+            ctx.Report.Step("Résultat", _stopRequested ? "Arrêtée avant la fin : INCOMPLÈTE"
+                : ctx.Problems.Count > 0 ? "INCOMPLÈTE : " + string.Join(" ; ", ctx.Problems) : "Complète : aucun fichier manquant signalé");
             ctx.Report.Finish();
             ShowResults(ctx, _backupRows);
             SaveReport(Path.Combine(layout.Folder, "Rapport de sauvegarde.html"));
             SetRunning(false);
         }
         Log(_stopRequested ? "===== Sauvegarde arrêtée =====" : "===== Sauvegarde terminée =====");
-        StatusText.Text = _stopRequested ? "Sauvegarde arrêtée." : "Sauvegarde terminée : brancher le disque sur le nouveau PC et ouvrir l'onglet 2.";
+        // Jamais « terminée » tout court s'il manque quelque chose : le technicien doit le voir avant d'effacer l'ancien PC.
+        StatusText.Text = _stopRequested ? "Sauvegarde arrêtée : elle est INCOMPLÈTE."
+            : ctx.Problems.Count > 0 ? $"Sauvegarde terminée mais INCOMPLÈTE ({ctx.Problems.Count} élément(s)) : ne pas effacer l'ancien PC avant d'avoir vérifié."
+            : "Sauvegarde terminée et complète : brancher le disque sur le nouveau PC et ouvrir l'onglet 2.";
         RefreshSources();
-        MessageBox.Show(this, $"{StatusText.Text}\n\nDossier : {layout.Folder}", Title, MessageBoxButton.OK, MessageBoxImage.Information);
+        MessageBox.Show(this, $"{StatusText.Text}{Problems(ctx)}\n\nDossier : {layout.Folder}", Title, MessageBoxButton.OK,
+            _stopRequested || ctx.Problems.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
     }
 
     private Dictionary<string, string> Manifest(UserProfile profile, IEnumerable<string> items, bool encrypted) => new()
@@ -429,15 +435,19 @@ public partial class MainWindow : Window
         }
         finally
         {
+            ctx.Report.Step("Résultat", _stopRequested ? "Arrêtée avant la fin : INCOMPLÈTE"
+                : ctx.Problems.Count > 0 ? "INCOMPLÈTE : " + string.Join(" ; ", ctx.Problems) : "Complète : aucun fichier manquant signalé");
             ctx.Report.Finish();
             ShowResults(ctx, _restoreRows);
             SaveReport(Path.Combine(AppPaths.ClientFolder(_reportClient, DateTime.Now), $"Migration {DateTime.Now:yyyy-MM-dd HH-mm}.html"));
             SetRunning(false);
         }
         Log(_stopRequested ? "===== Restauration arrêtée =====" : "===== Restauration terminée =====");
-        StatusText.Text = _stopRequested ? "Restauration arrêtée." : "Restauration terminée : vérifier avec le client, puis faire le rapport de migration.";
-        MessageBox.Show(this, StatusText.Text + "\n\nRedémarrer le PC est conseillé (Wi-Fi, fond d'écran, profils des navigateurs).",
-            Title, MessageBoxButton.OK, MessageBoxImage.Information);
+        StatusText.Text = _stopRequested ? "Restauration arrêtée : elle est INCOMPLÈTE."
+            : ctx.Problems.Count > 0 ? $"Restauration terminée mais INCOMPLÈTE ({ctx.Problems.Count} élément(s)) : voir le rapport."
+            : "Restauration terminée : vérifier avec le client, puis faire le rapport de migration.";
+        MessageBox.Show(this, StatusText.Text + Problems(ctx) + "\n\nRedémarrer le PC est conseillé (Wi-Fi, fond d'écran, profils des navigateurs).",
+            Title, MessageBoxButton.OK, _stopRequested || ctx.Problems.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
     }
 
     // ===================== Commun =====================
@@ -450,6 +460,9 @@ public partial class MainWindow : Window
                 return MessageBox.Show(this, message, Title, MessageBoxButton.OKCancel, MessageBoxImage.Information) == MessageBoxResult.OK;
             }),
             () => _stopRequested);
+
+    private static string Problems(JobContext ctx) =>
+        ctx.Problems.Count == 0 ? "" : "\n\n" + string.Join("\n", ctx.Problems.Take(8).Select(p => "• " + p)) + (ctx.Problems.Count > 8 ? "\n• …" : "");
 
     private static void ShowResults(JobContext ctx, Dictionary<string, ItemRow> rows)
     {
