@@ -72,8 +72,8 @@ internal sealed class MaintenanceReport
 
         var compare = new InfoGroup("Avant / Après");
         if (FreeBefore is { } b && FreeAfter is { } a) compare.Add("Espace libre sur " + SystemDrive, $"{Size(b)}  →  {Size(a)}");
-        foreach (var (label, before, after) in _compare)
-            compare.Add(label, $"{before ?? "?"}  →  {after ?? "?"}");
+        foreach (var (label, was, now) in _compare)
+            compare.Add(label, $"{was ?? "?"}  →  {now ?? "?"}");
         if (compare.Items.Count > 0) section.Groups.Add(compare);
 
         var steps = new InfoGroup("Étapes réalisées");
