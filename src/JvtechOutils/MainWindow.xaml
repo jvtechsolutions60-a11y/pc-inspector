@@ -74,6 +74,8 @@
                     <Hyperlink Click="HistoryLink_Click">Historique des clients</Hyperlink>
                     <Run Text="  ·  "/>
                     <Hyperlink Click="ReportsLink_Click">Dossier des rapports</Hyperlink>
+                    <Run Text="  ·  "/>
+                    <Hyperlink Click="SupportLink_Click" ToolTip="Réunit les journaux et rapports d'erreur des 14 derniers jours dans un .zip (mots de passe masqués)">Journaux pour le support</Hyperlink>
                 </TextBlock>
                 <TextBlock x:Name="StatusText" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap"/>
             </DockPanel>

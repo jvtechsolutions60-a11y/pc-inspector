@@ -18,6 +18,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # SDK figé par global.json (8.0.x) : même compilateur à chaque compilation.
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Version du SDK
+        run: dotnet --version
+
+      # Tests automatisés : données simulées uniquement, rien n'est lu ni modifié sur la machine de compilation.
+      # Un test en échec arrête la compilation : aucun .exe n'est produit.
+      - name: Tests automatisés
+        run: dotnet test tests/JvtechTests/JvtechTests.csproj -c Release --logger "console;verbosity=normal" --logger "trx;LogFileName=tests.trx" --results-directory publish/tests
+
       - name: Compiler PC Inspector
         run: dotnet build src/PcInspector/PcInspector.csproj -c Release -o publish/inspector -p:Version=${{ env.VERSION }}
 
@@ -60,10 +73,23 @@ jobs:
           if (-not (Test-Path publish/serveur/Kit/JVTECH/Win11Debloat/Win11Debloat.ps1)) { throw 'Win11Debloat.ps1 introuvable' }
           Compress-Archive -Path publish/serveur/* -DestinationPath publish/JVTECH-Serveur-PXE-v${{ env.VERSION }}.zip
 
+      # Empreintes SHA-256 : permettent de vérifier qu'un téléchargement est complet et n'a pas été modifié
+      # (Get-FileHash fichier -Algorithm SHA256, à comparer avec la ligne du fichier).
+      - name: Empreintes SHA-256
+        shell: pwsh
+        run: |
+          $files = @(Get-ChildItem publish/*.zip) + @(Get-ChildItem publish/outils/*.exe)
+          $lines = $files | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name }
+          Set-Content -Path publish/SHA256SUMS.txt -Value $lines -Encoding utf8NoBOM
+          Copy-Item publish/SHA256SUMS.txt publish/outils/
+          Get-Content publish/SHA256SUMS.txt
+
       - uses: actions/upload-artifact@v4
         with:
           name: JVTECH-Outils-v${{ env.VERSION }}
-          path: publish/outils/*.exe
+          path: |
+            publish/outils/*.exe
+            publish/outils/SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
         with:
@@ -85,3 +111,4 @@ jobs:
             publish/JVTECH-Outils-v${{ env.VERSION }}.zip
             publish/JVTECH-Serveur-PXE-v${{ env.VERSION }}.zip
             publish/outils/*.exe
+            publish/SHA256SUMS.txt

@@ -86,7 +86,7 @@ internal static class Repair
         var text = output.ToLowerInvariant();
         if (text.Contains("aucune violation") || text.Contains("did not find any integrity")) return SfcVerdict.Clean;
         if (text.Contains("pas pu en réparer") || text.Contains("pas pu réparer") || text.Contains("unable to fix")) return SfcVerdict.Unrepairable;
-        if (text.Contains("les a réparés") || text.Contains("successfully repaired")) return SfcVerdict.Repaired;
+        if (text.Contains("les a réparés") || text.Contains("les a correctement réparés") || text.Contains("successfully repaired")) return SfcVerdict.Repaired;
         if (text.Contains("n'a pas pu effectuer") || text.Contains("could not perform")) return SfcVerdict.CouldNotRun;
         if (text.Contains("en attente") || text.Contains("pending") || text.Contains("redémarr") || text.Contains("restart")) return SfcVerdict.PendingReboot;
         return SfcVerdict.Unknown;

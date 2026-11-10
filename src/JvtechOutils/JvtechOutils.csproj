@@ -27,6 +27,11 @@
     <Compile Include="..\PcInspector\Updater.cs" Link="Shared\Updater.cs" />
   </ItemGroup>
 
+  <!-- Export des journaux pour le support (.zip) -->
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+  </ItemGroup>
+
   <!-- Icônes des logiciels, affichées sur leurs boutons -->
   <ItemGroup>
     <Resource Include="..\PcInspector\app.ico" Link="Icons\PcInspector.ico" />

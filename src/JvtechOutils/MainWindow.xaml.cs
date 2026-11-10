@@ -55,6 +55,21 @@ public partial class MainWindow : Window
     private void ReportsLink_Click(object sender, RoutedEventArgs e) =>
         Open(AppPaths.EnsureFolder(AppPaths.ReportsRoot));
 
+    private void SupportLink_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var zip = SupportExport.ExportForSupport(AppPaths.EnsureFolder(AppPaths.ReportsRoot));
+            if (zip is null) { StatusText.Text = "Aucun journal des 14 derniers jours."; return; }
+            StatusText.Text = "Journaux réunis dans " + zip;
+            Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{zip}\"") { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Win32Exception or InvalidDataException)
+        {
+            StatusText.Text = "Export des journaux impossible : " + ex.Message;
+        }
+    }
+
     private void UpdateLink_Click(object sender, RoutedEventArgs e) => Open(_updateUrl);
 
     private void Open(string target)

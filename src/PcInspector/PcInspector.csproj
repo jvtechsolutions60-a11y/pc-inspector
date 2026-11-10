@@ -28,4 +28,9 @@
     <EmbeddedResource Include="Tools\7zr.exe" LogicalName="7zr.exe" />
   </ItemGroup>
 
+  <!-- Les tests automatisés (tests/JvtechTests) vérifient les règles internes sans rien exécuter sur le PC. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="JvtechTests" />
+  </ItemGroup>
+
 </Project>

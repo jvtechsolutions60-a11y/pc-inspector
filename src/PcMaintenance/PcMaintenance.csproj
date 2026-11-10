@@ -41,4 +41,9 @@
     <Compile Include="..\PcInspector\ExportWindow.xaml.cs" Link="ExportWindow.xaml.cs" DependentUpon="ExportWindow.xaml" />
   </ItemGroup>
 
+  <!-- Les tests automatisés (tests/JvtechTests) vérifient les règles internes sans rien exécuter sur le PC. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="JvtechTests" />
+  </ItemGroup>
+
 </Project>

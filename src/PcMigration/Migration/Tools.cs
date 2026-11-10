@@ -122,13 +122,8 @@ internal static class Tools
     {
         var result = new CopyResult();
         Directory.CreateDirectory(destination);
-        // /BYTES : tailles exactes dans le résumé (sinon « 1.2 g », arrondi et différent selon la langue).
-        var args = new StringBuilder($"{Quote(source)} {Quote(destination)} /E /COPY:DAT /DCOPY:T /R:1 /W:1 /XJ /MT:8 /NP /NFL /NDL /NJH /BYTES");
-        if (keepNewer) args.Append(" /XO");
-        if (excludeDirs is { Count: > 0 }) args.Append(" /XD ").Append(string.Join(" ", excludeDirs.Select(Quote)));
-        if (excludeFiles is { Count: > 0 }) args.Append(" /XF ").Append(string.Join(" ", excludeFiles.Select(Quote)));
         var output = new List<string>();
-        result.ExitCode = Run("robocopy.exe", args.ToString(), output, TimeSpan.FromHours(12)) ?? -1;
+        result.ExitCode = Run("robocopy.exe", RobocopyArguments(source, destination, keepNewer, excludeDirs, excludeFiles), output, TimeSpan.FromHours(12)) ?? -1;
         // Seulement le résumé final et les erreurs : pas la liste des fichiers.
         foreach (var line in output.Where(l => l.Trim().Length > 0 && (l.Contains("ERR") || l.Contains("ERREUR") || l.Contains(":"))).Take(30))
             log.Report("      " + line.Trim());
@@ -143,6 +138,23 @@ internal static class Tools
             if (keepNewer) result.Unverified = true;
         }
         return result;
+    }
+
+    /// <summary>Options qui suppriment ou déplacent des fichiers : jamais utilisées par PC Migration.</summary>
+    internal static readonly string[] ForbiddenSwitches = { "/MIR", "/PURGE", "/MOV", "/MOVE" };
+
+    /// <summary>
+    /// Arguments de robocopy. /E copie sans rien supprimer ; /XO (restauration) garde le fichier le plus récent déjà
+    /// présent ; /BYTES donne des tailles exactes dans le résumé (sinon « 1.2 g », arrondi et différent selon la langue).
+    /// </summary>
+    internal static string RobocopyArguments(string source, string destination, bool keepNewer,
+        IReadOnlyCollection<string>? excludeDirs = null, IReadOnlyCollection<string>? excludeFiles = null)
+    {
+        var args = new StringBuilder($"{Quote(source)} {Quote(destination)} /E /COPY:DAT /DCOPY:T /R:1 /W:1 /XJ /MT:8 /NP /NFL /NDL /NJH /BYTES");
+        if (keepNewer) args.Append(" /XO");
+        if (excludeDirs is { Count: > 0 }) args.Append(" /XD ").Append(string.Join(" ", excludeDirs.Select(Quote)));
+        if (excludeFiles is { Count: > 0 }) args.Append(" /XF ").Append(string.Join(" ", excludeFiles.Select(Quote)));
+        return args.ToString();
     }
 
     // « Fichiers :   120   100   20   0   0   0 » : Total, Copié, Ignoré, Discordance, Échec, Extras.
