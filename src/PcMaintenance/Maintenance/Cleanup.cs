@@ -166,21 +166,21 @@ internal static class Cleanup
             var folder = Path.Combine(local, userData);
             if (!Directory.Exists(folder)) continue;
             if (IsRunning(process)) { log.Report($"    {name} est ouvert : son cache n'est pas vidé."); continue; }
-            foreach (var profile in Directory.GetDirectories(folder).Where(p => File.Exists(Path.Combine(p, "Preferences"))))
+            foreach (var profile in SubFolders(folder).Where(p => File.Exists(Path.Combine(p, "Preferences"))))
                 foreach (var cache in new[] { "Cache", "Code Cache", "GPUCache" })
                     freed += CleanFolder(Path.Combine(profile, cache), DateTime.MaxValue);
         }
 
         var opera = Path.Combine(local, @"Opera Software");
         if (Directory.Exists(opera) && !IsRunning("opera"))
-            foreach (var profile in Directory.GetDirectories(opera))
+            foreach (var profile in SubFolders(opera))
                 freed += CleanFolder(Path.Combine(profile, "Cache"), DateTime.MaxValue);
 
         var firefox = Path.Combine(local, @"Mozilla\Firefox\Profiles");
         if (Directory.Exists(firefox))
         {
             if (IsRunning("firefox")) log.Report("    Firefox est ouvert : son cache n'est pas vidé.");
-            else foreach (var profile in Directory.GetDirectories(firefox)) freed += CleanFolder(Path.Combine(profile, "cache2"), DateTime.MaxValue);
+            else foreach (var profile in SubFolders(firefox)) freed += CleanFolder(Path.Combine(profile, "cache2"), DateTime.MaxValue);
         }
         return freed;
     }
@@ -300,35 +300,77 @@ internal static class Cleanup
 
     // ---------- Outils ----------
 
-    /// <summary>Supprime les fichiers modifiés avant <paramref name="olderThan"/>, puis les dossiers vides. Les fichiers ouverts sont ignorés.</summary>
+    /// <summary>
+    /// Supprime les fichiers modifiés avant <paramref name="olderThan"/>, puis les dossiers vidés. Parcours en flux, dossier
+    /// par dossier : la liste complète n'est jamais chargée en mémoire, et un dossier illisible, un chemin trop long ou
+    /// un fichier ouvert est simplement sauté sans arrêter le reste. Les jonctions et liens symboliques ne sont jamais
+    /// suivis : ils peuvent pointer vers les documents de l'utilisateur.
+    /// </summary>
     private static ulong CleanFolder(string folder, DateTime olderThan)
     {
         if (!Directory.Exists(folder)) return 0;
         ulong freed = 0;
-        IEnumerable<string> files;
-        try { files = Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).ToList(); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return 0; }
-        foreach (var file in files)
+        var visited = new List<string>();
+        var pending = new Stack<string>();
+        pending.Push(folder);
+        while (pending.Count > 0)
         {
-            try
+            var dir = pending.Pop();
+            visited.Add(dir);
+            foreach (var entry in SafeEntries(dir))
             {
-                var info = new FileInfo(file);
-                if (info.LastWriteTime >= olderThan) continue;
-                var size = (ulong)info.Length;
-                if (info.IsReadOnly) info.IsReadOnly = false;
-                info.Delete();
-                freed += size;
+                try
+                {
+                    if ((entry.Attributes & FileAttributes.ReparsePoint) != 0) continue;
+                    if (entry is DirectoryInfo sub) { pending.Push(sub.FullName); continue; }
+                    var file = (FileInfo)entry;
+                    if (file.LastWriteTime >= olderThan) continue;
+                    var size = (ulong)file.Length;
+                    if (file.IsReadOnly) file.IsReadOnly = false;
+                    file.Delete();
+                    freed += size;
+                }
+                // PathTooLongException est une IOException : le fichier est sauté, le parcours continue.
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException
+                                               or System.Security.SecurityException) { }
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException
-                                           or System.Security.SecurityException) { }
         }
-        try
+        // Les plus profonds d'abord ; le dossier de départ (Temp, Cache…) est gardé.
+        foreach (var dir in visited.Skip(1).OrderByDescending(d => d.Length))
         {
-            foreach (var dir in Directory.GetDirectories(folder, "*", SearchOption.AllDirectories).OrderByDescending(d => d.Length))
-                if (!Directory.EnumerateFileSystemEntries(dir).Any()) Directory.Delete(dir);
+            try { if (!Directory.EnumerateFileSystemEntries(dir).Any()) Directory.Delete(dir); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         return freed;
+    }
+
+    /// <summary>Sous-dossiers (profils de navigateur) ; dossier illisible ou chemin trop long : aucun, sans erreur.</summary>
+    private static string[] SubFolders(string folder)
+    {
+        try { return Directory.GetDirectories(folder); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return Array.Empty<string>(); }
+    }
+
+    /// <summary>Contenu d'un dossier lu en flux ; une erreur pendant la lecture arrête ce dossier seulement.</summary>
+    private static IEnumerable<FileSystemInfo> SafeEntries(string dir)
+    {
+        IEnumerator<FileSystemInfo> entries;
+        try { entries = new DirectoryInfo(dir).EnumerateFileSystemInfos().GetEnumerator(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException) { yield break; }
+        using (entries)
+        {
+            while (true)
+            {
+                FileSystemInfo current;
+                try
+                {
+                    if (!entries.MoveNext()) yield break;
+                    current = entries.Current;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException) { yield break; }
+                yield return current;
+            }
+        }
     }
 
     private static bool IsRunning(string process)

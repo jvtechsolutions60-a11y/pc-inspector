@@ -17,15 +17,19 @@ internal readonly struct FolderSize
     public static FolderSize operator +(FolderSize a, FolderSize b) => new(a.Files + b.Files, a.Bytes + b.Bytes);
 }
 
-/// <summary>Résultat d'une copie robocopy, vérifiée en recomptant la destination.</summary>
+/// <summary>Résultat d'une copie robocopy, lu dans le résumé que robocopy affiche à la fin (sans recompter les dossiers).</summary>
 internal sealed class CopyResult
 {
+    /// <summary>Fichiers de la source (total du résumé robocopy).</summary>
     public FolderSize Source { get; set; }
+    /// <summary>Fichiers présents à l'arrivée : copiés maintenant, ou déjà identiques et donc sautés.</summary>
     public FolderSize Copied { get; set; }
+    /// <summary>Fichiers en échec selon robocopy (ouverts, refusés, chemin invalide…).</summary>
+    public long Failed { get; set; }
     public int ExitCode { get; set; }
     /// <summary>Robocopy : 8 et plus = au moins un fichier non copié (ouvert, refusé, chemin invalide…).</summary>
     public bool HasFailures => ExitCode >= 8 || ExitCode < 0;
-    public long Missing => Math.Max(0, Source.Files - Copied.Files);
+    public long Missing => Math.Max(Failed, Math.Max(0, Source.Files - Copied.Files));
 
     public string Summary(string verb = "copiés")
     {
@@ -78,9 +82,10 @@ internal static class Tools
     public static CopyResult Robocopy(string source, string destination, IProgress<string> log, bool keepNewer = false,
         IReadOnlyCollection<string>? excludeDirs = null, IReadOnlyCollection<string>? excludeFiles = null)
     {
-        var result = new CopyResult { Source = Measure(source, excludeDirs?.ToList()) };
+        var result = new CopyResult();
         Directory.CreateDirectory(destination);
-        var args = new StringBuilder($"{Quote(source)} {Quote(destination)} /E /COPY:DAT /DCOPY:T /R:1 /W:1 /XJ /MT:8 /NP /NFL /NDL /NJH");
+        // /BYTES : tailles exactes dans le résumé (sinon « 1.2 g », arrondi et différent selon la langue).
+        var args = new StringBuilder($"{Quote(source)} {Quote(destination)} /E /COPY:DAT /DCOPY:T /R:1 /W:1 /XJ /MT:8 /NP /NFL /NDL /NJH /BYTES");
         if (keepNewer) args.Append(" /XO");
         if (excludeDirs is { Count: > 0 }) args.Append(" /XD ").Append(string.Join(" ", excludeDirs.Select(Quote)));
         if (excludeFiles is { Count: > 0 }) args.Append(" /XF ").Append(string.Join(" ", excludeFiles.Select(Quote)));
@@ -89,8 +94,37 @@ internal static class Tools
         // Seulement le résumé final et les erreurs : pas la liste des fichiers.
         foreach (var line in output.Where(l => l.Trim().Length > 0 && (l.Contains("ERR") || l.Contains("ERREUR") || l.Contains(":"))).Take(30))
             log.Report("      " + line.Trim());
-        result.Copied = Measure(destination, excludeDirs?.ToList());
+
+        if (!ReadSummary(output, result))
+        {
+            // Résumé introuvable (robocopy arrêté avant la fin) : on recompte, plus lent mais exact.
+            result.Source = Measure(source, excludeDirs?.ToList());
+            result.Copied = Measure(destination, excludeDirs?.ToList());
+        }
         return result;
+    }
+
+    // « Fichiers :   120   100   20   0   0   0 » : Total, Copié, Ignoré, Discordance, Échec, Extras.
+    // Le libellé change avec la langue de Windows (Dirs/Rép., Files/Fichiers, Bytes/Octets) mais l'ordre des lignes
+    // ne change pas : répertoires, fichiers, octets, puis la durée (qui contient des « : » et ne correspond pas).
+    private static readonly System.Text.RegularExpressions.Regex SummaryLine = new(
+        @"^\s*[^\d:]+:\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$");
+
+    /// <summary>Remplit le résultat avec le résumé de robocopy. Faux si le résumé n'est pas là.</summary>
+    internal static bool ReadSummary(IReadOnlyList<string> output, CopyResult result)
+    {
+        var rows = output.Select(l => SummaryLine.Match(l)).Where(m => m.Success)
+            .Select(m => Enumerable.Range(1, 6).Select(i => ulong.Parse(m.Groups[i].Value)).ToArray())
+            .ToList();
+        if (rows.Count < 3) return false;
+        // Les 3 dernières lignes de chiffres : un « /MT » peut répéter des lignes avant le résumé final.
+        var files = rows[rows.Count - 2];
+        var bytes = rows[rows.Count - 1];
+        const int Total = 0, Copied = 1, Skipped = 2, Failed = 4;
+        result.Source = new FolderSize((long)files[Total], bytes[Total]);
+        result.Copied = new FolderSize((long)(files[Copied] + files[Skipped]), bytes[Copied] + bytes[Skipped]);
+        result.Failed = (long)files[Failed];
+        return true;
     }
 
     public static string Quote(string path) => "\"" + path.TrimEnd('\\') + "\"";

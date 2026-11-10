@@ -93,23 +93,68 @@ public static partial class SecurityChecks
         var tasks = ReadTasks();
         if (tasks is null) return SecurityCheck.Info(name, "Impossible de lire le Planificateur de tâches");
 
-        var thirdParty = tasks.Where(t => !t.Name.StartsWith(@"\Microsoft\", StringComparison.OrdinalIgnoreCase)).ToList();
         var flagged = new List<(string Text, bool Severe)>();
-        foreach (var (taskName, command) in thirdParty)
+        var signatures = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        int microsoft = 0, thirdParty = 0;
+        foreach (var (taskName, command) in tasks)
         {
             var expanded = Environment.ExpandEnvironmentVariables(command);
-            if (TrustedAppData.Any(t => expanded.IndexOf(t, StringComparison.OrdinalIgnoreCase) >= 0)) continue;
+            var isMicrosoft = taskName.StartsWith(@"\Microsoft\", StringComparison.OrdinalIgnoreCase);
+            if (isMicrosoft) microsoft++; else thirdParty++;
+
+            // Les règles s'appliquent à toutes les tâches : un malware se cache volontiers sous \Microsoft\Windows\.
             var rule = TaskRules.FirstOrDefault(r => r.Pattern.IsMatch(expanded));
-            if (rule.Pattern is null) continue;
-            flagged.Add(($"{taskName.TrimStart('\\')} : {rule.Why} ({Shorten(expanded)})", rule.Severe));
+            var trusted = !isMicrosoft && TrustedAppData.Any(t => expanded.IndexOf(t, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (rule.Pattern is not null && !trusted)
+            {
+                flagged.Add(($"{taskName.TrimStart('\\')} : {rule.Why} ({Shorten(expanded)})", rule.Severe));
+                continue;
+            }
+
+            // Une tâche rangée chez Microsoft doit lancer un programme signé par Microsoft (signature intégrée ou catalogue Windows).
+            if (!isMicrosoft || TaskProgram(expanded) is not { } program) continue;
+            if (!signatures.TryGetValue(program, out var signed)) signatures[program] = signed = PcInspector.Authenticode.IsMicrosoftSigned(program);
+            if (signed) continue;
+            // Signé par un autre éditeur reconnu (pilote, Office d'un OEM…) : à vérifier. Pas signé du tout : très suspect.
+            var other = PcInspector.Authenticode.IsSigned(program) ? PcInspector.Authenticode.Publisher(program) : null;
+            flagged.Add(other is not null
+                ? ($"{taskName.TrimStart('\\')} : rangée parmi les tâches de Microsoft mais lance un programme signé par {other} ({Shorten(program)})", false)
+                : ($"{taskName.TrimStart('\\')} : rangée parmi les tâches de Microsoft mais lance un programme non signé ({Shorten(program)})", true));
         }
 
-        if (flagged.Count == 0) return SecurityCheck.Ok(name, $"{thirdParty.Count} tâche(s) hors Microsoft, rien de suspect");
+        if (flagged.Count == 0) return SecurityCheck.Ok(name, $"{thirdParty} tâche(s) d'éditeurs tiers et {microsoft} de Microsoft (signatures vérifiées), rien de suspect");
         var detail = string.Join(" · ", flagged.Select(f => f.Text));
         const string advice = "Vérifier ces tâches dans le Planificateur : un logiciel malveillant s'en sert pour revenir à chaque démarrage. Désactiver celles que le client ne connaît pas, puis lancer une analyse antivirus et AdwCleaner (PC Maintenance).";
         return flagged.Any(f => f.Severe)
             ? SecurityCheck.Danger(name, detail, advice)
             : SecurityCheck.Warning(name, detail, advice);
+    }
+
+    /// <summary>
+    /// Chemin du programme lancé par la tâche (entre guillemets, ou jusqu'au premier .exe). Null si ce n'est pas un .exe
+    /// existant : gestionnaire COM, script, ou programme d'une fonction retirée de Windows (on ne signale pas l'absence).
+    /// </summary>
+    private static string? TaskProgram(string command)
+    {
+        var text = command.Trim();
+        string candidate;
+        if (text.StartsWith("\"", StringComparison.Ordinal))
+        {
+            var end = text.IndexOf('"', 1);
+            if (end < 0) return null;
+            candidate = text.Substring(1, end - 1);
+        }
+        else
+        {
+            var exe = text.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+            if (exe < 0) return null;
+            candidate = text.Substring(0, exe + 4);
+        }
+        if (!candidate.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return null;
+        // « rundll32.exe » sans chemin : c'est celui de System32.
+        if (candidate.IndexOf('\\') < 0) candidate = PcInspector.AppPaths.SystemTool(candidate);
+        try { return System.IO.File.Exists(candidate) ? System.IO.Path.GetFullPath(candidate) : null; }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or System.IO.PathTooLongException) { return null; }
     }
 
     private static string Shorten(string command) => command.Length <= 90 ? command : command.Substring(0, 87) + "…";
