@@ -166,6 +166,9 @@ internal static class Backup
         if (code is null || !File.Exists(ctx.Layout.WingetFile))
         {
             foreach (var line in output.Take(10)) ctx.Log.Report("      " + line);
+            // Sans winget, tout est à réinstaller à la main : la liste complète va dans le rapport et dans le fichier lu à la restauration.
+            File.WriteAllLines(Path.Combine(ctx.Layout.Apps, "Sans winget (à réinstaller à la main).txt"), installed, Encoding.UTF8);
+            ctx.Report.Detail("Applications à réinstaller à la main (winget indisponible)", installed);
             return $"Liste des programmes enregistrée ({installed.Count}), mais winget n'a pas pu exporter : réinstallation à la main";
         }
         var ids = Winget.ReadIds(ctx.Layout.WingetFile);

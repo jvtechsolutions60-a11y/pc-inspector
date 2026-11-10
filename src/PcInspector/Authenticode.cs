@@ -26,6 +26,16 @@ public static class Authenticode
         catch (CryptographicException) { return false; }
     }
 
+    /// <summary>Signé par un éditeur reconnu par Windows, et pas modifié depuis.</summary>
+    public static bool IsSigned(string path) => File.Exists(path) && IsTrusted(path);
+
+    /// <summary>Nom de l'éditeur qui a signé le fichier, ou null.</summary>
+    public static string? Publisher(string path)
+    {
+        try { return new X509Certificate2(X509Certificate.CreateFromSignedFile(path)).GetNameInfo(X509NameType.SimpleName, false); }
+        catch (CryptographicException) { return null; }
+    }
+
     private static bool IsTrusted(string path)
     {
         var fileInfo = new WinTrustFileInfo(path);

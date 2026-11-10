@@ -34,6 +34,8 @@ public static partial class SecurityChecks
         ("PowerShell 2.0", PowerShell2),
         ("Bureau à distance", RemoteDesktop),
         ("Logiciels de prise en main à distance", RemoteAccessTools),
+        ("Connexions réseau actives", ActiveConnections),
+        ("Durcissement (références Microsoft et CIS)", Baseline),
         ("Redirections réseau (hosts, proxy)", NetworkRedirects),
         ("Serveurs DNS", DnsServers),
         ("Réseaux Wi-Fi enregistrés", WifiProfiles),

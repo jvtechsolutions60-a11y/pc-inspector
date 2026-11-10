@@ -50,6 +50,8 @@ public partial class MainWindow : Window
         }
     }
 
+    private void HistoryLink_Click(object sender, RoutedEventArgs e) => new HistoryWindow { Owner = this }.ShowDialog();
+
     private void ReportsLink_Click(object sender, RoutedEventArgs e) =>
         Open(AppPaths.EnsureFolder(AppPaths.ReportsRoot));
 

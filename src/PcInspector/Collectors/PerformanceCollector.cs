@@ -378,7 +378,6 @@ public static class Benchmark
         private readonly List<(DateTime Time, double? Perf, double? Acpi, double? Gpu)> _samples = new();
         private Timer? _timer;
         private PerformanceCounter? _perf;
-        private readonly string? _nvidiaSmi = File.Exists(AppPaths.SystemTool("nvidia-smi.exe")) ? AppPaths.SystemTool("nvidia-smi.exe") : null;
         private int _tick;
 
         public void Start()
@@ -397,9 +396,7 @@ public static class Benchmark
             var zones = Wmi.QueryOptional("SELECT CurrentTemperature FROM MSAcpi_ThermalZoneTemperature", Wmi.WmiScope)
                 .Select(z => z.ULong("CurrentTemperature")).Where(t => t is > 0).Select(t => t!.Value / 10.0 - 273.15).ToList();
             if (zones.Count > 0) acpi = zones.Max();
-            if (_nvidiaSmi is not null && _tick++ % 3 == 0)
-                ProcessRunner.Run(_nvidiaSmi, "--query-gpu=temperature.gpu --format=csv,noheader,nounits",
-                    l => { if (double.TryParse(l.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var t)) gpu = t; }, TimeSpan.FromSeconds(10));
+            if (_tick++ % 3 == 0) gpu = GpuSensors.MaxTemperature();
             lock (_samples) _samples.Add((DateTime.UtcNow, perf, acpi, gpu));
         }
 

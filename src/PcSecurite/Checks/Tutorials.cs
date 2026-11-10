@@ -58,6 +58,24 @@ public static class Tutorials
             "Si Windows Update bloque : vérifier l'espace libre sur C: (au moins 20 Go) et lancer l'utilitaire de résolution des problèmes.",
         }, "Ouvrir Windows Update", "ms-settings:windowsupdate"),
 
+        "Durcissement (références Microsoft et CIS)" => new(new[]
+        {
+            "Lire la liste « À renforcer » : chaque réglage est indiqué avec l'endroit où le modifier.",
+            "Sur Windows Pro : la plupart se règlent dans l'Éditeur de stratégie de groupe (gpedit.msc), sous Configuration ordinateur > Modèles d'administration.",
+            "Sécurité Windows > Protection contre les virus et menaces > Protection contre les rançongiciels : activer l'accès contrôlé aux dossiers, puis autoriser les logiciels légitimes bloqués.",
+            "Avant de durcir : vérifier que le client n'utilise ni vieux NAS (SMB, NTLM), ni macros Office indispensables, ni outil d'administration à distance.",
+            "Relancer PC Sécurité pour voir le nouveau score.",
+        }, "Ouvrir Sécurité Windows", "windowsdefender://threat", clientCanDo: false),
+
+        "Connexions réseau actives" => new(new[]
+        {
+            "Noter le nom et le dossier du programme signalé.",
+            "Ouvrir le Gestionnaire des tâches > Détails, clic droit sur le programme > Ouvrir l'emplacement du fichier.",
+            "Si le client ne le connaît pas : débrancher internet, terminer le processus, lancer une analyse Microsoft Defender hors ligne et AdwCleaner.",
+            "Vérifier le démarrage automatique et les tâches planifiées (PC Inspector, onglet Démarrage) pour qu'il ne revienne pas.",
+            "Après nettoyage, changer les mots de passe importants depuis un autre appareil.",
+        }, "Ouvrir la protection antivirus", "windowsdefender://threat", clientCanDo: false),
+
         "Antivirus" => new(new[]
         {
             "Ouvrir Sécurité Windows > Protection contre les virus et menaces.",

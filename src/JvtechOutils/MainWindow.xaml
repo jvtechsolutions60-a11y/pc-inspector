@@ -71,7 +71,9 @@
 
             <DockPanel Margin="2,4,2,0">
                 <TextBlock DockPanel.Dock="Right">
-                    <Hyperlink Click="ReportsLink_Click">Ouvrir le dossier des rapports</Hyperlink>
+                    <Hyperlink Click="HistoryLink_Click">Historique des clients</Hyperlink>
+                    <Run Text="  ·  "/>
+                    <Hyperlink Click="ReportsLink_Click">Dossier des rapports</Hyperlink>
                 </TextBlock>
                 <TextBlock x:Name="StatusText" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap"/>
             </DockPanel>
