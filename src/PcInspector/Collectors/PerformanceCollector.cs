@@ -31,7 +31,7 @@ public sealed class PerformanceCollector : ICollector
             .Add("Résultat", "Pas encore testé : le test bureautique se lance tout seul après le bilan")
             .Add("Test bureautique", "Environ 3 minutes : notes Windows (WinSAT), processeur (7-Zip), disque")
             .Add("Test gaming complet", "Environ 20 minutes : en plus, Cinebench, Blender (carte graphique) et 10 minutes de charge avec les températures")
-            .Add("Outils gaming", $"Cinebench et Blender Benchmark se déposent une fois dans le dossier {Benchmark.ToolsFolder}"));
+            .Add("Outils gaming", $"Cinebench est proposé au téléchargement chez Maxon au premier test gaming ; Blender Benchmark se dépose une fois dans le dossier {Benchmark.ToolsFolder}"));
         return section;
     }
 }
@@ -78,6 +78,12 @@ public static class Benchmark
     public static string ToolsFolder => Path.Combine(AppPaths.ExeFolder, "Outils");
 
     private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+
+    /// <summary>Cinebench est-il déjà dans le dossier Outils ?</summary>
+    public static bool HasCinebench => FindTool("Cinebench.exe") is not null;
+
+    /// <summary>Le technicien a accepté de télécharger Cinebench chez Maxon pour le prochain test gaming.</summary>
+    public static bool DownloadCinebench { get; set; }
 
     // Partie bureautique du dernier test : le test gaming la reprend au lieu de la refaire.
     private static List<InfoGroup>? _officeGroups;
@@ -323,10 +329,19 @@ public static class Benchmark
     {
         var group = new InfoGroup("Processeur (Cinebench, en points)");
         var cinebench = FindTool("Cinebench.exe");
+        string? downloadError = null;
+        if (cinebench is null && DownloadCinebench)
+        {
+            DownloadCinebench = false;
+            (cinebench, downloadError) = CinebenchDownload.Run(ToolsFolder, progress);
+        }
         using var sampler = new Sampler();
         if (cinebench is null)
         {
-            group.Add("Résultat", $"Cinebench absent : le télécharger sur maxon.net et le dézipper dans {ToolsFolder}");
+            group.Add("Résultat", downloadError is null
+                ? $"Cinebench absent : le télécharger sur maxon.net et le dézipper dans {ToolsFolder}"
+                : $"Téléchargement de Cinebench impossible ({downloadError}) : le télécharger à la main et le dézipper dans {ToolsFolder}");
+            group.AddLink("Télécharger", "Page de téléchargement de Maxon", CinebenchDownload.DownloadsPage);
             progress("Charge du processeur pendant 10 minutes (sans Cinebench)…");
             sampler.Start();
             CpuLoad(TimeSpan.FromMinutes(10));

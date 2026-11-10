@@ -26,6 +26,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\PcInspector\PcInspector.csproj" Aliases="inspector" />
     <ProjectReference Include="..\..\src\PcSecurite\PcSecurite.csproj" Aliases="securite" />
     <ProjectReference Include="..\..\src\PcMaintenance\PcMaintenance.csproj" Aliases="maintenance" />

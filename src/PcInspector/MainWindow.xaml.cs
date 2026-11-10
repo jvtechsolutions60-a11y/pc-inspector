@@ -166,6 +166,12 @@ public partial class MainWindow : Window
         if (MessageBox.Show(this, "Le test gaming dure environ 20 minutes et fait chauffer le PC au maximum (processeur puis carte graphique).\n\n" +
                 "Brancher le portable sur secteur et fermer les autres logiciels. Lancer le test ?",
                 "Test gaming complet", MessageBoxButton.OKCancel, MessageBoxImage.Information) != MessageBoxResult.OK) return;
+        if (!Benchmark.HasCinebench)
+            Benchmark.DownloadCinebench = MessageBox.Show(this,
+                "Cinebench n'est pas dans le dossier Outils.\n\nLe télécharger maintenant chez Maxon ? Gratuit, environ 1 Go, une seule fois : " +
+                "il est gardé dans le dossier Outils (sur la clé USB en mode clé USB). Il n'est lancé que s'il est signé par Maxon.\n\n" +
+                "En le téléchargeant, tu acceptes la licence d'utilisation de Maxon.\n\nNon : le test se fait sans Cinebench.",
+                "Cinebench (Maxon)", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
         if (_benchRunning)
         {
             // Le test bureautique tourne : le test gaming démarre juste après et reprend ses mesures.
