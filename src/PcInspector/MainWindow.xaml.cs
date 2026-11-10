@@ -140,12 +140,24 @@ public partial class MainWindow : Window
 
         ShowStatus(section.Error);
         ApplyFilter();
-
-        // Par défaut, le test bureautique part dès la première ouverture de l'onglet.
-        if (collector is PerformanceCollector && Benchmark.Last is null && !_benchRunning) await RunBenchmarkAsync(gaming: false);
     }
 
     private bool _benchRunning;
+    private bool _gamingQueued;
+    private bool _officeStarted;
+
+    /// <summary>
+    /// Test bureautique automatique au lancement, une fois le bilan et les onglets lus (pour ne pas fausser les mesures) :
+    /// ses résultats sont prêts pour le rapport, la fiche et le Texte Leboncoin.
+    /// </summary>
+    private async void StartOfficeBenchAfterPrefetch()
+    {
+        if (_officeStarted) return;
+        _officeStarted = true;
+        try { await Task.WhenAll(_tasks.Values.ToList()); }
+        catch (Exception) { /* une lecture d'onglet en erreur ne bloque pas le test */ }
+        if (Benchmark.Last is null) await RunBenchmarkAsync(gaming: false);
+    }
 
     private async void OfficeBench_Click(object sender, RoutedEventArgs e) => await RunBenchmarkAsync(gaming: false);
 
@@ -154,6 +166,14 @@ public partial class MainWindow : Window
         if (MessageBox.Show(this, "Le test gaming dure environ 20 minutes et fait chauffer le PC au maximum (processeur puis carte graphique).\n\n" +
                 "Brancher le portable sur secteur et fermer les autres logiciels. Lancer le test ?",
                 "Test gaming complet", MessageBoxButton.OKCancel, MessageBoxImage.Information) != MessageBoxResult.OK) return;
+        if (_benchRunning)
+        {
+            // Le test bureautique tourne : le test gaming démarre juste après et reprend ses mesures.
+            _gamingQueued = true;
+            GamingBenchButton.IsEnabled = false;
+            BenchText.Text = "Test gaming en attente : il démarre dès la fin du test bureautique en cours (il reprend ses mesures).";
+            return;
+        }
         await RunBenchmarkAsync(gaming: true);
     }
 
@@ -162,12 +182,14 @@ public partial class MainWindow : Window
     {
         if (_benchRunning) return;
         _benchRunning = true;
-        OfficeBenchButton.IsEnabled = GamingBenchButton.IsEnabled = false;
+        OfficeBenchButton.IsEnabled = false;
+        GamingBenchButton.IsEnabled = !gaming;
         BenchProgress.Visibility = Visibility.Visible;
+        BenchText.Text = gaming ? "Test gaming complet en cours…" : "Test bureautique en cours…";
         var perf = _collectors.OfType<PerformanceCollector>().First();
         void Progress(string text) => Dispatcher.BeginInvoke(new Action(() =>
         {
-            BenchText.Text = text;
+            BenchText.Text = (_gamingQueued ? "Test gaming en attente. " : "") + text;
         }));
         try
         {
@@ -187,6 +209,11 @@ public partial class MainWindow : Window
             BenchProgress.Visibility = Visibility.Collapsed;
         }
         if (SelectedCollector == perf) ApplyFilter();
+        if (_gamingQueued && !gaming)
+        {
+            _gamingQueued = false;
+            await RunBenchmarkAsync(gaming: true);
+        }
     }
 
     /// <summary>Affiche les lignes de l'onglet qui contiennent le texte recherché (toutes si la recherche est vide).</summary>
@@ -274,6 +301,7 @@ public partial class MainWindow : Window
             _cache[_health] = section;
             HealthRefreshButton.IsEnabled = true;
             Prefetch();
+            StartOfficeBenchAfterPrefetch();
             if (SelectedCollector != _health) return;
         }
 

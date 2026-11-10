@@ -208,7 +208,7 @@
                     BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="28,12">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal">
-                        <Button x:Name="OfficeBenchButton" Style="{StaticResource PrimaryButton}" Content="Test bureautique (≈ 3 min)"
+                        <Button x:Name="OfficeBenchButton" Style="{StaticResource PrimaryButton}" Content="Refaire le test bureautique"
                                 Click="OfficeBench_Click" Margin="0,0,8,0" Padding="14,6"
                                 ToolTip="Notes Windows (WinSAT), processeur (7-Zip) et vitesses du disque"/>
                         <Button x:Name="GamingBenchButton" Content="Test gaming complet (≈ 20 min)" Click="GamingBench_Click" Padding="14,6"
@@ -217,7 +217,7 @@
                     <ProgressBar x:Name="BenchProgress" Height="3" IsIndeterminate="True" BorderThickness="0" Margin="0,10,0,0"
                                  Background="Transparent" Foreground="{StaticResource AccentBrush}" Visibility="Collapsed"/>
                     <TextBlock x:Name="BenchText" Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,0" TextWrapping="Wrap"
-                               Text="Mesures seulement : rien n'est modifié sur le PC."/>
+                               Text="Le test bureautique se lance tout seul après le bilan. Mesures seulement : rien n'est modifié sur le PC."/>
                 </StackPanel>
             </Border>
 

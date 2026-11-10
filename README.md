@@ -54,11 +54,12 @@ et permet d'exporter un rapport.
     - export du rapport en **PDF** (Microsoft Edge en arrière-plan), en plus du HTML et du texte.
 
 11. **Onglet Performances** (novembre 2026) ✅ : mesures seulement, rien n'est modifié.
-    - **Test bureautique** (≈ 3 min, lancé par défaut à la première ouverture de l'onglet) : notes Windows (WinSAT),
+    - **Test bureautique** (≈ 3 min, lancé tout seul au démarrage, après le bilan) : notes Windows (WinSAT),
       processeur avec 7-Zip (`7zr.exe`, LGPL, embarqué), lecture du disque (WinSAT) et écriture de 1 Go sans cache,
       puis un verdict (« Très fluide », « Lent, SSD conseillé »…) ;
     - **Test gaming complet** (≈ 20 min) : en plus, Cinebench (scores mono et multi, puis 10 minutes de charge où la
       fréquence du processeur et les températures sont relevées) et Blender Benchmark (GPL) sur la carte graphique.
+      Le bouton reste disponible pendant le test bureautique : le test gaming attend sa fin et reprend ses mesures.
       Ces deux outils gratuits ne sont pas redistribuables : on les dépose une fois dans le dossier `Outils` à côté de
       `PcInspector.exe`. Blender télécharge ses scènes à la première utilisation ;
     - les résultats vont dans le rapport, la fiche de suivi et le Texte Leboncoin.

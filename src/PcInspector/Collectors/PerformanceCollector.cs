@@ -28,8 +28,8 @@ public sealed class PerformanceCollector : ICollector
     {
         var section = new InfoSection(Title);
         section.Groups.Add(new InfoGroup("Tests de performance")
-            .Add("Résultat", "Pas encore testé")
-            .Add("Test bureautique", $"Environ 3 minutes : notes Windows (WinSAT), processeur (7-Zip), disque")
+            .Add("Résultat", "Pas encore testé : le test bureautique se lance tout seul après le bilan")
+            .Add("Test bureautique", "Environ 3 minutes : notes Windows (WinSAT), processeur (7-Zip), disque")
             .Add("Test gaming complet", "Environ 20 minutes : en plus, Cinebench, Blender (carte graphique) et 10 minutes de charge avec les températures")
             .Add("Outils gaming", $"Cinebench et Blender Benchmark se déposent une fois dans le dossier {Benchmark.ToolsFolder}"));
         return section;
@@ -79,6 +79,11 @@ public static class Benchmark
 
     private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
 
+    // Partie bureautique du dernier test : le test gaming la reprend au lieu de la refaire.
+    private static List<InfoGroup>? _officeGroups;
+    private static WinSatScores? _officeWinSat;
+    private static string? _officeSevenZip;
+
     public static BenchmarkResult Run(bool gaming, Action<string> progress)
     {
         var section = new InfoSection("Performances");
@@ -86,14 +91,29 @@ public static class Benchmark
         var summary = new InfoGroup(gaming ? "Verdict (test gaming complet)" : "Verdict (test bureautique)");
         section.Groups.Add(summary);
 
-        progress("Notes Windows (WinSAT) : environ 2 minutes…");
-        var winsat = WinSat(section);
+        WinSatScores winsat;
+        if (gaming && _officeGroups is not null && _officeWinSat is not null)
+        {
+            // Le test bureautique vient d'être fait (au lancement du logiciel) : ses mesures sont reprises.
+            section.Groups.AddRange(_officeGroups);
+            winsat = _officeWinSat;
+            result.SevenZip = _officeSevenZip;
+        }
+        else
+        {
+            progress("Notes Windows (WinSAT) : environ 2 minutes…");
+            winsat = WinSat(section);
 
-        progress("Processeur : test 7-Zip…");
-        SevenZip(section, result);
+            progress("Processeur : test 7-Zip…");
+            SevenZip(section, result);
 
-        progress("Disque : test d'écriture…");
-        DiskWrite(section, winsat);
+            progress("Disque : test d'écriture…");
+            DiskWrite(section, winsat);
+
+            _officeGroups = section.Groups.Skip(1).ToList();
+            _officeWinSat = winsat;
+            _officeSevenZip = result.SevenZip;
+        }
 
         result.OfficeVerdict = OfficeVerdict(winsat, out var officeAdvice);
         summary.Add("Bureautique", result.OfficeVerdict ?? "Notes Windows indisponibles");
