@@ -157,7 +157,7 @@ public static partial class SecurityChecks
         foreach (var c in outside)
         {
             var path = PathOf(c.Pid);
-            if (path is null) continue;
+            if (path is null || IsJvtechTool(path)) continue;
             var exe = Path.GetFileName(path);
             if (RemoteTools.Any(t => exe.Replace(" ", "").IndexOf(t.Replace(" ", ""), StringComparison.OrdinalIgnoreCase) >= 0))
                 remote.Add($"{exe} → {c.Remote}");
@@ -169,7 +169,7 @@ public static partial class SecurityChecks
         foreach (var c in listening)
         {
             var path = PathOf(c.Pid);
-            if (path is null || Signed(path)) continue;
+            if (path is null || IsJvtechTool(path) || Signed(path)) continue;
             warnings.Add($"{Path.GetFileName(path)} attend des connexions sur le port {c.LocalPort}");
         }
 
@@ -184,6 +184,20 @@ public static partial class SecurityChecks
             return SecurityCheck.Info(name, summary + " · Programmes non signés à vérifier : " + string.Join(", ", warnings.Take(6)));
         return SecurityCheck.Ok(name, summary + " · tous les programmes connectés sont signés");
     }
+
+    private static readonly HashSet<string> JvtechExes = new(StringComparer.OrdinalIgnoreCase)
+        { "PcSecurite.exe", "PcInspector.exe", "PcMaintenance.exe", "PcMigration.exe", "JvtechOutils.exe" };
+
+    /// <summary>
+    /// Les outils JVTECH ne sont pas signés et sont souvent lancés depuis Téléchargements : sans cette exception,
+    /// PC Sécurité se signalerait lui-même (vérification des mises à jour, contrôle des certificats). Seuls les .exe
+    /// JVTECH rangés dans le même dossier que celui-ci sont ignorés, pas un fichier du même nom ailleurs.
+    /// </summary>
+    internal static bool IsJvtechTool(string path) => IsJvtechTool(path, AppPaths.ExeFolder);
+
+    internal static bool IsJvtechTool(string path, string ourFolder) =>
+        JvtechExes.Contains(Path.GetFileName(path))
+        && string.Equals(Path.GetFullPath(Path.GetDirectoryName(path) ?? "").TrimEnd('\\'), Path.GetFullPath(ourFolder).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
 
     private static string FolderOf(string path)
     {

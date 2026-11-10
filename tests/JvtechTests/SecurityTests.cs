@@ -76,4 +76,14 @@ public class SecurityTests
         Assert.IsTrue(References.ObsoleteSoftware.Any(r => r.Name.IsMatch("Microsoft Office Famille et Petite Entreprise 2016")));
         Assert.IsFalse(References.ObsoleteSoftware.Any(r => r.Name.IsMatch("Microsoft Office 2016 Click-to-Run Extensibility Component")));
     }
+
+    [TestMethod]
+    public void JvtechTools_InOurFolderOnly()
+    {
+        const string ours = @"C:\Users\Technicien\Downloads\JVTECH-Outils-v1.0.88";
+        Assert.IsTrue(SecurityChecks.IsJvtechTool(ours + @"\PcSecurite.exe", ours));
+        Assert.IsTrue(SecurityChecks.IsJvtechTool(ours + @"\PcInspector.exe", ours + @"\"));
+        Assert.IsFalse(SecurityChecks.IsJvtechTool(@"C:\Users\Technicien\AppData\Local\Temp\PcSecurite.exe", ours), "même nom ailleurs : contrôlé normalement");
+        Assert.IsFalse(SecurityChecks.IsJvtechTool(ours + @"\autre.exe", ours));
+    }
 }
