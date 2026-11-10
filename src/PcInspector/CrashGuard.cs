@@ -20,6 +20,9 @@ public static class CrashGuard
     private static string _name = "JVTECH";
     private static readonly object TraceLock = new();
 
+    /// <summary>Mode ligne de commande : aucune fenêtre d'erreur (un script ou un RMM attend le code de sortie).</summary>
+    public static bool Silent { get; set; }
+
     public static void Install(Application app, string name)
     {
         _name = name;
@@ -64,6 +67,7 @@ public static class CrashGuard
     {
         e.Handled = true;
         var file = Write(e.Exception, fatal: false);
+        if (Silent) return;
         try
         {
             MessageBox.Show(

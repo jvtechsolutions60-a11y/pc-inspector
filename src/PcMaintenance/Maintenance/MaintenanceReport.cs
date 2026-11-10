@@ -11,6 +11,7 @@ internal sealed class MaintenanceReport
 {
     private readonly List<(string Step, string Result)> _steps = new();
     private readonly List<(string Title, List<string> Lines)> _details = new();
+    private readonly List<(string Label, string? Before, string? After)> _compare = new();
 
     public DateTime Start { get; private set; }
     public DateTime? End { get; private set; }
@@ -24,6 +25,7 @@ internal sealed class MaintenanceReport
     {
         _steps.Clear();
         _details.Clear();
+        _compare.Clear();
         Start = start ?? DateTime.Now;
         End = null;
         FreeBefore = FreeSpace();
@@ -34,6 +36,15 @@ internal sealed class MaintenanceReport
     {
         End = DateTime.Now;
         FreeAfter = FreeSpace();
+    }
+
+    /// <summary>Une ligne du tableau « Avant / Après » (avant = relevé au début, sinon à la fin).</summary>
+    public void Compare(string label, string value, bool before)
+    {
+        var i = _compare.FindIndex(c => c.Label == label);
+        (string Label, string? Before, string? After) row = i >= 0 ? _compare[i] : (label, null, null);
+        row = before ? (label, value, row.After) : (label, row.Before, value);
+        if (i >= 0) _compare[i] = row; else _compare.Add(row);
     }
 
     public void Step(string step, string result) => _steps.Add((step, result));
@@ -58,6 +69,12 @@ internal sealed class MaintenanceReport
                 + (gained > 50L * 1024 * 1024 ? $" (+{Size((ulong)gained)} récupérés)" : ""));
         }
         section.Groups.Add(summary);
+
+        var compare = new InfoGroup("Avant / Après");
+        if (FreeBefore is { } b && FreeAfter is { } a) compare.Add("Espace libre sur " + SystemDrive, $"{Size(b)}  →  {Size(a)}");
+        foreach (var (label, before, after) in _compare)
+            compare.Add(label, $"{before ?? "?"}  →  {after ?? "?"}");
+        if (compare.Items.Count > 0) section.Groups.Add(compare);
 
         var steps = new InfoGroup("Étapes réalisées");
         foreach (var (step, result) in _steps) steps.Add(step, result);

@@ -179,6 +179,8 @@ public partial class MainWindow : Window
 
         SetRunning(true);
         _report.Begin();
+        _report.Compare("Mises à jour Windows en attente", WuValue.Text, before: true);
+        _report.Compare("Logiciels à mettre à jour (winget)", WingetValue.Text, before: true);
         Log("===== Début de la maintenance =====");
         try
         {
@@ -196,7 +198,7 @@ public partial class MainWindow : Window
             SetRunning(false);
         }
 
-        _ = AnalyzeAsync();
+        _ = RecordAfterAsync();
 
         if (_rebootRequired || WindowsUpdate.IsRebootPending())
         {
@@ -205,6 +207,14 @@ public partial class MainWindow : Window
             if (answer == MessageBoxResult.Yes)
                 Process.Start(new ProcessStartInfo(PcInspector.AppPaths.SystemTool("shutdown.exe"), "/r /t 5") { UseShellExecute = false, CreateNoWindow = true });
         }
+    }
+
+    /// <summary>Relit l'état du PC et le note comme « Après » dans le rapport.</summary>
+    private async Task RecordAfterAsync()
+    {
+        await AnalyzeAsync();
+        _report.Compare("Mises à jour Windows en attente", WuValue.Text, before: false);
+        _report.Compare("Logiciels à mettre à jour (winget)", WingetValue.Text, before: false);
     }
 
     /// <summary>Une étape qui plante est notée dans le journal et le rapport, puis la maintenance passe à la suivante.</summary>

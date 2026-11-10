@@ -15,6 +15,13 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (CommandLine.Wanted(e.Args))
+        {
+            // Sans fenêtre : le logiciel se ferme avec le code de sortie quand tout est fini.
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Dispatcher.InvokeAsync(async () => Shutdown(await CommandLine.RunAsync(e.Args)));
+            return;
+        }
         if (e.Args.Any(a => a.Equals("/preparation", StringComparison.OrdinalIgnoreCase)))
         {
             _preparationLock = new Mutex(true, @"Global\JVTECH-Preparation", out var first);
