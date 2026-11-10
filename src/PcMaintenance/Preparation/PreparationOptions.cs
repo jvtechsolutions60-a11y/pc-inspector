@@ -18,6 +18,8 @@ internal sealed class PreparationOptions
     public bool Win11Debloat { get; private set; } = true;
     /// <summary>Couper publicités, suggestions, Bing dans la recherche et widgets pour l'acheteur.</summary>
     public bool Tweaks { get; private set; } = true;
+    /// <summary>Résolution la plus haute sur chaque écran et mise à l'échelle à 100 %.</summary>
+    public bool Display { get; private set; } = true;
     /// <summary>Pilotes et logiciels du constructeur (Dell, Lenovo, HP).</summary>
     public bool Manufacturer { get; private set; } = true;
     /// <summary>Mettre aussi à jour le BIOS par l'outil du constructeur, seulement sur secteur.</summary>
@@ -44,6 +46,7 @@ internal sealed class PreparationOptions
             options.Debloat = Flag(values, "Debloat", options.Debloat);
             options.Win11Debloat = Flag(values, "Win11Debloat", options.Win11Debloat);
             options.Tweaks = Flag(values, "Publicites", options.Tweaks);
+            options.Display = Flag(values, "Ecran", options.Display);
             options.Manufacturer = Flag(values, "Constructeur", options.Manufacturer);
             options.Bios = Flag(values, "Bios", options.Bios);
             options.Reseal = Flag(values, "PremierDemarrage", options.Reseal);

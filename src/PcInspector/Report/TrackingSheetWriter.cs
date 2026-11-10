@@ -58,6 +58,7 @@ public static class TrackingSheetWriter
             new Box("Wi-Fi / Bluetooth", false, wireless),
             new Box("RAM / SMART stockage", Verified("Mémoire", "Disque"), Note("Mémoire", "Disque")),
             new Box("Batterie / charge", Verified("Batterie"), Note("Batterie") ?? "Pas de batterie"),
+            new Box("Performances", Benchmark.Last is not null, Benchmark.Last?.Summary ?? "Non testées (onglet Performances)"),
         };
         var preparation = new[]
         {

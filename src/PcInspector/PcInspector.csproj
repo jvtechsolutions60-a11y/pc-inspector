@@ -23,4 +23,9 @@
     <Reference Include="ReachFramework" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- 7-Zip 26.06 (7zr.exe, LGPL, github.com/ip7z/7zip) : test du processeur de l'onglet Performances -->
+    <EmbeddedResource Include="Tools\7zr.exe" LogicalName="7zr.exe" />
+  </ItemGroup>
+
 </Project>

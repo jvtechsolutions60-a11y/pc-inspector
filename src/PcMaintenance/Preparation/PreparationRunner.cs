@@ -243,6 +243,14 @@ internal sealed class PreparationRunner
         await Task.Run(() => Run("dism.exe", "/Online /Cleanup-Image /StartComponentCleanup", TimeSpan.FromMinutes(45)));
         _state.Result("Nettoyage", "Anciennes versions des composants Windows supprimées.");
 
+        if (_options.Display)
+        {
+            // En fin de préparation : le pilote graphique est installé, toutes les résolutions sont proposées.
+            _status.Report("Écran : résolution maximale et mise à l'échelle à 100 %…");
+            var screens = await Task.Run(() => Display.Run(_log));
+            _state.Result("Écran", screens.Count == 0 ? "Aucun écran réglé : voir le journal." : string.Join(" · ", screens) + ".");
+        }
+
         _status.Report("Contrôle final…");
         var missing = await Task.Run(MissingDrivers);
         _state.Result("Pilotes", missing.Count == 0 ? "Aucun périphérique en erreur ou sans pilote." : $"{missing.Count} périphérique(s) sans pilote ou en erreur : à vérifier.");

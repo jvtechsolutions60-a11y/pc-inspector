@@ -40,6 +40,7 @@ public partial class MainWindow : Window
         ("DIAGNOSTIC", new ICollector[]
         {
             new DiagnosticCollector(),
+            new PerformanceCollector(),
             new MissingDriversCollector(),
             new BootPerformanceCollector(),
             new BatteryCollector(),
@@ -123,6 +124,7 @@ public partial class MainWindow : Window
 
         SectionTitle.Text = collector.Title;
         GroupList.ItemsSource = null;
+        BenchPanel.Visibility = collector is PerformanceCollector ? Visibility.Visible : Visibility.Collapsed;
 
         if (refresh || !_cache.TryGetValue(collector, out var section))
         {
@@ -138,6 +140,53 @@ public partial class MainWindow : Window
 
         ShowStatus(section.Error);
         ApplyFilter();
+
+        // Par défaut, le test bureautique part dès la première ouverture de l'onglet.
+        if (collector is PerformanceCollector && Benchmark.Last is null && !_benchRunning) await RunBenchmarkAsync(gaming: false);
+    }
+
+    private bool _benchRunning;
+
+    private async void OfficeBench_Click(object sender, RoutedEventArgs e) => await RunBenchmarkAsync(gaming: false);
+
+    private async void GamingBench_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show(this, "Le test gaming dure environ 20 minutes et fait chauffer le PC au maximum (processeur puis carte graphique).\n\n" +
+                "Brancher le portable sur secteur et fermer les autres logiciels. Lancer le test ?",
+                "Test gaming complet", MessageBoxButton.OKCancel, MessageBoxImage.Information) != MessageBoxResult.OK) return;
+        await RunBenchmarkAsync(gaming: true);
+    }
+
+    /// <summary>Lance les tests en arrière-plan ; l'onglet affiche la progression puis les résultats.</summary>
+    private async Task RunBenchmarkAsync(bool gaming)
+    {
+        if (_benchRunning) return;
+        _benchRunning = true;
+        OfficeBenchButton.IsEnabled = GamingBenchButton.IsEnabled = false;
+        BenchProgress.Visibility = Visibility.Visible;
+        var perf = _collectors.OfType<PerformanceCollector>().First();
+        void Progress(string text) => Dispatcher.BeginInvoke(new Action(() =>
+        {
+            BenchText.Text = text;
+        }));
+        try
+        {
+            var result = await Task.Run(() => Benchmark.Run(gaming, Progress));
+            _cache[perf] = result.Section;
+            _tasks[perf] = Task.FromResult(result.Section);
+            BenchText.Text = $"Tests terminés à {DateTime.Now:HH:mm} : résultats ci-dessous, repris dans le rapport, la fiche et le Texte Leboncoin.";
+        }
+        catch (Exception ex)
+        {
+            BenchText.Text = "Les tests se sont arrêtés : " + ex.Message;
+        }
+        finally
+        {
+            _benchRunning = false;
+            OfficeBenchButton.IsEnabled = GamingBenchButton.IsEnabled = true;
+            BenchProgress.Visibility = Visibility.Collapsed;
+        }
+        if (SelectedCollector == perf) ApplyFilter();
     }
 
     /// <summary>Affiche les lignes de l'onglet qui contiennent le texte recherché (toutes si la recherche est vide).</summary>

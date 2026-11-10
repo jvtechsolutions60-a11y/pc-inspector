@@ -53,6 +53,17 @@ et permet d'exporter un rapport.
       5 minutes) et **étiquette PC** au format carte de visite à coller sous le PC ;
     - export du rapport en **PDF** (Microsoft Edge en arrière-plan), en plus du HTML et du texte.
 
+11. **Onglet Performances** (novembre 2026) ✅ : mesures seulement, rien n'est modifié.
+    - **Test bureautique** (≈ 3 min, lancé par défaut à la première ouverture de l'onglet) : notes Windows (WinSAT),
+      processeur avec 7-Zip (`7zr.exe`, LGPL, embarqué), lecture du disque (WinSAT) et écriture de 1 Go sans cache,
+      puis un verdict (« Très fluide », « Lent, SSD conseillé »…) ;
+    - **Test gaming complet** (≈ 20 min) : en plus, Cinebench (scores mono et multi, puis 10 minutes de charge où la
+      fréquence du processeur et les températures sont relevées) et Blender Benchmark (GPL) sur la carte graphique.
+      Ces deux outils gratuits ne sont pas redistribuables : on les dépose une fois dans le dossier `Outils` à côté de
+      `PcInspector.exe`. Blender télécharge ses scènes à la première utilisation ;
+    - les résultats vont dans le rapport, la fiche de suivi et le Texte Leboncoin.
+    Écartés : UserBenchmark, UserDiag (pas automatisables), OCCT, FurMark 2, 3DMark et PCMark (payants pour un atelier).
+
 Ergonomie : onglets classés Matériel / Diagnostic / Logiciel, recherche dans l'onglet (Ctrl+F), bouton Copier
 (texte prêt à coller dans un devis) et Actualiser (F5).
 
@@ -161,7 +172,7 @@ Sur le PC, `deploy/autounattend.xml` efface le disque 0, installe Windows 11 en 
 démarre en **mode audit**. `PcMaintenance.exe /preparation` enchaîne alors, en reprenant seul après chaque redémarrage :
 nettoyage par [Win11Debloat](https://github.com/Raphire/Win11Debloat) (version figée, mode Sysprep) puis applications des fabricants retirées (`debloat.ini`), publicités et suggestions coupées, pilotes et BIOS du constructeur (Dell Command Update, Lenovo System
 Update, HP Image Assistant, BIOS seulement sur secteur), Windows Update en boucle pilotes compris (partage des
-mises à jour entre PC du réseau), nettoyage, contrôle des pilotes et de l'activation, rapport envoyé au serveur.
+mises à jour entre PC du réseau), nettoyage, écran à sa résolution la plus haute avec mise à l'échelle à 100 %, contrôle des pilotes et de l'activation, rapport envoyé au serveur.
 À la fin, Sysprep remet le PC au **premier démarrage** et l'éteint : l'acheteur crée son propre compte.
 
 Les étapes se règlent dans `options.ini`. Mode d'emploi : `deploy/LISEZMOI.txt`.

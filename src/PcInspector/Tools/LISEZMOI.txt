@@ -1,0 +1,5 @@
+7zr.exe : 7-Zip 26.06 (version autonome), Igor Pavlov, licence GNU LGPL.
+Source et licence : https://www.7-zip.org/ et https://github.com/ip7z/7zip
+Téléchargé depuis la page des versions officielles GitHub (ip7z/7zip).
+SHA-256 : e80db2dad715a6c5adabe292d31ed54e11f4e9b99ca349827b50573b175891bc
+Utilisé par l'onglet Performances de PC Inspector pour le test du processeur (commande « 7zr b »).
