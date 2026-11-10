@@ -163,7 +163,7 @@ public static partial class SecurityChecks
                 remote.Add($"{exe} → {c.Remote}");
             if (Signed(path)) continue;
             // Programme non signé qui parle à internet depuis un dossier utilisateur : profil typique d'un logiciel malveillant.
-            if (UserFolder(path)) dangers.Add($"{exe} ({Shorten(path)}) → {c.Remote}:{c.RemotePort}");
+            if (UserFolder(path)) dangers.Add($"{exe} ({FolderOf(path)}) → {c.Remote}:{c.RemotePort}");
             else warnings.Add($"{exe} → {c.Remote}:{c.RemotePort}");
         }
         foreach (var c in listening)
@@ -185,7 +185,7 @@ public static partial class SecurityChecks
         return SecurityCheck.Ok(name, summary + " · tous les programmes connectés sont signés");
     }
 
-    private static string Shorten(string path)
+    private static string FolderOf(string path)
     {
         var folder = Path.GetDirectoryName(path) ?? "";
         var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -251,7 +251,4 @@ public static partial class SecurityChecks
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool QueryFullProcessImageName(IntPtr process, int flags, StringBuilder name, ref int size);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool CloseHandle(IntPtr handle);
 }
