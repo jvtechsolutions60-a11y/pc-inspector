@@ -17,6 +17,7 @@ public static partial class SecurityChecks
         ("Microsoft Defender", Defender),
         ("Pare-feu", Firewall),
         ("Dernière mise à jour", LastUpdate),
+        ("Mises à jour en échec", FailedUpdates),
         ("Activation de Windows", Activation),
         ("Contrôle de compte (UAC)", Uac),
         ("SmartScreen", SmartScreen),
@@ -130,11 +131,29 @@ public static partial class SecurityChecks
             return SecurityCheck.Ok(name, string.Join(", ", thirdParty) + " actif");
 
         var off = PcInspector.WindowsState.DisabledFirewallProfiles();
+        // Désactivé par une stratégie : l'utilisateur ne peut pas le rallumer dans Sécurité Windows (trace fréquente d'un malware ou d'un « optimiseur »).
+        var forced = new[] { ("DomainProfile", "domaine"), ("StandardProfile", "privé"), ("PublicProfile", "public") }
+            .Where(p => PolicyDword(@"SOFTWARE\Policies\Microsoft\WindowsFirewall\" + p.Item1, "EnableFirewall") == 0)
+            .Select(p => p.Item2).ToList();
+        if (forced.Count > 0)
+            return SecurityCheck.Danger(name, "Pare-feu Windows coupé par une stratégie (GPO) pour le réseau " + string.Join(", ", forced),
+                "Hors entreprise, aucune stratégie ne devrait couper le pare-feu : chercher le logiciel qui l'a posée (optimiseur, malware), puis supprimer la clé HKLM\\SOFTWARE\\Policies\\Microsoft\\WindowsFirewall.");
         if (off.Count == 0) return SecurityCheck.Ok(name, "Pare-feu Windows activé sur tous les réseaux");
         var detail = "Pare-feu Windows désactivé pour le réseau " + string.Join(", ", off);
         return off.Contains("public")
             ? SecurityCheck.Danger(name, detail, "Réactiver le pare-feu, surtout pour les réseaux publics (Wi-Fi d'hôtel, gare…).")
             : SecurityCheck.Warning(name, detail, "Réactiver le pare-feu sur tous les profils.");
+    }
+
+    private static SecurityCheck FailedUpdates()
+    {
+        const string name = "Mises à jour en échec";
+        var failures = PcInspector.WindowsUpdateFailures.Read();
+        if (failures is null) return SecurityCheck.Info(name, "Historique de Windows Update illisible");
+        if (failures.Count == 0) return SecurityCheck.Ok(name, "Aucune mise à jour en échec ces 60 derniers jours");
+        var detail = string.Join(" · ", failures.Take(4).Select(f => $"{f.Title} : {f.Attempts} échec(s), {f.Code} ({f.Meaning})"));
+        return SecurityCheck.Warning(name, detail,
+            "Une mise à jour qui échoue en boucle laisse une faille ouverte : suivre la piste indiquée pour chaque code, puis relancer Windows Update.");
     }
 
     private static SecurityCheck LastUpdate()
@@ -268,11 +287,44 @@ public static partial class SecurityChecks
         var blank = accounts.Where(a => !a.Sid.EndsWith("-501") && HasBlankPassword(a.Name)).Select(a => a.Name).ToList();
         if (blank.Count > 0) problems.Add("sans mot de passe : " + string.Join(", ", blank));
 
-        if (problems.Count == 0) return SecurityCheck.Ok(name, $"{accounts.Count} compte(s) actif(s), tous protégés par un mot de passe ou un code PIN");
-        var detail = string.Join(" · ", problems);
+        // Comptes masqués de l'écran de connexion (SpecialAccounts\UserList = 0) : discret, souvent laissé par un intrus.
+        var admins = Administrators();
+        using (var hiddenKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\UserList"))
+        {
+            var hidden = (hiddenKey?.GetValueNames() ?? Array.Empty<string>())
+                .Where(n => hiddenKey!.GetValue(n) is int v && v == 0)
+                .Where(n => accounts.Any(a => a.Name.Equals(n, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            foreach (var account in hidden)
+            {
+                var isAdmin = admins.Contains(account, StringComparer.OrdinalIgnoreCase);
+                problems.Add($"compte {(isAdmin ? "administrateur " : "")}caché de l'écran de connexion : {account}");
+                danger |= isAdmin;
+            }
+        }
+
+        var adminText = admins.Count == 0 ? "" : $" · administrateurs : {string.Join(", ", admins)}";
+        if (problems.Count == 0) return SecurityCheck.Ok(name, $"{accounts.Count} compte(s) actif(s), tous protégés par un mot de passe ou un code PIN{adminText}");
+        var detail = string.Join(" · ", problems) + adminText;
         return danger
-            ? SecurityCheck.Danger(name, detail, "Désactiver le compte Invité et mettre un mot de passe sur chaque compte.")
+            ? SecurityCheck.Danger(name, detail, "Désactiver le compte Invité, demander au client s'il connaît chaque compte caché (sinon le désactiver et changer les mots de passe), et mettre un mot de passe sur chaque compte.")
             : SecurityCheck.Warning(name, detail, "Mettre un mot de passe (ou un code PIN Windows Hello) sur chaque compte.");
+    }
+
+    /// <summary>Membres actifs du groupe Administrateurs (SID S-1-5-32-544, quel que soit son nom dans la langue de Windows).</summary>
+    private static List<string> Administrators()
+    {
+        var group = Wmi.QueryOptional("SELECT Name, Domain FROM Win32_Group WHERE SID = 'S-1-5-32-544'").FirstOrDefault();
+        if (group?.Str("Name") is not { } groupName || group.Str("Domain") is not { } domain) return new List<string>();
+        return Wmi.QueryOptional($"ASSOCIATORS OF {{Win32_Group.Domain='{domain}',Name='{groupName}'}} WHERE AssocClass=Win32_GroupUser ResultClass=Win32_UserAccount")
+            .Where(u => u.Bool("Disabled") != true)
+            .Select(u => u.Str("Name") ?? "").Where(n => n.Length > 0).ToList();
+    }
+
+    internal static int? PolicyDword(string path, string value)
+    {
+        using var key = Registry.LocalMachine.OpenSubKey(path);
+        return key?.GetValue(value) is int v ? v : null;
     }
 
     private static SecurityCheck AutoLogon()

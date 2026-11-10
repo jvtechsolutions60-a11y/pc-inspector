@@ -30,6 +30,7 @@
     <Compile Include="..\PcInspector\ProcessRunner.cs" Link="Shared\ProcessRunner.cs" />
     <Compile Include="..\PcInspector\WingetShell.cs" Link="Shared\WingetShell.cs" />
     <Compile Include="..\PcInspector\Authenticode.cs" Link="Shared\Authenticode.cs" />
+    <Compile Include="..\PcInspector\WindowsUpdateFailures.cs" Link="Shared\WindowsUpdateFailures.cs" />
     <Compile Include="..\PcInspector\CrashGuard.cs" Link="Shared\CrashGuard.cs" />
     <Compile Include="..\PcInspector\Updater.cs" Link="Shared\Updater.cs" />
     <Compile Include="..\PcInspector\Models\InfoSection.cs" Link="Shared\InfoSection.cs" />

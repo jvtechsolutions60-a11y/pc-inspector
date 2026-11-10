@@ -25,7 +25,7 @@ internal static class CommandLine
 {
     public const int Success = 0, Warnings = 1, Critical = 2;
 
-    private static readonly string[] Known = { "restore", "adwcleaner", "clean", "windowsupdate", "winget", "pack" };
+    private static readonly string[] Known = { "restore", "adwcleaner", "clean", "repair", "windowsupdate", "winget", "pack" };
     private static readonly string[] All = { "restore", "adwcleaner", "clean", "windowsupdate", "winget" };
 
     private const int WingetNothingToUpgrade = unchecked((int)0x8A150014);
@@ -164,6 +164,12 @@ internal static class CommandLine
                 report.Detail("Programmes lancés au démarrage (à désactiver s'ils sont inutiles)", result.Startup);
                 return ($"{Cleanup.Size(result.Freed)} libérés", true, false);
             }
+            case "repair":
+            {
+                var result = await Task.Run(() => Repair.Run(log));
+                report.Detail("Réparation de Windows", result.Details);
+                return (result.Summary, result.Ok, false);
+            }
             case "windowsupdate":
                 return await Task.Run(() => InstallUpdates(report, log));
             case "winget":
@@ -255,6 +261,7 @@ internal static class CommandLine
         "restore" => "Point de restauration",
         "adwcleaner" => "Suppression des adwares (AdwCleaner)",
         "clean" => "Nettoyage du PC",
+        "repair" => "Réparer Windows (DISM + SFC)",
         "windowsupdate" => "Mises à jour Windows",
         "winget" => "Mise à jour des logiciels (winget)",
         "pack" => "Pack logiciels nouveau PC",
@@ -266,6 +273,7 @@ internal static class CommandLine
         "restore" => "créerait un point de restauration",
         "adwcleaner" => "téléchargerait AdwCleaner et supprimerait les adwares trouvés",
         "clean" => "viderait temporaires, cache Windows Update et caches des navigateurs (favoris, mots de passe, historique et cookies gardés)",
+        "repair" => "lancerait DISM /RestoreHealth puis SFC /scannow (20 à 45 minutes)",
         "windowsupdate" => "installerait les mises à jour Windows en attente",
         "winget" => "mettrait à jour les logiciels connus de winget",
         "pack" => "installerait les logiciels du pack (" + string.Join(", ", SoftwarePack.Load().Select(i => i.Name)) + ")",
@@ -318,8 +326,8 @@ internal static class CommandLine
     private const string Usage = @"
 PC Maintenance en ligne de commande
   --silent                 sans fenêtre (obligatoire pour un script ou un RMM)
-  --action=a,b,...         restore, adwcleaner, clean (ou cleanall), windowsupdate, winget, pack, all
-                           (par défaut : clean ; all = tout sauf pack)
+  --action=a,b,...         restore, adwcleaner, clean (ou cleanall), repair, windowsupdate, winget, pack, all
+                           (par défaut : clean ; all = tout sauf repair et pack)
   --dry-run                simulation : montre ce qui serait fait, ne modifie rien
   --report=chemin          rapport avant / après en .html, .txt ou .pdf
   --client=""Nom""           nom du client dans le rapport

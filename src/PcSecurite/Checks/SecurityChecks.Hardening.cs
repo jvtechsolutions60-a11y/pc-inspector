@@ -15,6 +15,19 @@ public static partial class SecurityChecks
         const string name = "Microsoft Defender";
         const string scope = @"root\Microsoft\Windows\Defender";
         var status = Wmi.QueryOptional("SELECT * FROM MSFT_MpComputerStatus", scope).FirstOrDefault();
+        // Defender coupé par stratégie (GPO) : l'utilisateur ne peut plus le rallumer, signe classique d'un malware ou d'un « optimiseur ».
+        const string policies = @"SOFTWARE\Policies\Microsoft\Windows Defender";
+        var forced = new List<string>();
+        if (PolicyDword(policies, "DisableAntiSpyware") == 1 || PolicyDword(policies, "DisableAntiVirus") == 1) forced.Add("antivirus désactivé");
+        if (PolicyDword(policies + @"\Real-Time Protection", "DisableRealtimeMonitoring") == 1) forced.Add("protection en temps réel désactivée");
+        if (PolicyDword(policies + @"\Real-Time Protection", "DisableBehaviorMonitoring") == 1) forced.Add("surveillance du comportement désactivée");
+        if (PolicyDword(policies + @"\Spynet", "SpynetReporting") == 0) forced.Add("protection cloud désactivée");
+        var otherAv = Wmi.QueryOptional("SELECT displayName FROM AntiVirusProduct", @"root\SecurityCenter2")
+            .Select(a => a.Str("displayName") ?? "").Any(n => n.Length > 0 && n.IndexOf("Defender", StringComparison.OrdinalIgnoreCase) < 0);
+        if (forced.Count > 0 && !otherAv)
+            return SecurityCheck.Danger(name, "Coupé par une stratégie (GPO) : " + string.Join(", ", forced),
+                "Hors entreprise, aucune stratégie ne devrait couper Defender : analyser le PC (AdwCleaner, Defender hors ligne), puis supprimer la clé HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows Defender et redémarrer.");
+
         if (status is null) return SecurityCheck.Info(name, "Non disponible");
         var mode = status.Str("AMRunningMode") ?? "Normal";
         if (status.Bool("AMServiceEnabled") != true || !mode.Equals("Normal", StringComparison.OrdinalIgnoreCase))

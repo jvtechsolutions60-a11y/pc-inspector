@@ -24,6 +24,7 @@ public partial class MainWindow : Window
     private readonly List<string> _installedUpdates = new();
     private IReadOnlyList<WingetUpdate> _wingetUpdates = Array.Empty<WingetUpdate>();
     private string _updateUrl = Updater.ReleasesPage;
+    private List<PcInspector.WindowsUpdateFailures.Failure> _failedUpdates = new();
 
     public MainWindow()
     {
@@ -131,6 +132,12 @@ public partial class MainWindow : Window
             var titles = updates.Take(3).Select(u => "• " + u.Title).ToList();
             if (updates.Count > 3) titles.Add($"… et {updates.Count - 3} autre(s)");
             if (reboot) titles.Insert(0, "Redémarrage en attente pour finir une installation.");
+            var failed = await Task.Run(() => PcInspector.WindowsUpdateFailures.Read());
+            if (!_running) _failedUpdates = failed ?? new List<PcInspector.WindowsUpdateFailures.Failure>();
+            if (failed is { Count: > 0 })
+            {
+                titles.Add($"⚠ {failed.Count} en échec répété : " + string.Join(" ; ", failed.Take(2).Select(f => $"{f.Title} ({f.Code}, {f.Meaning})")));
+            }
             WuDetail.Text = titles.Count == 0 ? "Aucune mise à jour à installer." : string.Join("\n", titles);
             WuDetail.ToolTip = updates.Count == 0 ? null : string.Join("\n", updates.Select(u => u.Title));
         }
@@ -171,7 +178,7 @@ public partial class MainWindow : Window
     private async void StartButton_Click(object sender, RoutedEventArgs e)
     {
         if (_running) return;
-        if (new[] { RestoreCheck, AdwCheck, CleanCheck, WuCheck, WingetCheck, PackCheck }.All(c => c.IsChecked != true))
+        if (new[] { RestoreCheck, AdwCheck, CleanCheck, RepairCheck, WuCheck, WingetCheck, PackCheck }.All(c => c.IsChecked != true))
         {
             MessageBox.Show(this, "Cocher au moins une étape.", Title, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
@@ -181,12 +188,14 @@ public partial class MainWindow : Window
         _report.Begin();
         _report.Compare("Mises à jour Windows en attente", WuValue.Text, before: true);
         _report.Compare("Logiciels à mettre à jour (winget)", WingetValue.Text, before: true);
+        _report.Detail("Mises à jour Windows en échec avant l'intervention", _failedUpdates.Select(f => $"{f.Title} : {f.Attempts} échec(s), dernier le {f.Last:dd/MM/yyyy}, {f.Code} : {f.Meaning}"));
         Log("===== Début de la maintenance =====");
         try
         {
             if (RestoreCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("Point de restauration", RunRestorePointAsync);
             if (AdwCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("AdwCleaner", RunAdwCleanerAsync);
             if (CleanCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("Nettoyage du PC", RunCleanupAsync);
+            if (RepairCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("Réparer Windows", RunRepairAsync);
             if (WuCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("Mises à jour Windows", RunWindowsUpdateAsync);
             if (WingetCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("Mise à jour des logiciels", RunWingetAsync);
             if (PackCheck.IsChecked == true && !_stopRequested) await SafeStepAsync("Installation des logiciels", RunPackAsync);
@@ -345,6 +354,7 @@ public partial class MainWindow : Window
         StopButton.IsEnabled = running;
         StopButton.Content = "Arrêter après l'étape";
         CleanCheck.IsEnabled = !running;
+        RepairCheck.IsEnabled = !running;
         RefreshButton.IsEnabled = !running;
         WuCheck.IsEnabled = !running;
         WingetCheck.IsEnabled = !running;
@@ -361,6 +371,17 @@ public partial class MainWindow : Window
         RestoreStatus.Text = result;
         Log("Point de restauration : " + result);
         _report.Step("Point de restauration", result);
+    }
+
+    private async Task RunRepairAsync()
+    {
+        Log("--- Réparer Windows (DISM + SFC) ---");
+        RepairStatus.Text = "En cours, 20 à 45 minutes (voir le journal)…";
+        var log = new Progress<string>(Log);
+        var result = await Task.Run(() => Repair.Run(log));
+        RepairStatus.Text = result.Summary;
+        _report.Step("Réparer Windows (DISM + SFC)", result.Summary);
+        _report.Detail("Réparation de Windows", result.Details);
     }
 
     private async Task RunAdwCleanerAsync()
