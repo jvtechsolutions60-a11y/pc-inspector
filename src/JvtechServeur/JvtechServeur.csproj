@@ -17,6 +17,11 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- ProtectedData (DPAPI) : mot de passe du partage et jeton chiffrés dans serveur.ini -->
+    <Reference Include="System.Security" />
+  </ItemGroup>
+
   <!-- Version et charte graphique, partagées avec les autres logiciels -->
   <ItemGroup>
     <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />

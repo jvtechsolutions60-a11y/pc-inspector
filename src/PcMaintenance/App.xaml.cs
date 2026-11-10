@@ -30,7 +30,33 @@ public partial class App : Application
                 Shutdown();
                 return;
             }
-            new PreparationWindow().Show();
+            // Garde-fou : jamais de préparation revente sur un PC en service (PC d'un client) sans confirmation explicite.
+            var options = Preparation.PreparationOptions.Load();
+            var state = Preparation.PreparationState.Load();
+            var mode = Preparation.PreparationGuard.ReadMode();
+            var machine = Environment.MachineName;
+            var permission = Preparation.PreparationGuard.Decide(mode, state.ConfirmedMachine, machine, options.Reseal);
+            PcInspector.CrashGuard.Trace($"Préparation : mode Windows {mode}, autorisée {permission.Allowed}, Sysprep {permission.ResealAllowed}. {permission.Reason}");
+            if (!permission.Allowed)
+            {
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                if (!PreparationRefusalWindow.Ask(permission.Reason, machine))
+                {
+                    // Lancement par erreur ou PC sorti du mode audit : on retire aussi la reprise automatique.
+                    Preparation.PreparationRunner.RemoveAutoStart();
+                    PcInspector.CrashGuard.Trace("Préparation refusée, rien n'a été fait.");
+                    Shutdown();
+                    return;
+                }
+                state.ConfirmedMachine = machine;
+                state.Save();
+                permission = Preparation.PreparationGuard.Decide(mode, state.ConfirmedMachine, machine, options.Reseal);
+                PcInspector.CrashGuard.Trace("Préparation hors mode audit confirmée par le technicien (nom du PC tapé).");
+                ShutdownMode = ShutdownMode.OnMainWindowClose;
+            }
+            var window = new PreparationWindow(permission);
+            MainWindow = window;
+            window.Show();
             return;
         }
         new MainWindow().Show();

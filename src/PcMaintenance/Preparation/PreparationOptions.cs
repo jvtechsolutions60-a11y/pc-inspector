@@ -8,7 +8,8 @@ namespace PcMaintenance.Preparation;
 
 /// <summary>
 /// Réglages de la préparation, lus dans options.ini à côté du .exe (une ligne « Nom = 1 ou 0 »).
-/// Sans fichier, tout est fait.
+/// Sans fichier, tout est fait, sauf la remise au premier démarrage (Sysprep) : elle exige « PremierDemarrage = 1 »
+/// écrit en toutes lettres, pour qu'un fichier absent, abîmé ou mal tapé ne déclenche jamais Sysprep.
 /// </summary>
 internal sealed class PreparationOptions
 {
@@ -25,7 +26,7 @@ internal sealed class PreparationOptions
     /// <summary>Mettre aussi à jour le BIOS par l'outil du constructeur, seulement sur secteur.</summary>
     public bool Bios { get; private set; } = true;
     /// <summary>À la fin, remettre le PC au premier démarrage (choix de la langue, compte de l'acheteur) et l'éteindre.</summary>
-    public bool Reseal { get; private set; } = true;
+    public bool Reseal { get; private set; }
     /// <summary>Nombre maximal de passages de Windows Update (chacun suivi d'un redémarrage).</summary>
     public int MaxRounds { get; private set; } = 8;
 
@@ -33,26 +34,31 @@ internal sealed class PreparationOptions
 
     public static PreparationOptions Load()
     {
-        var options = new PreparationOptions();
         try
         {
-            if (!File.Exists(FilePath)) return options;
-            var values = File.ReadAllLines(FilePath)
-                .Where(l => !l.TrimStart().StartsWith("#"))
-                .Select(l => l.Split(new[] { '=' }, 2))
-                .Where(p => p.Length == 2)
-                .GroupBy(p => p[0].Trim(), StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.First()[1].Trim(), StringComparer.OrdinalIgnoreCase);
-            options.Debloat = Flag(values, "Debloat", options.Debloat);
-            options.Win11Debloat = Flag(values, "Win11Debloat", options.Win11Debloat);
-            options.Tweaks = Flag(values, "Publicites", options.Tweaks);
-            options.Display = Flag(values, "Ecran", options.Display);
-            options.Manufacturer = Flag(values, "Constructeur", options.Manufacturer);
-            options.Bios = Flag(values, "Bios", options.Bios);
-            options.Reseal = Flag(values, "PremierDemarrage", options.Reseal);
-            if (values.TryGetValue("PassagesMax", out var max) && int.TryParse(max, out var rounds) && rounds > 0) options.MaxRounds = rounds;
+            return File.Exists(FilePath) ? Parse(File.ReadAllLines(FilePath)) : new PreparationOptions();
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return new PreparationOptions(); }
+    }
+
+    /// <summary>Lecture des lignes d'options.ini (séparée pour les tests automatisés).</summary>
+    internal static PreparationOptions Parse(IEnumerable<string> lines)
+    {
+        var options = new PreparationOptions();
+        var values = lines
+            .Where(l => !l.TrimStart().StartsWith("#"))
+            .Select(l => l.Split(new[] { '=' }, 2))
+            .Where(p => p.Length == 2)
+            .GroupBy(p => p[0].Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First()[1].Trim(), StringComparer.OrdinalIgnoreCase);
+        options.Debloat = Flag(values, "Debloat", options.Debloat);
+        options.Win11Debloat = Flag(values, "Win11Debloat", options.Win11Debloat);
+        options.Tweaks = Flag(values, "Publicites", options.Tweaks);
+        options.Display = Flag(values, "Ecran", options.Display);
+        options.Manufacturer = Flag(values, "Constructeur", options.Manufacturer);
+        options.Bios = Flag(values, "Bios", options.Bios);
+        options.Reseal = values.TryGetValue("PremierDemarrage", out var reseal) && reseal == "1";
+        if (values.TryGetValue("PassagesMax", out var max) && int.TryParse(max, out var rounds) && rounds > 0) options.MaxRounds = Math.Min(rounds, 20);
         return options;
     }
 

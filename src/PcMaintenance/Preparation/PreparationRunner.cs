@@ -36,9 +36,11 @@ internal sealed class PreparationRunner
     private readonly ServerLink _server = ServerLink.Load();
 
     public volatile bool StopRequested;
+    private readonly PreparationPermission _permission;
 
-    public PreparationRunner(IProgress<string> log, IProgress<PreparationStep> step, IProgress<string> status)
+    public PreparationRunner(IProgress<string> log, IProgress<PreparationStep> step, IProgress<string> status, PreparationPermission permission)
     {
+        _permission = permission;
         _log = new Progress<string>(text =>
         {
             log.Report(text);
@@ -110,7 +112,8 @@ internal sealed class PreparationRunner
                 case PreparationStep.Finish:
                     await FinishAsync();
                     Next(PreparationStep.Done);
-                    return _options.Reseal ? Outcome.Reseal : Outcome.Finished;
+                    // Sysprep seulement si le garde-fou l'autorise (mode audit et PremierDemarrage=1).
+                    return _permission.ResealAllowed ? Outcome.Reseal : Outcome.Finished;
 
                 default:
                     return Outcome.Finished;
@@ -134,6 +137,7 @@ internal sealed class PreparationRunner
         _status.Report("Mise en route…");
         _state.Started = DateTime.Now;
         _log.Report($"Préparation de {Model()} (n° de série {Serial()}).");
+        _log.Report(_permission.Reason + (PreparationGuard.IsBuiltInAdministrator() ? " Session : Administrateur intégré." : ""));
 
         // La fenêtre de Sysprep s'ouvre d'elle-même en mode audit : elle servira à la fin, pas maintenant.
         foreach (var process in Process.GetProcessesByName("sysprep"))
@@ -265,7 +269,7 @@ internal sealed class PreparationRunner
         WriteReport();
         RemoveAutoStart();
         _server.Status(Model(), Serial(), _state.Started, "Prêt pour la revente",
-            _options.Reseal ? "Remise au premier démarrage : le PC s'éteint." : "Préparation terminée.", finished: true, toCheck: missing.Count > 0);
+            _permission.ResealAllowed ? "Remise au premier démarrage : le PC s'éteint." : "Préparation terminée.", finished: true, toCheck: missing.Count > 0);
     }
 
     /// <summary>Remet ce qui avait été changé pour la préparation.</summary>
@@ -369,8 +373,16 @@ internal sealed class PreparationRunner
     /// de premier démarrage de Windows (langue, réseau, son propre compte). Les fichiers de réponse gardés par
     /// Windows sont retirés d'abord, sinon il retournerait en mode audit.
     /// </summary>
-    public void Reseal()
+    public bool Reseal()
     {
+        // Dernière vérification juste avant Sysprep : le PC doit encore être en mode audit, sinon on s'arrête là.
+        var mode = PreparationGuard.ReadMode();
+        if (!_permission.ResealAllowed || mode != SetupMode.Audit)
+        {
+            _log.Report($"Remise au premier démarrage NON lancée : Windows n'est pas en mode audit (état lu : {mode}).");
+            RemoveAutoStart();
+            return false;
+        }
         var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
         foreach (var answer in new[] { @"Panther\unattend.xml", @"Panther\Unattend\unattend.xml", @"System32\Sysprep\unattend.xml" })
         {
@@ -390,6 +402,7 @@ internal sealed class PreparationRunner
             "del \"%~f0\""), Encoding.ASCII);
         _log.Report("Remise au premier démarrage (Sysprep) : le PC va s'éteindre.");
         Process.Start(new ProcessStartInfo(PcInspector.AppPaths.SystemTool("cmd.exe"), $"/c \"{script}\"") { UseShellExecute = false, CreateNoWindow = true });
+        return true;
     }
 
     // ---------- Outils ----------
@@ -400,7 +413,7 @@ internal sealed class PreparationRunner
         key?.SetValue(RunValue, $"\"{AppInfo.Entry.Location}\" /preparation");
     }
 
-    private static void RemoveAutoStart()
+    internal static void RemoveAutoStart()
     {
         try
         {

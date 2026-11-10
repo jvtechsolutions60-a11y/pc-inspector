@@ -18,7 +18,11 @@ namespace JvtechServeur;
 
 public partial class MainWindow : Window
 {
-    private sealed record AddressItem(IPAddress Address, string Label);
+    private sealed record AddressItem(IPAddress Address, IPAddress Mask, string Label);
+    /// <summary>Carte réseau du serveur, lue par le suivi des postes (autre fil) pour n'accepter que le réseau local.</summary>
+    private volatile Tuple<IPAddress?, IPAddress?> _statusNetwork = Tuple.Create<IPAddress?, IPAddress?>(null, null);
+    /// <summary>Marge après la fin de « Accepter les PC » pour qu'un PC accepté finisse de charger Windows PE.</summary>
+    private static readonly TimeSpan TftpGrace = TimeSpan.FromMinutes(15);
 
     private static readonly TimeSpan AcceptDuration = TimeSpan.FromMinutes(30);
 
@@ -46,13 +50,15 @@ public partial class MainWindow : Window
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
         AutoUpdateBox.IsChecked = _config.AutoUpdate;
-        var addresses = ServerConfig.Addresses().Select(a => new AddressItem(a.Address, $"{a.Address}  ({a.Name})")).ToList();
+        var addresses = ServerConfig.Addresses().Select(a => new AddressItem(a.Address, a.Mask, $"{a.Address}  ({a.Name})")).ToList();
         AddressBox.ItemsSource = addresses;
         AddressBox.SelectedItem = addresses.FirstOrDefault(a => a.Address.ToString() == _config.ServerAddress) ?? addresses.FirstOrDefault();
 
+        ImageBuilder.ProtectRoot(Log);
+        if (AddressBox.SelectedItem is AddressItem selected) _statusNetwork = Tuple.Create<IPAddress?, IPAddress?>(selected.Address, selected.Mask);
         try
         {
-            _status = new StatusServer(_postes, Log);
+            _status = new StatusServer(_postes, Log, _config.ReportToken, () => (_statusNetwork.Item1, _statusNetwork.Item2));
             _status.Start();
         }
         catch (HttpListenerException ex)
@@ -107,7 +113,8 @@ public partial class MainWindow : Window
                 _postes.Booting(mac);
             });
             _dhcp.Start();
-            _tftp = new TftpServer(item.Address, ServerConfig.TftpFolder, Log, (client, file) => Log($"{client} a chargé {file}."));
+            _tftp = new TftpServer(item.Address, ServerConfig.TftpFolder, Log, (client, file) => Log($"{client} a chargé {file}."),
+                () => DateTime.Now < _acceptUntil + TftpGrace);
             _tftp.Start();
         }
         catch (SocketException ex)
@@ -124,7 +131,8 @@ public partial class MainWindow : Window
             _config.ServerAddress = item.Address.ToString();
             _config.Save();
         }
-        try { ImageBuilder.CopyKit(item.Address, Log); }
+        _statusNetwork = Tuple.Create<IPAddress?, IPAddress?>(item.Address, item.Mask);
+        try { ImageBuilder.CopyKit(item.Address, _config.ReportToken, Log); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Log("Kit de préparation non mis à jour : " + ex.Message);

@@ -17,11 +17,16 @@ namespace PcMaintenance.Preparation;
 internal sealed class ServerLink
 {
     private readonly string? _url;
+    private readonly string _token;
     private readonly object _lock = new();
     /// <summary>Messages envoyés l'un après l'autre, sans bloquer la fenêtre, dans l'ordre.</summary>
     private Task _queue = Task.CompletedTask;
 
-    private ServerLink(string? url) => _url = url;
+    private ServerLink(string? url, string token)
+    {
+        _url = url;
+        _token = token;
+    }
 
     public bool Enabled => _url is not null;
 
@@ -30,14 +35,17 @@ internal sealed class ServerLink
         try
         {
             var path = Path.Combine(AppPaths.ExeFolder, "serveur.ini");
-            var url = File.Exists(path)
-                ? File.ReadAllLines(path).Select(l => l.Trim()).Where(l => l.StartsWith("Url=", StringComparison.OrdinalIgnoreCase)).Select(l => l.Substring(4).Trim()).FirstOrDefault()
-                : null;
-            return new ServerLink(string.IsNullOrEmpty(url) ? null : url!.TrimEnd('/') + "/");
+            var lines = File.Exists(path) ? File.ReadAllLines(path).Select(l => l.Trim()).ToList() : new List<string>();
+            string? Value(string name) => lines.Where(l => l.StartsWith(name + "=", StringComparison.OrdinalIgnoreCase))
+                .Select(l => l.Substring(name.Length + 1).Trim()).FirstOrDefault();
+            var url = Value("Url");
+            // Adresse du serveur de l'atelier seulement (http sur le réseau local) : rien n'est envoyé ailleurs.
+            if (url is null || !Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttp) url = null;
+            return new ServerLink(url is null ? null : url.TrimEnd('/') + "/", Value("Jeton") ?? "");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return new ServerLink(null);
+            return new ServerLink(null, "");
         }
     }
 
@@ -82,6 +90,8 @@ internal sealed class ServerLink
             request.ContentType = "text/plain; charset=utf-8";
             request.Timeout = 15000;
             request.Proxy = null;
+            // Jeton du kit d'installation : le serveur refuse les remontées sans lui. Jamais écrit dans le journal.
+            if (_token.Length > 0) request.Headers["X-JVTECH-Jeton"] = _token;
             using (var stream = request.GetRequestStream()) stream.Write(bytes, 0, bytes.Length);
             using var response = (HttpWebResponse)request.GetResponse();
             return response.StatusCode == HttpStatusCode.OK;

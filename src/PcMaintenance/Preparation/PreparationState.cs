@@ -28,6 +28,11 @@ internal sealed class PreparationState
     /// <summary>Nombre de passages de Windows Update déjà faits.</summary>
     public int Round { get; set; }
     public DateTime Started { get; set; } = DateTime.Now;
+    /// <summary>
+    /// Nom du PC pour lequel le technicien a confirmé une préparation hors mode audit (vide sinon).
+    /// Permet la reprise automatique après redémarrage sans redemander, mais seulement sur ce PC.
+    /// </summary>
+    public string? ConfirmedMachine { get; set; }
     public List<(string Step, string Result)> Results { get; } = new();
     public List<(string Title, string Line)> Details { get; } = new();
 
@@ -48,6 +53,7 @@ internal sealed class PreparationState
                 case "Step" when int.TryParse(value, out var step): state.Step = (PreparationStep)step; break;
                 case "Round" when int.TryParse(value, out var round): state.Round = round; break;
                 case "Started" when DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var started): state.Started = started; break;
+                case "HorsAudit": state.ConfirmedMachine = value.Trim(); break;
                 case "Result" when value.Split('|') is { Length: 2 } r: state.Results.Add((r[0], r[1])); break;
                 case "Detail" when value.Split('|') is { Length: 2 } d: state.Details.Add((d[0], d[1])); break;
             }
@@ -63,6 +69,7 @@ internal sealed class PreparationState
             "Round=" + Round,
             "Started=" + Started.ToString("o", CultureInfo.InvariantCulture),
         };
+        if (!string.IsNullOrWhiteSpace(ConfirmedMachine)) lines.Add("HorsAudit=" + Clean(ConfirmedMachine!));
         lines.AddRange(Results.Select(r => $"Result={Clean(r.Step)}|{Clean(r.Result)}"));
         lines.AddRange(Details.Select(d => $"Detail={Clean(d.Title)}|{Clean(d.Line)}"));
         File.WriteAllLines(FilePath, lines);

@@ -49,6 +49,8 @@ public partial class MainWindow : Window
     {
         ClientBox.Text = ReportInfo.LoadDefaults().Client;
         _profiles = UserProfile.All();
+        // Logiciel coupé net pendant une sauvegarde ou une restauration : on vide les fichiers secrets restés en clair.
+        foreach (var profile in _profiles) Migration.Secrets.Cleanup(profile);
         var current = UserProfile.Interactive(_profiles);
         foreach (var combo in new[] { BackupProfileCombo, RestoreProfileCombo })
         {

@@ -113,26 +113,45 @@ internal static class Backup
         if (string.IsNullOrEmpty(ctx.Password)) return "Non fait : mot de passe de la sauvegarde manquant";
         Directory.CreateDirectory(ctx.Layout.Passwords);
         var done = new List<string>();
-        foreach (var browser in Browser.InstalledFor(ctx.Profile).Where(b => b.Chromium))
+        // Le navigateur écrit le CSV en clair : on le fait enregistrer sur le disque du PC, dans un dossier local
+        // réservé (jamais sur le disque externe), et on le vide quoi qu'il arrive.
+        var secrets = Secrets.Create(ctx.Profile);
+        try
         {
-            if (ctx.Stop()) break;
-            if (!browser.MayHavePasswords(ctx.Profile)) { ctx.Log.Report($"    {browser.Name} : aucun mot de passe enregistré."); continue; }
-            var since = DateTime.Now.AddSeconds(-5);
-            if (!browser.OpenPasswordsPage()) ctx.Log.Report($"    {browser.Name} n'a pas pu être ouvert : l'ouvrir à la main.");
-            var asked = ctx.Ask(
-                $"{browser.Name} : exporter les mots de passe.\n\n" +
-                $"1. Dans {browser.Name}, ouvert sur la page des mots de passe ({browser.PasswordsPage}), cliquer « Exporter les mots de passe » (ou « Télécharger le fichier »).\n" +
-                $"2. Enregistrer le fichier dans :\n{ctx.Layout.Passwords}\n(ou dans Documents / Téléchargements, il sera retrouvé).\n\n" +
-                "Cliquer OK une fois le fichier enregistré. Annuler : passer ce navigateur.\n\n" +
-                "Le fichier est chiffré tout de suite avec le mot de passe de la sauvegarde, puis effacé.");
-            if (!asked) { done.Add($"{browser.Name} : passé"); continue; }
-            var csv = FindExport(ctx, since);
-            if (csv is null) { done.Add($"{browser.Name} : fichier CSV introuvable, non sauvegardé"); continue; }
-            var count = Math.Max(0, File.ReadAllLines(csv).Count(line => line.Trim().Length > 0) - 1);
-            var target = Path.Combine(ctx.Layout.Passwords, browser.Key + ".csv");
-            Vault.Encrypt(File.ReadAllBytes(csv), target + Vault.Extension, ctx.Password!);
-            Tools.Wipe(csv);
-            done.Add($"{browser.Name} : {count} mots de passe (chiffrés)");
+            foreach (var browser in Browser.InstalledFor(ctx.Profile).Where(b => b.Chromium))
+            {
+                if (ctx.Stop()) break;
+                if (!browser.MayHavePasswords(ctx.Profile)) { ctx.Log.Report($"    {browser.Name} : aucun mot de passe enregistré."); continue; }
+                var since = DateTime.Now.AddSeconds(-5);
+                if (!browser.OpenPasswordsPage()) ctx.Log.Report($"    {browser.Name} n'a pas pu être ouvert : l'ouvrir à la main.");
+                var asked = ctx.Ask(
+                    $"{browser.Name} : exporter les mots de passe.\n\n" +
+                    $"1. Dans {browser.Name}, ouvert sur la page des mots de passe ({browser.PasswordsPage}), cliquer « Exporter les mots de passe » (ou « Télécharger le fichier »).\n" +
+                    $"2. Enregistrer le fichier dans ce dossier du PC (pas sur le disque externe) :\n{secrets}\n(Téléchargements ou Documents marchent aussi, il sera retrouvé).\n\n" +
+                    "Cliquer OK une fois le fichier enregistré. Annuler : passer ce navigateur.\n\n" +
+                    "Le fichier est chiffré tout de suite avec le mot de passe de la sauvegarde, puis effacé.");
+                if (!asked) { done.Add($"{browser.Name} : passé"); continue; }
+                var csv = FindExport(ctx, since, secrets);
+                if (csv is null) { done.Add($"{browser.Name} : fichier CSV introuvable, non sauvegardé"); continue; }
+                try
+                {
+                    var bytes = File.ReadAllBytes(csv);
+                    var count = Math.Max(0, Encoding.UTF8.GetString(bytes).Split('\n').Count(line => line.Trim().Length > 0) - 1);
+                    var target = Path.Combine(ctx.Layout.Passwords, browser.Key + ".csv");
+                    Vault.Encrypt(bytes, target + Vault.Extension, ctx.Password!);
+                    Array.Clear(bytes, 0, bytes.Length);
+                    done.Add($"{browser.Name} : {count} mots de passe (chiffrés)");
+                }
+                finally
+                {
+                    // Effacé même si le chiffrement échoue (disque plein, débranché…) : jamais de CSV laissé en clair.
+                    Tools.Wipe(csv);
+                }
+            }
+        }
+        finally
+        {
+            Secrets.Cleanup(ctx.Profile);
         }
         if (Browser.InstalledFor(ctx.Profile).Any(b => b.Key == "Firefox"))
             done.Add("Mozilla Firefox : les mots de passe suivent le profil Firefox (élément Navigateurs)");
@@ -140,9 +159,9 @@ internal static class Backup
         return done.Count == 0 ? "Aucun mot de passe enregistré dans les navigateurs" : string.Join(" ; ", done);
     }
 
-    private static string? FindExport(JobContext ctx, DateTime since)
+    private static string? FindExport(JobContext ctx, DateTime since, string secrets)
     {
-        var places = new[] { ctx.Layout.Passwords, ctx.Profile.FolderByKey("Documents")?.Path, ctx.Profile.FolderByKey("Downloads")?.Path,
+        var places = new[] { secrets, ctx.Layout.Passwords, ctx.Profile.FolderByKey("Documents")?.Path, ctx.Profile.FolderByKey("Downloads")?.Path,
                              ctx.Profile.FolderByKey("Desktop")?.Path };
         var files = new List<FileInfo>();
         foreach (var place in places.Where(p => p is not null && Directory.Exists(p)))
@@ -222,28 +241,61 @@ internal static class Backup
     {
         if (string.IsNullOrEmpty(ctx.Password)) return "Non fait : mot de passe de la sauvegarde manquant (les clés Wi-Fi sont en clair)";
         Directory.CreateDirectory(ctx.Layout.WiFi);
-        var output = new List<string>();
-        Tools.Run("netsh.exe", $"wlan export profile key=clear folder={Tools.Quote(ctx.Layout.WiFi)}", output, TimeSpan.FromMinutes(2));
-        var files = Directory.GetFiles(ctx.Layout.WiFi, "*.xml");
         var names = new List<string>();
-        foreach (var file in files)
+
+        // 1. API Windows : profils et clés lus en mémoire puis chiffrés directement sur le disque externe.
+        var profiles = WlanApi.ReadProfiles();
+        if (profiles is not null)
         {
-            names.Add(WiFiName(file));
-            Vault.EncryptAndWipe(file, ctx.Password!);
+            var index = 0;
+            foreach (var (name, xml) in profiles)
+            {
+                var file = Path.Combine(ctx.Layout.WiFi, $"{++index:000} {Tools.SafeName(name)}.xml{Vault.Extension}");
+                Vault.Encrypt(Encoding.UTF8.GetBytes(xml), file, ctx.Password!);
+                names.Add(name);
+            }
+            ctx.Report.Detail("Réseaux Wi-Fi enregistrés", names);
+            return names.Count == 0 ? "Aucun réseau Wi-Fi enregistré" : $"{names.Count} réseaux (clés chiffrées)";
         }
+
+        // 2. Secours (API indisponible) : export netsh dans le dossier local réservé, jamais sur le disque externe.
+        var secrets = Secrets.Create(ctx.Profile);
+        try
+        {
+            var output = new List<string>();
+            Tools.Run("netsh.exe", $"wlan export profile key=clear folder={Tools.Quote(secrets)}", output, TimeSpan.FromMinutes(2));
+            var index = 0;
+            foreach (var file in Directory.GetFiles(secrets, "*.xml"))
+            {
+                try
+                {
+                    var name = WiFiName(file);
+                    Vault.Encrypt(File.ReadAllBytes(file), Path.Combine(ctx.Layout.WiFi, $"{++index:000} {Tools.SafeName(name)}.xml{Vault.Extension}"), ctx.Password!);
+                    names.Add(name);
+                }
+                finally { Tools.Wipe(file); }
+            }
+        }
+        finally { Secrets.Cleanup(ctx.Profile); }
         ctx.Report.Detail("Réseaux Wi-Fi enregistrés", names);
-        return files.Length == 0 ? "Aucun réseau Wi-Fi enregistré (ou pas de carte Wi-Fi)" : $"{files.Length} réseaux (clés chiffrées)";
+        return names.Count == 0 ? "Aucun réseau Wi-Fi enregistré (ou pas de carte Wi-Fi)" : $"{names.Count} réseaux (clés chiffrées)";
     }
 
     internal static string WiFiName(string xmlFile)
     {
         try
         {
-            var match = Regex.Match(File.ReadAllText(xmlFile), "<name>([^<]+)</name>");
-            if (match.Success) return System.Net.WebUtility.HtmlDecode(match.Groups[1].Value);
+            if (WiFiNameFromXml(File.ReadAllText(xmlFile)) is { } name) return name;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         return Path.GetFileNameWithoutExtension(xmlFile);
+    }
+
+    /// <summary>Nom du réseau dans un profil Wi-Fi (XML), sans rien écrire sur le disque.</summary>
+    internal static string? WiFiNameFromXml(string xml)
+    {
+        var match = Regex.Match(xml, "<name>([^<]+)</name>");
+        return match.Success ? System.Net.WebUtility.HtmlDecode(match.Groups[1].Value) : null;
     }
 
     // ---------- Outlook ----------

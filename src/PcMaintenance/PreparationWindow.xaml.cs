@@ -31,8 +31,11 @@ public partial class PreparationWindow : Window
     private bool _finished;
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromMinutes(1) };
 
-    public PreparationWindow()
+    private readonly PreparationPermission _permission;
+
+    internal PreparationWindow(PreparationPermission permission)
     {
+        _permission = permission;
         InitializeComponent();
     }
 
@@ -47,7 +50,7 @@ public partial class PreparationWindow : Window
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
 
-        _runner = new PreparationRunner(new Progress<string>(Log), new Progress<PreparationStep>(ShowStep), new Progress<string>(t => StatusText.Text = t));
+        _runner = new PreparationRunner(new Progress<string>(Log), new Progress<PreparationStep>(ShowStep), new Progress<string>(t => StatusText.Text = t), _permission);
         ShowStep(_runner.Current);
         _clock.Tick += (_, _) => ShowElapsed();
         _clock.Start();
@@ -61,14 +64,19 @@ public partial class PreparationWindow : Window
         {
             case PreparationRunner.Outcome.Reseal:
                 ShowStep(PreparationStep.Done);
-                StatusText.Text = "Terminé : le PC s'éteint, prêt pour son acheteur.";
-                _runner.Reseal();
-                await System.Threading.Tasks.Task.Delay(2000);
-                Application.Current.Shutdown();
+                if (_runner.Reseal())
+                {
+                    StatusText.Text = "Terminé : le PC s'éteint, prêt pour son acheteur.";
+                    await System.Threading.Tasks.Task.Delay(2000);
+                    Application.Current.Shutdown();
+                }
+                else StatusText.Text = "Terminé, mais la remise au premier démarrage n'a pas été lancée (voir le journal).";
                 break;
             case PreparationRunner.Outcome.Finished:
                 ShowStep(PreparationStep.Done);
-                StatusText.Text = "Terminé. Le PC reste en mode audit (remise au premier démarrage désactivée dans options.ini).";
+                StatusText.Text = _permission.ResealAllowed
+                    ? "Terminé."
+                    : "Terminé, sans remise au premier démarrage (désactivée dans options.ini, ou PC hors mode audit).";
                 break;
             case PreparationRunner.Outcome.Reboot:
                 StatusText.Text += " Reprise automatique après le redémarrage.";

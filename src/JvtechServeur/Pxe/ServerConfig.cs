@@ -6,12 +6,15 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Text;
 
 namespace JvtechServeur.Pxe;
 
 /// <summary>
 /// Dossiers du serveur et réglages gardés dans C:\JVTECH-PXE\serveur.ini :
-/// mot de passe du partage, date de la dernière mise à jour intégrée à l'image.
+/// mot de passe du partage, jeton du suivi des postes, date de la dernière mise à jour intégrée à l'image.
+/// Le mot de passe et le jeton sont chiffrés avec DPAPI (clé de ce PC) : copié ailleurs, le fichier ne les révèle pas.
+/// Un ancien serveur.ini avec « MotDePasse= » en clair est relu puis réécrit chiffré.
 /// </summary>
 internal sealed class ServerConfig
 {
@@ -30,6 +33,8 @@ internal sealed class ServerConfig
     private static string FilePath => Path.Combine(Root, "serveur.ini");
 
     public string SharePassword { get; set; } = "";
+    /// <summary>Jeton secret que PC Maintenance joint à chaque remontée (voir StatusPolicy).</summary>
+    public string ReportToken { get; set; } = "";
     /// <summary>Mise à jour cumulative intégrée à l'image (ex. KB5066835), vide si aucune.</summary>
     public string LastUpdate { get; set; } = "";
     public DateTime? LastUpdateDate { get; set; }
@@ -45,15 +50,23 @@ internal sealed class ServerConfig
     public static ServerConfig Load()
     {
         var config = new ServerConfig();
+        var loadedForMigration = false;
         try
         {
-            if (!File.Exists(FilePath)) return config;
-            var values = File.ReadAllLines(FilePath)
+            var values = (File.Exists(FilePath) ? File.ReadAllLines(FilePath) : Array.Empty<string>())
                 .Select(l => l.Split(new[] { '=' }, 2))
                 .Where(p => p.Length == 2)
                 .GroupBy(p => p[0].Trim())
                 .ToDictionary(g => g.Key, g => g.First()[1].Trim());
-            config.SharePassword = values.TryGetValue("MotDePasse", out var pw) ? pw : "";
+            config.SharePassword = values.TryGetValue("MotDePasseProtege", out var protectedPw) ? Unprotect(protectedPw)
+                : values.TryGetValue("MotDePasse", out var pw) ? pw : "";
+            config.ReportToken = values.TryGetValue("JetonProtege", out var token) ? Unprotect(token) : "";
+            var legacy = values.ContainsKey("MotDePasse");
+            if (config.ReportToken.Length == 0 || legacy)
+            {
+                if (config.ReportToken.Length == 0) config.ReportToken = StatusPolicy.NewToken();
+                loadedForMigration = true;
+            }
             config.LastUpdate = values.TryGetValue("DerniereMiseAJour", out var kb) ? kb : "";
             config.LastUpdateDate = values.TryGetValue("DateMiseAJour", out var d) && DateTime.TryParse(d, out var date) ? date : null;
             config.LastCheck = values.TryGetValue("DerniereVerification", out var c) && DateTime.TryParse(c, out var check) ? check : null;
@@ -61,7 +74,25 @@ internal sealed class ServerConfig
             config.ServerAddress = values.TryGetValue("Adresse", out var ip) ? ip : "";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        if (config.ReportToken.Length == 0) { config.ReportToken = StatusPolicy.NewToken(); loadedForMigration = true; }
+        // Mot de passe en clair d'une ancienne version, ou jeton créé : on réécrit le fichier chiffré tout de suite.
+        if (loadedForMigration)
+        {
+            try { config.Save(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
         return config;
+    }
+
+    private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("JVTECH-PXE serveur.ini");
+
+    private static string Protect(string value) => value.Length == 0 ? "" :
+        Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(value), Entropy, DataProtectionScope.LocalMachine));
+
+    private static string Unprotect(string value)
+    {
+        try { return value.Length == 0 ? "" : Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(value), Entropy, DataProtectionScope.LocalMachine)); }
+        catch (Exception ex) when (ex is CryptographicException or FormatException) { return ""; }
     }
 
     public void Save()
@@ -69,7 +100,8 @@ internal sealed class ServerConfig
         Directory.CreateDirectory(Root);
         File.WriteAllLines(FilePath, new[]
         {
-            "MotDePasse=" + SharePassword,
+            "MotDePasseProtege=" + Protect(SharePassword),
+            "JetonProtege=" + Protect(ReportToken),
             "DerniereMiseAJour=" + LastUpdate,
             "DateMiseAJour=" + (LastUpdateDate?.ToString("yyyy-MM-dd") ?? ""),
             "DerniereVerification=" + (LastCheck?.ToString("yyyy-MM-dd HH:mm") ?? ""),

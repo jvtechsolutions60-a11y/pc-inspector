@@ -22,13 +22,19 @@ internal sealed class TftpServer : IDisposable
     private readonly string _root;
     private readonly Action<string> _log;
     private readonly Action<IPAddress, string> _sent;
+    private readonly Func<bool> _open;
     private UdpClient? _socket;
     private volatile bool _running;
     private Dictionary<string, string> _byName = new(StringComparer.OrdinalIgnoreCase);
 
     /// <param name="sent">Appelé quand un fichier a été entièrement envoyé à un PC.</param>
-    public TftpServer(IPAddress server, string root, Action<string> log, Action<IPAddress, string> sent)
+    /// <param name="open">
+    /// Vrai pendant que les PC sont acceptés (plus une marge pour finir de charger Windows PE). En dehors, aucun
+    /// fichier n'est envoyé : Windows PE contient le mot de passe du partage, il ne doit pas être lisible en permanence.
+    /// </param>
+    public TftpServer(IPAddress server, string root, Action<string> log, Action<IPAddress, string> sent, Func<bool> open)
     {
+        _open = open;
         _server = server;
         // Avec le \ final : « C:\PXE » ne doit pas laisser passer « C:\PXE-autre ».
         _root = Path.GetFullPath(root).TrimEnd('\\') + "\\";
@@ -77,6 +83,13 @@ internal sealed class TftpServer : IDisposable
         using var socket = new UdpClient(new IPEndPoint(_server, 0));
         socket.Connect(client);
         socket.Client.ReceiveTimeout = 2000;
+
+        if (!_open())
+        {
+            _log($"TFTP : {client.Address} refusé (« Accepter les PC » n'est pas actif).");
+            SendError(socket, 2, "Serveur JVTECH : PC non accepte");
+            return;
+        }
 
         var path = Resolve(requested);
         if (path is null)

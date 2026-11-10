@@ -26,6 +26,7 @@ internal static class ImageBuilder
     {
         foreach (var folder in new[] { ServerConfig.InstallFolder, ServerConfig.TftpFolder, Path.Combine(ServerConfig.TftpFolder, "Boot"), ServerConfig.WorkFolder, ServerConfig.ReportsFolder })
             Directory.CreateDirectory(folder);
+        ProtectRoot(log);
 
         status("Compte de lecture du partage…");
         if (config.SharePassword.Length == 0) config.SharePassword = ServerConfig.NewPassword();
@@ -56,7 +57,7 @@ internal static class ImageBuilder
         if (!KeepEditions(log)) return "Impossible de préparer les éditions de Windows (install.wim).";
 
         status("Fichiers de préparation et partage…");
-        CopyKit(server, log);
+        CopyKit(server, config.ReportToken, log);
         if (!Share(log)) return "Impossible de créer le partage JVTECH-Install ou les règles du pare-feu.";
 
         status("Windows PE pour le démarrage réseau (5 minutes)…");
@@ -82,6 +83,9 @@ $pw = ConvertTo-SecureString {Tools.Quote(password)} -AsPlainText -Force
 $u = Get-LocalUser -Name '{ServerConfig.ShareUser}' -ErrorAction SilentlyContinue
 if ($u) {{ Set-LocalUser -Name '{ServerConfig.ShareUser}' -Password $pw -PasswordNeverExpires $true; Enable-LocalUser -Name '{ServerConfig.ShareUser}' }}
 else {{ New-LocalUser -Name '{ServerConfig.ShareUser}' -Password $pw -PasswordNeverExpires -UserMayNotChangePassword -Description 'Lecture du partage JVTECH-Install (PXE)' | Out-Null }}
+# Droits minimaux : retiré du groupe Utilisateurs (pas d'ouverture de session sur le serveur).
+# Il garde seulement l'accès réseau au partage JVTECH-Install, en lecture.
+Remove-LocalGroupMember -SID 'S-1-5-32-545' -Member '{ServerConfig.ShareUser}' -ErrorAction SilentlyContinue
 # Compte technique : caché de l'écran de connexion.
 $list = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\UserList'
 New-Item -Path $list -Force | Out-Null
@@ -142,7 +146,7 @@ if (Test-Path $dst) {{
     /// grâce au dossier sources\$OEM$\$1. serveur.ini dit à PC Maintenance où envoyer l'avancement.
     /// Refait à chaque démarrage du serveur : un changement d'options.ini s'applique aux PC suivants.
     /// </summary>
-    public static void CopyKit(IPAddress server, Action<string> log)
+    public static void CopyKit(IPAddress server, string token, Action<string> log)
     {
         var kit = Path.Combine(AppPaths.ExeFolder, "Kit");
         var oem = Path.Combine(ServerConfig.InstallFolder, @"sources\$OEM$\$1\JVTECH");
@@ -160,11 +164,25 @@ if (Test-Path $dst) {{
             "# Écrit par JVTECH Serveur PXE : où PC Maintenance envoie l'avancement et le rapport.",
             $"Url=http://{server}:{ServerConfig.StatusPort}/jvtech/",
             $"Nom={Environment.MachineName}",
+            "# Jeton secret joint à chaque remontée : sans lui, le serveur refuse (JVTECH Serveur PXE le recrée s'il manque).",
+            $"Jeton={token}",
         });
         log("Fichier de réponse et PC Maintenance ajoutés à l'installation.");
     }
 
-    /// <summary>Partage en lecture seule pour le compte jvtechpxe, et pare-feu ouvert pour le PXE et le suivi.</summary>
+    /// <summary>
+    /// C:\JVTECH-PXE réservé aux administrateurs et à SYSTEM (serveur.ini, rapports des postes, image) ; le compte
+    /// jvtechpxe reçoit ensuite la lecture du seul dossier Installation (voir Share). Refait à chaque démarrage.
+    /// </summary>
+    public static void ProtectRoot(Action<string> log)
+    {
+        Directory.CreateDirectory(ServerConfig.Root);
+        var (code, lines) = Tools.Run(Tools.System32("icacls.exe"),
+            $"\"{ServerConfig.Root}\" /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F *S-1-5-18:(OI)(CI)F", null, TimeSpan.FromMinutes(5));
+        if (code != 0) log("Droits du dossier " + ServerConfig.Root + " non restreints : " + string.Join(" ", lines));
+    }
+
+    /// <summary>Partage en lecture seule pour le compte jvtechpxe, et pare-feu ouvert pour le PXE et le suivi (réseau local).</summary>
     private static bool Share(Action<string> log)
     {
         var exe = AppInfo.Entry.Location;
@@ -177,7 +195,7 @@ New-SmbShare -Name '{ServerConfig.ShareName}' -Path $path -ReadAccess $account |
 Get-NetFirewallRule -DisplayName 'JVTECH PXE*' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
 New-NetFirewallRule -DisplayName 'JVTECH PXE (DHCP et TFTP)' -Direction Inbound -Protocol UDP -LocalPort 67,69,4011 -Action Allow -Profile Any | Out-Null
 New-NetFirewallRule -DisplayName 'JVTECH PXE (transferts TFTP)' -Direction Inbound -Protocol UDP -Program {Tools.Quote(exe)} -Action Allow -Profile Any | Out-Null
-New-NetFirewallRule -DisplayName 'JVTECH PXE (suivi des postes)' -Direction Inbound -Protocol TCP -LocalPort {ServerConfig.StatusPort} -Action Allow -Profile Any | Out-Null
+New-NetFirewallRule -DisplayName 'JVTECH PXE (suivi des postes)' -Direction Inbound -Protocol TCP -LocalPort {ServerConfig.StatusPort} -RemoteAddress LocalSubnet -Action Allow -Profile Any | Out-Null
 # Partage de fichiers et d'imprimantes, et réseau de l'atelier en « privé » pour qu'il soit accessible.
 Enable-NetFirewallRule -Group '@FirewallAPI.dll,-28502' -ErrorAction SilentlyContinue
 Get-NetConnectionProfile | Where-Object {{ $_.NetworkCategory -eq 'Public' }} | Set-NetConnectionProfile -NetworkCategory Private -ErrorAction SilentlyContinue

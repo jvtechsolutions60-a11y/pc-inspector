@@ -114,7 +114,6 @@ internal static class Restore
     private static string Passwords(JobContext ctx)
     {
         if (string.IsNullOrEmpty(ctx.Password)) return "Non fait : mot de passe de la sauvegarde manquant";
-        var desktop = ctx.Profile.FolderByKey("Desktop")?.Path ?? Path.GetTempPath();
         var done = new List<string>();
         foreach (var file in Directory.GetFiles(ctx.Layout.Passwords, "*.csv" + Vault.Extension))
         {
@@ -123,7 +122,9 @@ internal static class Restore
             var browser = Browser.ByKey(key) ?? Browser.ByKey("Edge")!;
             var plain = Vault.Decrypt(file, ctx.Password!);
             if (plain is null) { done.Add($"{browser.Name} : mot de passe de la sauvegarde incorrect"); continue; }
-            var csv = Path.Combine(desktop, $"Mots de passe {browser.Name} - à importer puis effacé.csv");
+            // Le navigateur n'importe qu'un fichier : il est posé dans le dossier local réservé (pas le Bureau, qui peut
+            // être synchronisé avec OneDrive), puis effacé dès l'import fini, même en cas d'erreur.
+            var csv = Path.Combine(Secrets.Create(ctx.Profile), $"Mots de passe {browser.Name} - à importer puis effacé.csv");
             File.WriteAllBytes(csv, plain);
             Array.Clear(plain, 0, plain.Length);
             try
@@ -137,13 +138,14 @@ internal static class Restore
                 var imported = ctx.Ask(
                     $"{target.Name} : importer les mots de passe.\n\n" +
                     $"1. Dans {target.Name}, ouvert sur la page des mots de passe ({target.PasswordsPage}), cliquer « Importer des mots de passe » (menu « … » dans Edge).\n" +
-                    $"2. Choisir le fichier sur le Bureau :\n{Path.GetFileName(csv)}\n\n" +
+                    $"2. Choisir le fichier :\n{csv}\n\n" +
                     "Cliquer OK une fois l'import terminé : le fichier est alors effacé. Annuler : passer (le fichier est effacé aussi).");
                 done.Add($"{target.Name} : {(imported ? "importés" : "passé")}");
             }
             finally
             {
                 Tools.Wipe(csv);
+                Secrets.Cleanup(ctx.Profile);
             }
         }
         ctx.Report.Detail("Mots de passe", done);
@@ -155,26 +157,37 @@ internal static class Restore
     private static string WiFi(JobContext ctx)
     {
         if (string.IsNullOrEmpty(ctx.Password)) return "Non fait : mot de passe de la sauvegarde manquant";
-        var temp = Path.Combine(Path.GetTempPath(), "JVTECH-WiFi");
-        Directory.CreateDirectory(temp);
         var names = new List<string>();
         int ok = 0, failed = 0;
-        foreach (var file in Directory.GetFiles(ctx.Layout.WiFi, "*.xml" + Vault.Extension))
+        try
         {
-            var plain = Vault.Decrypt(file, ctx.Password!);
-            if (plain is null) { failed++; continue; }
-            var xml = Path.Combine(temp, Guid.NewGuid().ToString("N") + ".xml");
-            File.WriteAllBytes(xml, plain);
-            try
+            foreach (var file in Directory.GetFiles(ctx.Layout.WiFi, "*.xml" + Vault.Extension))
             {
-                var name = Backup.WiFiName(xml);
-                var output = new List<string>();
-                var code = Tools.Run("netsh.exe", $"wlan add profile filename={Tools.Quote(xml)} user=all", output, TimeSpan.FromMinutes(1));
-                if (code == 0) { ok++; names.Add(name); }
-                else { failed++; names.Add($"{name} : non ajouté ({string.Join(" ", output).Trim()})"); }
+                var plain = Vault.Decrypt(file, ctx.Password!);
+                if (plain is null) { failed++; continue; }
+                var text = System.Text.Encoding.UTF8.GetString(plain);
+                Array.Clear(plain, 0, plain.Length);
+                var name = Backup.WiFiNameFromXml(text) ?? Path.GetFileName(file);
+
+                // 1. API Windows, en mémoire. 2. Secours netsh avec un fichier dans le dossier local réservé, effacé aussitôt.
+                var error = WlanApi.AddProfile(text);
+                if (error is not null && error != "aucune carte Wi-Fi")
+                {
+                    var xml = Path.Combine(Secrets.Create(ctx.Profile), Guid.NewGuid().ToString("N") + ".xml");
+                    try
+                    {
+                        File.WriteAllText(xml, text);
+                        var output = new List<string>();
+                        error = Tools.Run("netsh.exe", $"wlan add profile filename={Tools.Quote(xml)} user=all", output, TimeSpan.FromMinutes(1)) == 0
+                            ? null : string.Join(" ", output).Trim();
+                    }
+                    finally { Tools.Wipe(xml); }
+                }
+                if (error is null) { ok++; names.Add(name); }
+                else { failed++; names.Add($"{name} : non ajouté ({error})"); }
             }
-            finally { Tools.Wipe(xml); }
         }
+        finally { Secrets.Cleanup(ctx.Profile); }
         ctx.Report.Detail("Réseaux Wi-Fi ajoutés", names);
         return $"{ok} réseaux ajoutés" + (failed > 0 ? $", {failed} en échec" : "");
     }
