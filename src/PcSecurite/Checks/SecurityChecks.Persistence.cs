@@ -13,23 +13,6 @@ namespace PcSecurite.Checks;
 /// <summary>Serveurs DNS détournés et tâches planifiées qui relancent un logiciel malveillant. Lecture seule.</summary>
 public static partial class SecurityChecks
 {
-    // Box des opérateurs français et DNS publics connus.
-    private static readonly Dictionary<string, string> KnownDns = new()
-    {
-        ["80.10.246.2"] = "Orange", ["80.10.246.129"] = "Orange", ["81.253.149.1"] = "Orange", ["81.253.149.2"] = "Orange",
-        ["212.27.40.240"] = "Free", ["212.27.40.241"] = "Free",
-        ["109.0.66.10"] = "SFR", ["109.0.66.20"] = "SFR", ["86.64.145.140"] = "SFR", ["86.64.145.146"] = "SFR",
-        ["194.158.122.10"] = "Bouygues Telecom", ["194.158.122.15"] = "Bouygues Telecom",
-        ["8.8.8.8"] = "Google", ["8.8.4.4"] = "Google",
-        ["1.1.1.1"] = "Cloudflare", ["1.0.0.1"] = "Cloudflare", ["1.1.1.2"] = "Cloudflare", ["1.0.0.2"] = "Cloudflare", ["1.1.1.3"] = "Cloudflare", ["1.0.0.3"] = "Cloudflare",
-        ["9.9.9.9"] = "Quad9", ["149.112.112.112"] = "Quad9", ["9.9.9.10"] = "Quad9", ["9.9.9.11"] = "Quad9",
-        ["208.67.222.222"] = "OpenDNS", ["208.67.220.220"] = "OpenDNS", ["208.67.222.123"] = "OpenDNS", ["208.67.220.123"] = "OpenDNS",
-        ["94.140.14.14"] = "AdGuard", ["94.140.15.15"] = "AdGuard", ["94.140.14.15"] = "AdGuard", ["94.140.15.16"] = "AdGuard",
-        ["80.67.169.12"] = "FDN", ["80.67.169.40"] = "FDN",
-        ["193.110.81.0"] = "DNS0.eu", ["185.253.5.0"] = "DNS0.eu",
-        ["76.76.2.0"] = "Control D", ["76.76.10.0"] = "Control D",
-    };
-
     private static SecurityCheck DnsServers()
     {
         const string name = "Serveurs DNS";
@@ -41,14 +24,16 @@ public static partial class SecurityChecks
             foreach (var server in servers.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()))
             {
                 if (IsLocal(server)) known.Add(server + " (box ou réseau local)");
-                else if (KnownDns.TryGetValue(server, out var owner) || IsNextDns(server, out owner)) known.Add($"{server} ({owner})");
+                else if (References.KnownDns.TryGetValue(server, out var owner) || IsNextDns(server, out owner)) known.Add($"{server} ({owner})");
                 else unknown.Add($"{server} sur {adapter.Str("Description") ?? "carte réseau"}");
             }
         }
 
         if (unknown.Count > 0)
-            return SecurityCheck.Danger(name, "DNS inconnu : " + string.Join(", ", unknown.Distinct()),
-                "Un DNS inconnu peut envoyer vers de faux sites (banque, mises à jour). Remettre les DNS en automatique si le client ne l'a pas choisi.");
+            // Avertissement et non danger : un DNS absent de la liste peut être celui d'une entreprise, d'un VPN ou d'un
+            // opérateur moins courant. Le technicien vérifie avec le client avant de toucher à quoi que ce soit.
+            return SecurityCheck.Warning(name, "DNS absent de la liste des DNS connus : " + string.Join(", ", unknown.Distinct()),
+                "Demander au client s'il a choisi ce DNS (VPN, entreprise, contrôle parental). Sinon, un DNS inconnu peut envoyer vers de faux sites (banque, mises à jour) : remettre les DNS en automatique.");
         if (known.Count == 0) return SecurityCheck.Info(name, "Aucun serveur DNS configuré (pas de connexion réseau ?)");
         return SecurityCheck.Ok(name, string.Join(", ", known.Distinct()));
     }
@@ -91,7 +76,7 @@ public static partial class SecurityChecks
     {
         const string name = "Tâches planifiées";
         var tasks = ReadTasks();
-        if (tasks is null) return SecurityCheck.Info(name, "Impossible de lire le Planificateur de tâches");
+        if (tasks is null) return SecurityCheck.Unknown(name, "Impossible de lire le Planificateur de tâches");
 
         var flagged = new List<(string Text, bool Severe)>();
         var signatures = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);

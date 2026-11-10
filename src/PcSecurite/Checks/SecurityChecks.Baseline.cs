@@ -126,7 +126,7 @@ public static partial class SecurityChecks
     {
         const string name = "Connexions réseau actives";
         var connections = TcpTable();
-        if (connections.Count == 0) return SecurityCheck.Info(name, "Table des connexions illisible");
+        if (connections.Count == 0) return SecurityCheck.Unknown(name, "Table des connexions illisible");
 
         var paths = new Dictionary<int, string?>();
         string? PathOf(int pid)

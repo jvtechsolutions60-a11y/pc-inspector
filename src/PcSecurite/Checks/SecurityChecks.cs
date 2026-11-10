@@ -55,29 +55,21 @@ public static partial class SecurityChecks
     public static SecurityCheck RunSafely(string name, Func<SecurityCheck> run)
     {
         try { return run(); }
-        catch (Exception ex) { return SecurityCheck.Info(name, "Impossible de vérifier : " + ex.Message); }
+        catch (Exception ex) { return SecurityCheck.Unknown(name, "Impossible de vérifier : " + ex.Message); }
     }
-
-    // Fin du support des versions de Windows (éditions Famille et Pro).
-    private static readonly (int Build, string Name, DateTime End)[] Support =
-    {
-        (26200, "Windows 11 25H2", new DateTime(2027, 10, 12)),
-        (26100, "Windows 11 24H2", new DateTime(2026, 10, 13)),
-        (22631, "Windows 11 23H2", new DateTime(2025, 11, 11)),
-        (22621, "Windows 11 22H2", new DateTime(2024, 10, 8)),
-        (22000, "Windows 11 21H2", new DateTime(2023, 10, 10)),
-        (0, "Windows 10", new DateTime(2025, 10, 14)),
-    };
 
     private static SecurityCheck WindowsSupport()
     {
         const string name = "Version de Windows";
         var os = Wmi.Query("SELECT Caption, BuildNumber FROM Win32_OperatingSystem").FirstOrDefault();
         if (!int.TryParse(os?.Str("BuildNumber"), out var build))
-            return SecurityCheck.Info(name, os?.Str("Caption") ?? "Version inconnue");
+            return SecurityCheck.Unknown(name, os?.Str("Caption") ?? "Version inconnue");
 
         var caption = os!.Str("Caption") ?? "Windows";
-        var (_, versionName, end) = Support.First(s => build >= s.Build);
+        // Version sortie après la dernière mise à jour des références : sa date de fin n'est pas connue.
+        if (build > References.WindowsSupport.Max(s => s.Build))
+            return SecurityCheck.Unknown(name, $"{caption} (build {build}) : version plus récente que les références de PC Sécurité, date de fin du support non vérifiée");
+        var (_, versionName, end) = References.WindowsSupport.First(s => build >= s.Build);
         var isBusiness = caption.IndexOf("Enterprise", StringComparison.OrdinalIgnoreCase) >= 0
                          || caption.IndexOf("Entreprise", StringComparison.OrdinalIgnoreCase) >= 0
                          || caption.IndexOf("Education", StringComparison.OrdinalIgnoreCase) >= 0;
@@ -93,6 +85,8 @@ public static partial class SecurityChecks
                 build >= 22000 ? CheckKind.Fix : CheckKind.Change);
         if (DateTime.Today > end.AddDays(-90))
             return SecurityCheck.Warning(name, $"{detail} : fin du support le {end:dd/MM/yyyy}", "Prévoir la mise à niveau vers la version suivante.");
+        if (References.IsStale(DateTime.Today))
+            return SecurityCheck.Unknown(name, $"{detail} : supporté jusqu'au {end:dd/MM/yyyy} d'après les {References.StaleNote}");
         return SecurityCheck.Ok(name, $"{detail} : supporté jusqu'au {end:dd/MM/yyyy}");
     }
 
@@ -149,7 +143,7 @@ public static partial class SecurityChecks
     {
         const string name = "Mises à jour en échec";
         var failures = PcInspector.WindowsUpdateFailures.Read();
-        if (failures is null) return SecurityCheck.Info(name, "Historique de Windows Update illisible");
+        if (failures is null) return SecurityCheck.Unknown(name, "Historique de Windows Update illisible");
         if (failures.Count == 0) return SecurityCheck.Ok(name, "Aucune mise à jour en échec ces 60 derniers jours");
         var detail = string.Join(" · ", failures.Take(4).Select(f => $"{f.Title} : {f.Attempts} échec(s), {f.Code} ({f.Meaning})"));
         return SecurityCheck.Warning(name, detail,
@@ -160,7 +154,7 @@ public static partial class SecurityChecks
     {
         const string name = "Dernière mise à jour";
         var last = WindowsUpdateInfo.LastInstalled();
-        if (last is null) return SecurityCheck.Info(name, "Date inconnue");
+        if (last is null) return SecurityCheck.Unknown(name, "Date inconnue");
         var days = (int)(DateTime.Today - last.Value.Date).TotalDays;
         var detail = $"Dernière mise à jour installée le {last:dd/MM/yyyy} (il y a {days} jours)";
         if (days > 60) return SecurityCheck.Danger(name, detail, "Windows ne se met plus à jour : vérifier Windows Update et l'espace disque.");
@@ -174,7 +168,7 @@ public static partial class SecurityChecks
         var reboot = WindowsUpdateInfo.IsRebootPending();
         var pending = WindowsUpdateInfo.PendingUpdates();
         if (pending is null)
-            return SecurityCheck.Info(name, "Recherche impossible (Windows Update indisponible ou trop lent)" + (reboot ? " · redémarrage en attente" : ""));
+            return SecurityCheck.Unknown(name, "Recherche impossible (Windows Update indisponible ou trop lent)" + (reboot ? " · redémarrage en attente" : ""));
         if (pending.Count == 0 && !reboot) return SecurityCheck.Ok(name, "Aucune, Windows est à jour");
 
         var parts = new List<string>();
@@ -189,7 +183,7 @@ public static partial class SecurityChecks
         return PcInspector.WindowsState.LicenseStatus() switch
         {
             1 => SecurityCheck.Ok(name, "Windows est activé"),
-            null => SecurityCheck.Info(name, "État inconnu"),
+            null => SecurityCheck.Unknown(name, "État inconnu"),
             _ => SecurityCheck.Warning(name, "Windows n'est pas activé", "Activer Windows avec une licence valide (clé OEM du BIOS visible dans PC Inspector)."),
         };
     }
@@ -223,7 +217,7 @@ public static partial class SecurityChecks
         var drive = Environment.GetEnvironmentVariable("SystemDrive") ?? "C:";
         var volume = Wmi.QueryOptional($"SELECT ProtectionStatus FROM Win32_EncryptableVolume WHERE DriveLetter = '{drive}'",
             @"root\CIMV2\Security\MicrosoftVolumeEncryption").FirstOrDefault();
-        if (volume is null) return SecurityCheck.Info(name, "Non disponible sur cette édition de Windows");
+        if (volume is null) return SecurityCheck.NotApplicable(name, "Non disponible sur cette édition de Windows");
         var isLaptop = Wmi.QueryOptional("SELECT Name FROM Win32_Battery").Count > 0;
         return volume.ULong("ProtectionStatus") switch
         {

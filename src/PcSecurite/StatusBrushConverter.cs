@@ -33,6 +33,8 @@ public sealed class StatusTextConverter : IValueConverter
         CheckStatus.Danger => "URGENT",
         CheckStatus.Warning => "À AMÉLIORER",
         CheckStatus.Ok => "EN ORDRE",
+        CheckStatus.NotApplicable => "NON CONCERNÉ",
+        CheckStatus.Unknown => "NON VÉRIFIÉ",
         _ => "INFO",
     };
 

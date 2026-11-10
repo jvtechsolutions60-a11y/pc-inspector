@@ -10,6 +10,10 @@ public enum CheckStatus
     Danger,
     /// <summary>Information seulement, ne compte pas dans la note.</summary>
     Info,
+    /// <summary>Contrôle sans objet sur ce PC (pas de Wi-Fi, édition sans BitLocker…). Ne compte pas dans la note.</summary>
+    NotApplicable,
+    /// <summary>Contrôle impossible à exécuter ou à conclure (accès refusé, service muet). Ne compte pas dans la note.</summary>
+    Unknown,
 }
 
 /// <summary>Ce que demande un point rouge ou orange.</summary>
@@ -68,6 +72,7 @@ public sealed class SecurityCheck
         CheckStatus.Ok => "🟢",
         CheckStatus.Warning => "🟠",
         CheckStatus.Danger => "🔴",
+        CheckStatus.Unknown => "❔",
         _ => "⚪",
     };
 
@@ -75,4 +80,9 @@ public sealed class SecurityCheck
     public static SecurityCheck Warning(string name, string detail, string advice, CheckKind kind = CheckKind.Fix) => new(name, CheckStatus.Warning, detail, advice, kind);
     public static SecurityCheck Danger(string name, string detail, string advice, CheckKind kind = CheckKind.Fix) => new(name, CheckStatus.Danger, detail, advice, kind);
     public static SecurityCheck Info(string name, string detail) => new(name, CheckStatus.Info, detail);
+    public static SecurityCheck NotApplicable(string name, string detail) => new(name, CheckStatus.NotApplicable, detail);
+    public static SecurityCheck Unknown(string name, string detail) => new(name, CheckStatus.Unknown, detail);
+
+    /// <summary>Statuts qui comptent dans la note : réussi, à améliorer, échoué.</summary>
+    public bool IsScored => Status is CheckStatus.Ok or CheckStatus.Warning or CheckStatus.Danger;
 }

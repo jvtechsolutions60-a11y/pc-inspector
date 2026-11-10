@@ -28,7 +28,7 @@ public static partial class SecurityChecks
             return SecurityCheck.Danger(name, "Coupé par une stratégie (GPO) : " + string.Join(", ", forced),
                 "Hors entreprise, aucune stratégie ne devrait couper Defender : analyser le PC (AdwCleaner, Defender hors ligne), puis supprimer la clé HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows Defender et redémarrer.");
 
-        if (status is null) return SecurityCheck.Info(name, "Non disponible");
+        if (status is null) return SecurityCheck.Unknown(name, "État de Defender illisible");
         var mode = status.Str("AMRunningMode") ?? "Normal";
         if (status.Bool("AMServiceEnabled") != true || !mode.Equals("Normal", StringComparison.OrdinalIgnoreCase))
             return SecurityCheck.Info(name, "En retrait : un autre antivirus assure la protection");
@@ -58,7 +58,7 @@ public static partial class SecurityChecks
     {
         const string name = "Intégrité de la mémoire";
         var guard = Wmi.QueryOptional("SELECT SecurityServicesRunning FROM Win32_DeviceGuard", @"root\Microsoft\Windows\DeviceGuard").FirstOrDefault();
-        if (guard is null) return SecurityCheck.Info(name, "Non disponible sur cette version de Windows");
+        if (guard is null) return SecurityCheck.NotApplicable(name, "Non disponible sur cette version de Windows");
         // 1 = Credential Guard, 2 = intégrité de la mémoire (HVCI).
         var running = (guard.Str("SecurityServicesRunning") ?? "").Split(',').Select(s => s.Trim()).ToList();
         return running.Contains("2")
@@ -100,7 +100,7 @@ public static partial class SecurityChecks
     private static SecurityCheck SecureBootCertificates()
     {
         const string name = "Certificats Secure Boot 2023";
-        if (Firmware.SecureBootEnabled() != true) return SecurityCheck.Info(name, "Secure Boot inactif, non concerné");
+        if (Firmware.SecureBootEnabled() != true) return SecurityCheck.NotApplicable(name, "Secure Boot inactif, non concerné");
         using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\SecureBoot\Servicing");
         return (key?.GetValue("UEFICA2023Status") as string) switch
         {
@@ -116,10 +116,10 @@ public static partial class SecurityChecks
         const string name = "BIOS";
         var bios = Wmi.QueryOptional("SELECT SMBIOSBIOSVersion, ReleaseDate FROM Win32_BIOS").FirstOrDefault();
         var raw = bios?.Str("ReleaseDate");
-        if (string.IsNullOrEmpty(raw)) return SecurityCheck.Info(name, "Date inconnue");
+        if (string.IsNullOrEmpty(raw)) return SecurityCheck.Unknown(name, "Date inconnue");
         DateTime date;
         try { date = ManagementDateTimeConverter.ToDateTime(raw); }
-        catch (ArgumentOutOfRangeException) { return SecurityCheck.Info(name, "Date inconnue"); }
+        catch (ArgumentOutOfRangeException) { return SecurityCheck.Unknown(name, "Date inconnue"); }
 
         var years = (DateTime.Today - date).TotalDays / 365.25;
         var detail = $"Version {bios!.Str("SMBIOSBIOSVersion")} du {date:dd/MM/yyyy}";

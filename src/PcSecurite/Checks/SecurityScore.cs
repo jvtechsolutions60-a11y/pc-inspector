@@ -6,10 +6,13 @@ namespace PcSecurite.Checks;
 
 public static class SecurityScore
 {
-    /// <summary>Note sur 100 : un point vert vaut 1, orange 0,5, rouge 0. Les infos ne comptent pas.</summary>
+    /// <summary>
+    /// Note sur 100 : un point vert vaut 1, orange 0,5, rouge 0. Les infos, les contrôles sans objet et ceux qui n'ont
+    /// pas pu conclure ne comptent pas (jamais comptés comme un échec).
+    /// </summary>
     public static int Compute(IEnumerable<SecurityCheck> checks)
     {
-        var scored = checks.Where(c => c.Status != CheckStatus.Info).ToList();
+        var scored = checks.Where(c => c.IsScored).ToList();
         if (scored.Count == 0) return 0;
         var points = scored.Sum(c => c.Status switch { CheckStatus.Ok => 1.0, CheckStatus.Warning => 0.5, _ => 0.0 });
         var score = (int)Math.Round(points * 100 / scored.Count);
