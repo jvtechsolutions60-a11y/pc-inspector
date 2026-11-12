@@ -58,7 +58,7 @@ public sealed class HealthCollector : ICollector
         // résultats sont remis dans l'ordre habituel.
         var checks = new Action<AddFinding>[]
         {
-            Disks, SystemDriveSpace, Memory, Battery, Devices, GraphicsDriver, Crashes, Antivirus, Firewall, Activation, Updates, WindowsVersion,
+            Disks, SystemDriveSpace, Memory, Battery, Devices, GraphicsDriver, BadTweaks, Crashes, Antivirus, Firewall, Activation, Updates, WindowsVersion,
         };
         var results = new List<Finding>[checks.Length];
         System.Threading.Tasks.Parallel.For(0, checks.Length, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = 6 }, i =>
@@ -207,6 +207,19 @@ public sealed class HealthCollector : ICollector
         foreach (var driver in GpuDriver.ReadAll(DateTime.Today))
             if (driver.Severity != Severity.Ok)
                 add(driver.Severity, "Carte graphique", $"{driver.Vendor} : {driver.Message}", "Carte graphique");
+    }
+
+    /// <summary>Réglages changés par un « optimiseur » (lecture seule : on donne la commande pour revenir par défaut).</summary>
+    private static void BadTweaks(AddFinding add)
+    {
+        var tweaks = Tweaks.ReadAll();
+        if (tweaks.Count == 0)
+        {
+            add(Severity.Ok, "Réglages Windows", "Aucun « tweak » d'optimisation nuisible repéré (horloge, maintenance, TRIM, alimentation).", "Diagnostic");
+            return;
+        }
+        foreach (var tweak in tweaks)
+            add(Severity.Warning, "Réglages Windows", $"{tweak.Name} : {tweak.Message} Remettre par défaut (invite de commandes administrateur) : {tweak.Fix}.", "Diagnostic");
     }
 
     private static void Crashes(AddFinding add)
