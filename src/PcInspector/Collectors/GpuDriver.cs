@@ -100,6 +100,8 @@ internal static class GpuDriver
     {
         var parts = (windowsVersion ?? "").Split('.');
         if (parts.Length != 4 || !parts.All(p => p.Length > 0 && p.All(char.IsDigit))) return null;
+        // Forme NVIDIA : 3e nombre sur 1 ou 2 chiffres (ex. 15), 4e sur 4 chiffres au plus (ex. 6094).
+        if (parts[2].Length > 2 || parts[3].Length > 4) return null;
         var digits = parts[2] + parts[3].PadLeft(4, '0');
         if (digits.Length < 5) return null;
         var last = digits.Substring(digits.Length - 5);
