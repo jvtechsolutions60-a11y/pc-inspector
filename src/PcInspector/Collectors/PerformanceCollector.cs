@@ -134,6 +134,13 @@ public static class Benchmark
             section.Groups.Add(load);
             result.GamingVerdict = GamingVerdict(blender, winsat);
             summary.Add("Jeux", result.GamingVerdict);
+            // Un score de jeu ne vaut que si la carte a un pilote récent du fabricant.
+            try
+            {
+                foreach (var driver in GpuDriver.ReadAll(DateTime.Today).Where(d => d.Vendor is "NVIDIA" or "AMD" or "Windows"))
+                    summary.Add("Pilote graphique", $"{driver.Vendor} : {driver.Message}");
+            }
+            catch (Exception ex) when (ex is System.Management.ManagementException or System.Runtime.InteropServices.COMException or UnauthorizedAccessException) { }
             if (load.Items.FirstOrDefault(i => i.Label == "Verdict") is { } heat) summary.Add("Refroidissement", heat.Value);
         }
 

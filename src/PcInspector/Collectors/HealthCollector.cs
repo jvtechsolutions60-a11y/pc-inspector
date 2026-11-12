@@ -58,7 +58,7 @@ public sealed class HealthCollector : ICollector
         // résultats sont remis dans l'ordre habituel.
         var checks = new Action<AddFinding>[]
         {
-            Disks, SystemDriveSpace, Memory, Battery, Devices, Crashes, Antivirus, Firewall, Activation, Updates, WindowsVersion,
+            Disks, SystemDriveSpace, Memory, Battery, Devices, GraphicsDriver, Crashes, Antivirus, Firewall, Activation, Updates, WindowsVersion,
         };
         var results = new List<Finding>[checks.Length];
         System.Threading.Tasks.Parallel.For(0, checks.Length, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = 6 }, i =>
@@ -200,6 +200,13 @@ public sealed class HealthCollector : ICollector
         }
         var names = string.Join(", ", errors.Select(e => e.Str("Name")).Where(n => !string.IsNullOrEmpty(n)).Take(3));
         add(Severity.Warning, "Périphériques", $"{errors.Count} en erreur" + (names.Length > 0 ? $" ({names}{(errors.Count > 3 ? "…" : "")})" : "") + " : vérifier les pilotes.", "Diagnostic");
+    }
+
+    private static void GraphicsDriver(AddFinding add)
+    {
+        foreach (var driver in GpuDriver.ReadAll(DateTime.Today))
+            if (driver.Severity != Severity.Ok)
+                add(driver.Severity, "Carte graphique", $"{driver.Vendor} : {driver.Message}", "Carte graphique");
     }
 
     private static void Crashes(AddFinding add)

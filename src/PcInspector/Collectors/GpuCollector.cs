@@ -23,7 +23,16 @@ public sealed class GpuCollector : ICollector
             var height = gpu.ULong("CurrentVerticalResolution");
             var refresh = gpu.ULong("CurrentRefreshRate");
 
-            section.Groups.Add(new InfoGroup(name)
+            DateTime? driverDate = null;
+            if (gpu.Str("DriverDate") is { Length: > 0 } rawDate)
+            {
+                try { driverDate = System.Management.ManagementDateTimeConverter.ToDateTime(rawDate); }
+                catch (ArgumentOutOfRangeException) { }
+            }
+            var driver = GpuDriver.Judge(name, gpu.Str("AdapterCompatibility"), gpu.Str("DriverVersion"), driverDate, DateTime.Today);
+
+            var group = new InfoGroup(name);
+            section.Groups.Add(group
                 .Add("Fabricant", gpu.Str("AdapterCompatibility"))
                 .Add("Mémoire vidéo", Wmi.FormatBytes(VideoMemory(name) ?? gpu.ULong("AdapterRAM")))
                 .Add("Processeur vidéo", gpu.Str("VideoProcessor"))
@@ -31,6 +40,13 @@ public sealed class GpuCollector : ICollector
                 .Add("Date du pilote", gpu.Date("DriverDate"))
                 .Add("Résolution", width is > 0 && height is > 0 ? $"{width} × {height}" + (refresh is > 0 ? $" à {refresh} Hz" : "") : null)
                 .Add("Statut", gpu.Str("Status")));
+            if (driver is not null)
+            {
+                var mark = driver.Severity switch { Severity.Critical => "✘", Severity.Warning => "!", _ => "✔" };
+                group.Add("État du pilote", $"{mark} {char.ToUpper(driver.Message[0])}{driver.Message.Substring(1)}");
+                if (driver.DownloadUrl is not null && driver.Severity != Severity.Ok)
+                    group.AddLink("Pilote officiel", $"Site {driver.Vendor}", driver.DownloadUrl);
+            }
         }
 
         var monitors = Wmi.QueryOptional("SELECT * FROM WmiMonitorID", Wmi.WmiScope);
