@@ -30,6 +30,14 @@ public sealed record BilanVente(
         StatutVente.Bloque => "Bloqué",
         _ => "Incomplet",
     };
+
+    /// <summary>
+    /// Statut et liste des réserves : gardée avec la fiche enregistrée. Si elle change ensuite (nouvelle réserve),
+    /// la fiche et l'annonce ne sont plus à jour et la finalisation est refusée.
+    /// </summary>
+    public string Empreinte => Reserves.Count == 0
+        ? Libelle
+        : Libelle + " : " + string.Join(", ", Reserves.Select(r => r.Id).OrderBy(i => i, StringComparer.Ordinal));
 }
 
 /// <summary>

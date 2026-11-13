@@ -9,6 +9,7 @@ using System.Windows.Controls;
 using System.Runtime.InteropServices;
 using System.Windows.Media;
 using Jvtech.Atelier.Actions;
+using Jvtech.Atelier.Actions.Finaliser;
 using Jvtech.Atelier.Actions.Preparation;
 using Jvtech.Atelier.Dossier;
 using Jvtech.Lecture;
@@ -22,7 +23,7 @@ public partial class MainWindow : Window
 {
     private static readonly string[] StepNames =
         { "1 · Identification", "2 · Préparation", "3 · Tests", "4 · Fiche", "5 · Annonce", "6 · Finalisation" };
-    private static readonly int[] StepsAvailable = { 0, 1, 2, 3, 4 };
+    private static readonly int[] StepsAvailable = { 0, 1, 2, 3, 4, 5 };
 
     private readonly ModeWindows _mode = Installation.Lire();
     private readonly ReglagesAtelier _reglages = ReglagesAtelier.Lire(AppPaths.ExeFolder);
@@ -41,6 +42,7 @@ public partial class MainWindow : Window
     private readonly List<LigneLogiciel> _logiciels = PackAtelier.Logiciels.Select(l => new LigneLogiciel(l)).ToList();
     private readonly List<ActionRecord> _actions = new();
     private CancellationTokenSource? _arret;
+    private string? _empreinteComposee;
     private readonly bool _reprendre = Reprise.Demandee(Environment.GetCommandLineArgs());
 
     public MainWindow()
@@ -76,6 +78,8 @@ public partial class MainWindow : Window
         }).ToList();
         IdentPanel.Visibility = step == 0 ? Visibility.Visible : Visibility.Collapsed;
         PrepPanel.Visibility = step == 1 ? Visibility.Visible : Visibility.Collapsed;
+        FinalPanel.Visibility = step == 5 ? Visibility.Visible : Visibility.Collapsed;
+        if (step == 5) ShowFinalisation();
         TestsPanel.Visibility = step == 2 ? Visibility.Visible : Visibility.Collapsed;
         ListingPanel.Visibility = step is 3 or 4 ? Visibility.Visible : Visibility.Collapsed;
         if (step is 3 or 4 && ListingText.Text.Length == 0) Compose();
@@ -343,6 +347,7 @@ public partial class MainWindow : Window
     {
         ShowSaleStatus();
         var texte = Annonce.Composer(Donnees());
+        _empreinteComposee = _bilan?.Empreinte;
         ListingTitle.Text = texte.Titre;
         ListingText.Text = texte.Description;
         ListingWarnings.Text = string.Join(Environment.NewLine, texte.Avertissements.Select(a => "! " + a));
@@ -381,7 +386,9 @@ public partial class MainWindow : Window
             _dossier!.EnregistrerTexte("fiche-interne.txt", fiche);
             // L'annonce enregistrée est celle affichée, avec les retouches du technicien.
             _dossier.EnregistrerTexte("annonce.txt", ListingTitle.Text.Trim() + Environment.NewLine + Environment.NewLine + ListingText.Text.Trim() + Environment.NewLine);
-            _dossier.Journaliser($"Fiche interne et annonce enregistrées (statut : {_bilan?.Libelle ?? "?"})", maintenant);
+            // Statut et réserves avec lesquels l'annonce affichée a été composée : vérifiés avant Sysprep.
+            if (_empreinteComposee is not null) _dossier.EnregistrerEmpreinteFiche(_empreinteComposee, maintenant);
+            _dossier.Journaliser($"Fiche interne et annonce enregistrées (composées avec : {_empreinteComposee ?? "?"} ; statut actuel : {_bilan?.Empreinte ?? "?"})", maintenant);
             ShowHeader();
             ListingStatus.Text = "Enregistrées dans " + _dossier.Chemin;
         }
@@ -645,5 +652,64 @@ public partial class MainWindow : Window
         {
             PrepStatus.Text = "Enregistrement impossible : " + ex.Message;
         }
+    }
+
+    // ---------- Finalisation ----------
+
+    private DecisionFinalisation DecisionActuelle()
+    {
+        ShowSaleStatus();
+        var mode = Installation.Lire();
+        string? inventaire = null, empreinte = null;
+        if (_dossier is not null)
+        {
+            inventaire = _dossier.LireInventaire().Inventaire;
+            empreinte = _dossier.LireEmpreinteFiche();
+        }
+        return Finalisation.Decider(mode, _bilan!, inventaire, empreinte, FinalConfirm.Text);
+    }
+
+    private void ShowFinalisation()
+    {
+        var d = DecisionActuelle();
+        FinalConditions.Text = d.Permise
+            ? "✓ Toutes les conditions sont remplies."
+            : string.Join(Environment.NewLine, d.Raisons.Select(r => "✕ " + r));
+        SysprepButton.IsEnabled = d.Permise && _arret is null;
+    }
+
+    private void FinalConfirm_Changed(object sender, TextChangedEventArgs e)
+    {
+        if (FinalPanel.Visibility == Visibility.Visible) ShowFinalisation();
+    }
+
+    private async void Sysprep_Click(object sender, RoutedEventArgs e)
+    {
+        var technicien = OperatorBox.Text.Trim();
+        var d = DecisionActuelle();
+        if (!d.Permise || technicien.Length == 0)
+        {
+            FinalStatus.Text = technicien.Length == 0 ? "Indiquer le nom du technicien (étape Identification)." : "Conditions non remplies.";
+            ShowFinalisation();
+            return;
+        }
+        var choix = MessageBox.Show(this,
+            $"Lancer Sysprep sur {PcTitle.Text} ?\n\nWindows repartira sur l'écran de premier démarrage pour l'acheteur, puis le PC s'éteindra. Aucune donnée n'est effacée.\n\nCette étape ne s'annule pas depuis JVTECH Atelier.",
+            "Finalisation", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+        if (choix != MessageBoxResult.Yes) return;
+
+        _dossier!.Journaliser($"Finalisation demandée par {technicien} (statut : {_bilan!.Empreinte})");
+        SysprepButton.IsEnabled = false;
+        FinalStatus.Text = "Sysprep en cours : ne pas éteindre le PC ni retirer la clé USB avant l'extinction.";
+        try
+        {
+            var faites = await RunActionsAsync(new IActionAtelier[] { new SysprepOobe(t => Dispatcher.BeginInvoke(new Action(() => FinalStatus.Text = t))) });
+            FinalStatus.Text = faites.Count == 0 ? "Sysprep non lancé." : faites[0].Trace.Detail;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            FinalStatus.Text = "Sysprep impossible : " + ex.Message;
+        }
+        ShowFinalisation();
     }
 }

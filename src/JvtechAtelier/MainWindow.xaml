@@ -278,6 +278,23 @@
                 </DockPanel>
             </Border>
 
+            <!-- Étape 6 : finalisation (Sysprep, mode audit seulement) -->
+            <Border x:Name="FinalPanel" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,16,0" Padding="18,14" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="Finalisation (Sysprep)" Style="{StaticResource PageTitle}"/>
+                    <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,12" TextWrapping="Wrap"
+                               Text="Sysprep remet Windows sur l'écran de premier démarrage pour l'acheteur (langue, réseau, son propre compte), puis éteint le PC. Il n'efface aucune donnée et ne formate rien. Proposé seulement en mode audit, quand le statut est Prêt ou Prêt avec réserve et que la fiche et l'annonce à jour sont enregistrées."/>
+                    <TextBlock Text="Conditions" Style="{StaticResource SectionTitle}"/>
+                    <TextBlock x:Name="FinalConditions" Style="{StaticResource CardDetail}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                    <TextBlock Text="Confirmation : taper le numéro d'inventaire du PC" Style="{StaticResource CardTitle}"/>
+                    <WrapPanel Margin="0,4,0,0">
+                        <TextBox x:Name="FinalConfirm" Width="140" Margin="0,0,8,0" TextChanged="FinalConfirm_Changed"/>
+                        <Button x:Name="SysprepButton" Content="Lancer Sysprep (le PC s'éteindra)" Style="{StaticResource PrimaryButton}" IsEnabled="False" Click="Sysprep_Click"/>
+                    </WrapPanel>
+                    <TextBlock x:Name="FinalStatus" Style="{StaticResource Hint}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
             <!-- Étapes pas encore disponibles -->
             <Border x:Name="LaterPanel" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,16,0" Padding="18,14" Visibility="Collapsed">
                 <StackPanel>

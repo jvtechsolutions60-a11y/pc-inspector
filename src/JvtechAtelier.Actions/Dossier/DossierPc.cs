@@ -21,6 +21,7 @@ public sealed class DossierPc
     public const string FichierReglages = "atelier.ini";
     public const string FichierTests = "tests.ini";
     public const string FichierPreparation = "preparation.ini";
+    public const string FichierFiche = "fiche.ini";
 
     private DossierPc(string chemin, string identifiant)
     {
@@ -187,6 +188,23 @@ public sealed class DossierPc
     {
         var fichier = Path.Combine(Chemin, FichierPreparation);
         return File.Exists(fichier) ? EtatPreparation.Lire(File.ReadAllText(fichier, Encoding.UTF8)) : null;
+    }
+
+    /// <summary>Statut et réserves au moment où la fiche et l'annonce ont été enregistrées (contrôlé avant Sysprep).</summary>
+    public void EnregistrerEmpreinteFiche(string empreinte, DateTime quand) =>
+        EcrireAtomique(Path.Combine(Chemin, FichierFiche),
+            "; Fiche interne et annonce enregistrées avec ce statut" + Environment.NewLine
+            + "empreinte=" + Echapper(empreinte) + Environment.NewLine
+            + "le=" + quand.ToString("s", CultureInfo.InvariantCulture) + Environment.NewLine);
+
+    public string? LireEmpreinteFiche()
+    {
+        var fichier = Path.Combine(Chemin, FichierFiche);
+        if (!File.Exists(fichier)) return null;
+        foreach (var ligne in File.ReadAllLines(fichier, Encoding.UTF8))
+            if (ligne.StartsWith("empreinte=", StringComparison.Ordinal))
+                return Deschapper(ligne.Substring("empreinte=".Length));
+        return null;
     }
 
     public void EnregistrerTests(IEnumerable<ResultatTestManuel> resultats)

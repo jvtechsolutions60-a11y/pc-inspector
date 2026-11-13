@@ -85,6 +85,7 @@ public sealed class InstallationLogiciel : IActionAtelier
     public SortieAction Executer(CancellationToken annulation)
     {
         annulation.ThrowIfCancellationRequested();
+        EnregistrerWingetSiAbsent(_progression);
         var dernieres = new List<string>();
         var journal = new Progress<string>(l =>
         {
@@ -95,5 +96,45 @@ public sealed class InstallationLogiciel : IActionAtelier
         var code = Winget.InstallAsync(_logiciel.Id, journal).GetAwaiter().GetResult();
         var (reussi, texte) = CodesWinget.Interpreter(code);
         return new SortieAction(reussi, code, texte);
+    }
+
+    private static bool _enregistrementTente;
+
+    /// <summary>
+    /// En mode audit, « Programme d'installation d'application » (winget) n'est pas encore enregistré pour le compte :
+    /// on l'enregistre une fois (comme PC Maintenance), sans rien télécharger.
+    /// </summary>
+    private static void EnregistrerWingetSiAbsent(Action<string>? progression)
+    {
+        if (_enregistrementTente) return;
+        using (var test = WingetShell.Start("--version"))
+        {
+            if (test is not null)
+            {
+                test.StandardInput.Close();
+                test.WaitForExit(30000);
+                return;
+            }
+        }
+        _enregistrementTente = true;
+        progression?.Invoke("winget absent pour ce compte : enregistrement de « Programme d'installation d'application »…");
+        var powershell = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe");
+        try
+        {
+            using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(powershell,
+                "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"Add-AppxPackage -RegisterByFamilyName -MainPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe -ErrorAction SilentlyContinue\"")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+            if (p is not null && !p.WaitForExit(180000))
+            {
+                try { p.Kill(); } catch (InvalidOperationException) { }
+            }
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            progression?.Invoke("Enregistrement de winget impossible : " + ex.Message);
+        }
     }
 }
