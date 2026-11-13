@@ -65,17 +65,7 @@ public partial class MainWindow : Window
     private void ShowStep(int step)
     {
         _step = step;
-        var accent = (Brush)FindResource("AccentBrush");
-        var border = (Brush)FindResource("BorderBrush");
-        Steps.ItemsSource = StepNames.Select((n, i) => new
-        {
-            Index = i,
-            Title = n.ToUpperInvariant(),
-            State = i == step ? "● Affichée" : StepsAvailable.Contains(i) ? "○ Ouvrir" : "À venir",
-            Enabled = StepsAvailable.Contains(i),
-            Border = i == step ? accent : border,
-            Thickness = new Thickness(i == step ? 2 : 1),
-        }).ToList();
+        RefreshSteps();
         IdentPanel.Visibility = step == 0 ? Visibility.Visible : Visibility.Collapsed;
         PrepPanel.Visibility = step == 1 ? Visibility.Visible : Visibility.Collapsed;
         FinalPanel.Visibility = step == 5 ? Visibility.Visible : Visibility.Collapsed;
@@ -85,6 +75,51 @@ public partial class MainWindow : Window
         if (step is 3 or 4 && ListingText.Text.Length == 0) Compose();
         LaterPanel.Visibility = StepsAvailable.Contains(step) ? Visibility.Collapsed : Visibility.Visible;
         LaterTitle.Text = StepNames[step];
+    }
+
+    private void RefreshSteps()
+    {
+        var accent = (Brush)FindResource("AccentBrush");
+        var border = (Brush)FindResource("BorderBrush");
+        Steps.ItemsSource = StepNames.Select((n, i) => new
+        {
+            Index = i,
+            Title = n.ToUpperInvariant(),
+            State = (i == _step ? "● " : "") + EtatEtape(i),
+            Enabled = StepsAvailable.Contains(i),
+            Border = i == _step ? accent : border,
+            Thickness = new Thickness(i == _step ? 2 : 1),
+        }).ToList();
+    }
+
+    /// <summary>Où en est chaque étape, d'après ce qui est réellement enregistré dans le dossier du PC.</summary>
+    private string EtatEtape(int i)
+    {
+        try
+        {
+            switch (i)
+            {
+                case 0:
+                    return _dossier is null ? "À enregistrer" : IdentifiantAtelier.NormaliserInventaire(_dossier.LireInventaire().Inventaire) is null ? "Sans n° V…" : "✓ Enregistrée";
+                case 1:
+                    var prep = PlanPreparation.EnControle(_prep);
+                    return prep.Statut == Statut.Conforme ? "✓ Terminée" : _prep is null ? "○ À faire" : "? En cours ou à vérifier";
+                case 2:
+                    var faits = _tests.Count(t => t.Enregistre is { Resultat: not ResultatTest.NonTeste });
+                    return $"{faits} sur {_tests.Count} tests" + (_auto.Count == 0 ? ", contrôles à lancer" : "");
+                case 3:
+                case 4:
+                    var empreinte = _dossier?.LireEmpreinteFiche();
+                    return empreinte is null ? "○ À faire" : _bilan is not null && empreinte == _bilan.Empreinte ? "✓ Enregistrée" : "? À refaire (statut changé)";
+                default:
+                    return !Installation.FinalisationPermise(_mode) ? "Pas en mode audit"
+                        : _bilan?.Statut is StatutVente.Pret or StatutVente.PretAvecReserve ? "Possible" : "✕ Bloquée";
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return "Dossier illisible";
+        }
     }
 
     private void Step_Click(object sender, RoutedEventArgs e)
@@ -330,6 +365,7 @@ public partial class MainWindow : Window
             .Concat(bilan.Manquants.Select(m => $"○ {m} : non fait ou à vérifier"))
             .Concat(bilan.Reserves.Select(r => $"? Réserve, {r.Titre} : {r.Constat}"));
         SaleDetail.Text = string.Join(Environment.NewLine, lignes);
+        RefreshSteps();
     }
 
     // ---------- Fiche et annonce ----------
@@ -386,11 +422,14 @@ public partial class MainWindow : Window
             _dossier!.EnregistrerTexte("fiche-interne.txt", fiche);
             // L'annonce enregistrée est celle affichée, avec les retouches du technicien.
             _dossier.EnregistrerTexte("annonce.txt", ListingTitle.Text.Trim() + Environment.NewLine + Environment.NewLine + ListingText.Text.Trim() + Environment.NewLine);
+            _dossier.Journaliser("Rapport enregistré : rapport.html", maintenant);
+            _dossier.EnregistrerTexte("rapport.html", Rapport.Html(Donnees(), Installation.Libelle(_mode), AppInfo.Version, maintenant, _dossier.LireJournal()));
             // Statut et réserves avec lesquels l'annonce affichée a été composée : vérifiés avant Sysprep.
             if (_empreinteComposee is not null) _dossier.EnregistrerEmpreinteFiche(_empreinteComposee, maintenant);
             _dossier.Journaliser($"Fiche interne et annonce enregistrées (composées avec : {_empreinteComposee ?? "?"} ; statut actuel : {_bilan?.Empreinte ?? "?"})", maintenant);
             ShowHeader();
-            ListingStatus.Text = "Enregistrées dans " + _dossier.Chemin;
+            ListingStatus.Text = "Fiche interne, annonce et rapport (rapport.html, imprimable en PDF) enregistrés dans " + _dossier.Chemin;
+            RefreshSteps();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {

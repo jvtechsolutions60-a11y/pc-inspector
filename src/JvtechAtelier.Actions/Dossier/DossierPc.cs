@@ -207,6 +207,15 @@ public sealed class DossierPc
         return null;
     }
 
+    /// <summary>Dernières lignes du journal du PC (pour le rapport).</summary>
+    public IReadOnlyList<string> LireJournal(int maximum = 300)
+    {
+        var fichier = Path.Combine(Chemin, FichierJournal);
+        if (!File.Exists(fichier)) return Array.Empty<string>();
+        var lignes = File.ReadAllLines(fichier, Encoding.UTF8);
+        return lignes.Skip(Math.Max(0, lignes.Length - maximum)).ToList();
+    }
+
     public void EnregistrerTests(IEnumerable<ResultatTestManuel> resultats)
     {
         var sb = new StringBuilder();

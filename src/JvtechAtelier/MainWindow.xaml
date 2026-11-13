@@ -271,7 +271,7 @@
                     <WrapPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
                         <Button Content="Copier le titre" Margin="0,0,8,0" Click="CopyTitle_Click"/>
                         <Button Content="Copier le descriptif" Margin="0,0,8,0" Click="CopyDescription_Click"/>
-                        <Button Content="Enregistrer fiches et annonce dans le dossier" Style="{StaticResource PrimaryButton}" Click="SaveListing_Click"/>
+                        <Button Content="Enregistrer fiche, annonce et rapport dans le dossier" Style="{StaticResource PrimaryButton}" Click="SaveListing_Click"/>
                         <TextBlock x:Name="ListingStatus" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </WrapPanel>
                     <TextBox x:Name="ListingText" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" FontFamily="Consolas" FontSize="12"/>
