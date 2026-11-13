@@ -36,7 +36,7 @@ public class SeparationTests
         ("service Windows", new Regex(@"\bServiceController\b|System\.ServiceProcess")),
         ("méthode WMI", new Regex(@"\.InvokeMethod\(|\.Put\(\s*\)|\bDeleteInstance\b")),
         ("lancement de programme", new Regex(@"Process\.Start|new\s+ProcessStartInfo|\bProcessRunner\b")),
-        ("écriture de fichier", new Regex(@"File\.(Write|Append|Delete|Move|Copy|Create|Replace|SetAttributes|Encrypt)\w*|Directory\.(Create|Delete|Move)\w*|new\s+(FileStream|StreamWriter)\b|\.(Delete|MoveTo|CopyTo)\(")),
+        ("écriture de fichier", new Regex(@"File\.(Write|Append|Delete|Move|Copy|Create|Replace|SetAttributes|Encrypt)\w*|Directory\.(Create|Delete|Move)\w*|new\s+(FileStream|StreamWriter)\b|(FileInfo|DirectoryInfo)\b[^;]*\.(Delete|MoveTo|CopyTo|Create)\(|\.Delete\(\s*(true|false)?\s*\)")),
         ("outil système qui modifie", new Regex(@"\b(powercfg|bcdedit|reg(\.exe)?\s+(add|delete|import)|sc(\.exe)?\s+(config|stop|delete)|netsh|sysprep|dism|wusa|winget\s+(install|upgrade|uninstall))\b", RegexOptions.IgnoreCase)),
     };
 
@@ -101,7 +101,10 @@ public class SeparationTests
         Assert.IsTrue(Violations("File.WriteAllText(p, t);").Any());
         Assert.IsTrue(Violations("Process.Start(\"powercfg\", \"/h off\");").Any());
         Assert.IsTrue(Violations("new ServiceController(\"wuauserv\").Stop();").Any());
+        Assert.IsTrue(Violations("new FileInfo(p).Delete();").Any());
+        Assert.IsTrue(Violations("dir.Delete(true);").Any());
         Assert.IsFalse(Violations("using var k = Registry.LocalMachine.OpenSubKey(p);").Any());
+        Assert.IsFalse(Violations("BitConverter.GetBytes(value).CopyTo(request, offset);").Any(), "copie de tableau en mémoire");
         Assert.IsFalse(Violations("// File.WriteAllText est interdit ici").Any());
     }
 
