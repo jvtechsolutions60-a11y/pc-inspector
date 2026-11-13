@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Seul module de JVTECH v2 autorisé à modifier Windows (mises à jour, logiciels, pilotes, test mémoire, Sysprep
+    confirmé). Utilisé uniquement par JVTECH Atelier, qui compile ses fichiers dans son .exe.
+    JVTECH Audit ne doit jamais l'inclure : tests/JvtechTests/SeparationTests le vérifie.
+  -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>JvtechAtelier.Actions</AssemblyName>
+    <RootNamespace>Jvtech.Atelier.Actions</RootNamespace>
+    <Product>JVTECH Atelier, actions</Product>
+    <Company>JVTECH Solutions</Company>
+    <Version>2.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
+  </ItemGroup>
+
+</Project>

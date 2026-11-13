@@ -1,0 +1,48 @@
+<Window x:Class="JvtechAtelier.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="JVTECH Atelier" Width="1100" Height="720" MinWidth="900" MinHeight="560"
+        WindowStartupLocation="CenterScreen" Background="{StaticResource ContentBrush}" FontFamily="Segoe UI">
+    <DockPanel>
+        <Border DockPanel.Dock="Top" Background="{StaticResource HeaderBrush}" Padding="28,18">
+            <StackPanel>
+                <TextBlock Text="JVTECH ATELIER" Style="{StaticResource AppName}"/>
+                <TextBlock x:Name="VersionText" Style="{StaticResource AppSubtitle}"/>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="24,20">
+                <!-- Les 6 étapes du parcours (cahier § 3.2), actives au lot 1 -->
+                <ItemsControl x:Name="Steps">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Rows="1"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource Card}" Margin="0,0,8,0">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Title}" Style="{StaticResource CardTitle}"/>
+                                    <TextBlock Text="{Binding State}" Style="{StaticResource CardDetail}"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Border Style="{StaticResource Card}" Margin="0,16,0,0" BorderBrush="{StaticResource WarningBrush}" BorderThickness="2">
+                    <StackPanel>
+                        <TextBlock Text="STATUT AVANT VENTE" Style="{StaticResource CardTitle}"/>
+                        <TextBlock x:Name="SaleStatus" Style="{StaticResource PageTitle}"/>
+                        <TextBlock x:Name="SaleDetail" Style="{StaticResource CardDetail}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Style="{StaticResource Hint}" Margin="2,16,0,0" TextWrapping="Wrap"
+                           Text="Version d'aperçu (lot 0) : aucune action n'est disponible, rien n'est modifié sur ce PC. Le parcours arrive au lot 1."/>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>
