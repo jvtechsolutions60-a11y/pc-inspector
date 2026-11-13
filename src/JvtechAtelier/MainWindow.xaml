@@ -170,6 +170,42 @@
                 </DockPanel>
             </Border>
 
+            <!-- Étapes 4 et 5 : fiche et annonce -->
+            <Border x:Name="ListingPanel" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,16,0" Padding="18,14" Visibility="Collapsed">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Fiche et annonce" Style="{StaticResource PageTitle}"/>
+                    <TextBlock DockPanel.Dock="Top" Style="{StaticResource Hint}" Margin="0,4,0,10"
+                               Text="Texte composé à partir des valeurs retenues (corrigées comprises) et des tests. Ce qui n'est pas connu n'est pas écrit. Les réserves commerciales sont toujours mentionnées. Pas de lien ni de prix."/>
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <StackPanel Margin="0,0,16,0">
+                            <TextBlock Text="État" Style="{StaticResource CardTitle}"/>
+                            <ComboBox x:Name="ConditionBox" Width="200" IsEditable="True" Margin="0,2,0,0">
+                                <ComboBoxItem Content="Très bon état"/>
+                                <ComboBoxItem Content="Bon état"/>
+                                <ComboBoxItem Content="État correct, traces d'usage"/>
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,16,0">
+                            <TextBlock Text="Remarques (ajoutées à la fin)" Style="{StaticResource CardTitle}"/>
+                            <TextBox x:Name="NotesBox" Width="320" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Button Content="Composer le texte" Style="{StaticResource PrimaryButton}" Margin="0,16,0,0" Click="Compose_Click"/>
+                    </WrapPanel>
+                    <TextBlock DockPanel.Dock="Top" x:Name="ListingWarnings" Foreground="{StaticResource WarningBrush}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                        <TextBlock DockPanel.Dock="Right" x:Name="TitleLength" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        <TextBox x:Name="ListingTitle" TextChanged="ListingTitle_Changed" FontWeight="SemiBold"/>
+                    </DockPanel>
+                    <WrapPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                        <Button Content="Copier le titre" Margin="0,0,8,0" Click="CopyTitle_Click"/>
+                        <Button Content="Copier le descriptif" Margin="0,0,8,0" Click="CopyDescription_Click"/>
+                        <Button Content="Enregistrer fiches et annonce dans le dossier" Style="{StaticResource PrimaryButton}" Click="SaveListing_Click"/>
+                        <TextBlock x:Name="ListingStatus" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </WrapPanel>
+                    <TextBox x:Name="ListingText" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" FontFamily="Consolas" FontSize="12"/>
+                </DockPanel>
+            </Border>
+
             <!-- Étapes pas encore disponibles -->
             <Border x:Name="LaterPanel" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,16,0" Padding="18,14" Visibility="Collapsed">
                 <StackPanel>

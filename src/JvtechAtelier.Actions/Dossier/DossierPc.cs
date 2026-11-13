@@ -166,6 +166,16 @@ public sealed class DossierPc
                 c.Restaurer(corr.Corrige, corr.Par, corr.Le);
     }
 
+    /// <summary>Enregistre un document du PC (fiche, annonce) dans son dossier. Nom de fichier simple uniquement.</summary>
+    public string EnregistrerTexte(string nomFichier, string contenu)
+    {
+        if (nomFichier.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || nomFichier.Contains(".."))
+            throw new ArgumentException("Nom de fichier invalide : " + nomFichier, nameof(nomFichier));
+        var chemin = Path.Combine(Chemin, nomFichier);
+        EcrireAtomique(chemin, contenu);
+        return chemin;
+    }
+
     /// <summary>Enregistre les résultats des tests manuels (preuve : technicien, date, remarque).</summary>
     public void EnregistrerTests(IEnumerable<ResultatTestManuel> resultats)
     {

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Runtime.InteropServices;
 using System.Windows.Media;
 using Jvtech.Atelier.Dossier;
 using Jvtech.Lecture;
@@ -18,7 +19,7 @@ public partial class MainWindow : Window
 {
     private static readonly string[] StepNames =
         { "1 · Identification", "2 · Préparation", "3 · Tests", "4 · Fiche", "5 · Annonce", "6 · Finalisation" };
-    private static readonly int[] StepsAvailable = { 0, 2 };
+    private static readonly int[] StepsAvailable = { 0, 2, 3, 4 };
 
     private readonly ModeWindows _mode = Installation.Lire();
     private readonly ReglagesAtelier _reglages = ReglagesAtelier.Lire(AppPaths.ExeFolder);
@@ -26,7 +27,10 @@ public partial class MainWindow : Window
     private List<LigneChamp> _lignes = new();
     private List<LigneTest> _tests = new();
     private List<Controle> _auto = new();
+    private MesureBatterie? _batterie;
+    private BilanVente? _bilan;
     private DossierPc? _dossier;
+    private List<Controle> _controles = new();
     private bool _portable;
     private int _step;
 
@@ -62,6 +66,8 @@ public partial class MainWindow : Window
         }).ToList();
         IdentPanel.Visibility = step == 0 ? Visibility.Visible : Visibility.Collapsed;
         TestsPanel.Visibility = step == 2 ? Visibility.Visible : Visibility.Collapsed;
+        ListingPanel.Visibility = step is 3 or 4 ? Visibility.Visible : Visibility.Collapsed;
+        if (step is 3 or 4 && ListingText.Text.Length == 0) Compose();
         LaterPanel.Visibility = StepsAvailable.Contains(step) ? Visibility.Collapsed : Visibility.Visible;
         LaterTitle.Text = StepNames[step];
     }
@@ -206,7 +212,7 @@ public partial class MainWindow : Window
                     RegleControles.Disques(LectureControles.Disques()),
                     RegleControles.MemoireRapide(LectureControles.NombreBarrettes(), memoire, LectureControles.ErreursMemoireMaterielles()),
                     RegleControles.MemoireApprofondi(memoire),
-                    RegleControles.Batterie(LectureControles.Batterie(portable), seuils),
+                    RegleControles.Batterie(_batterie = LectureControles.Batterie(portable), seuils),
                 };
             });
             AutoChecks.ItemsSource = _auto.Select(c => new LigneControle(c)).ToList();
@@ -273,7 +279,8 @@ public partial class MainWindow : Window
                 Controle.NonRealise(RegleControles.IdBatterie, "Batterie"),
             });
         controles.AddRange(_tests.Select(t => TestsManuels.EnControle(t.Test, t.Enregistre)));
-        var bilan = RegleVente.Evaluer(controles, TestsManuels.Obligatoires(_portable));
+        var bilan = _bilan = RegleVente.Evaluer(controles, TestsManuels.Obligatoires(_portable));
+        _controles = controles;
         SaleStatus.Text = bilan.Libelle;
         SaleCard.BorderBrush = (Brush)FindResource(bilan.Statut switch
         {
@@ -285,5 +292,68 @@ public partial class MainWindow : Window
             .Concat(bilan.Manquants.Select(m => $"○ {m} : non fait ou à vérifier"))
             .Concat(bilan.Reserves.Select(r => $"? Réserve, {r.Titre} : {r.Constat}"));
         SaleDetail.Text = string.Join(Environment.NewLine, lignes);
+    }
+
+    // ---------- Fiche et annonce ----------
+
+    private DonneesFiche Donnees() => new(
+        IdentifiantAtelier.NormaliserInventaire(InventoryBox.Text),
+        _lignes.Select(l => l.Champ).ToList(),
+        _controles,
+        _bilan ?? RegleVente.Evaluer(_controles, TestsManuels.Obligatoires(_portable)),
+        _batterie,
+        ConditionBox.Text,
+        NotesBox.Text);
+
+    private void Compose()
+    {
+        ShowSaleStatus();
+        var texte = Annonce.Composer(Donnees());
+        ListingTitle.Text = texte.Titre;
+        ListingText.Text = texte.Description;
+        ListingWarnings.Text = string.Join(Environment.NewLine, texte.Avertissements.Select(a => "! " + a));
+        ListingStatus.Text = "Relire et corriger le texte si besoin avant de le publier.";
+    }
+
+    private void Compose_Click(object sender, RoutedEventArgs e) => Compose();
+
+    private void ListingTitle_Changed(object sender, TextChangedEventArgs e) =>
+        TitleLength.Text = $"{ListingTitle.Text.Length} / {Annonce.LongueurTitreMax}";
+
+    private void CopyTitle_Click(object sender, RoutedEventArgs e) => Copy(ListingTitle.Text, "Titre copié.");
+
+    private void CopyDescription_Click(object sender, RoutedEventArgs e) => Copy(ListingText.Text, "Descriptif copié.");
+
+    private void Copy(string text, string done)
+    {
+        try
+        {
+            Clipboard.SetText(text);
+            ListingStatus.Text = done;
+        }
+        catch (COMException)
+        {
+            ListingStatus.Text = "Le presse-papiers est occupé : réessayer.";
+        }
+    }
+
+    private void SaveListing_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var maintenant = DateTime.Now;
+            EnsureFolder(maintenant);
+            var fiche = Annonce.FicheInterne(Donnees(), Installation.Libelle(_mode), maintenant);
+            _dossier!.EnregistrerTexte("fiche-interne.txt", fiche);
+            // L'annonce enregistrée est celle affichée, avec les retouches du technicien.
+            _dossier.EnregistrerTexte("annonce.txt", ListingTitle.Text.Trim() + Environment.NewLine + Environment.NewLine + ListingText.Text.Trim() + Environment.NewLine);
+            _dossier.Journaliser($"Fiche interne et annonce enregistrées (statut : {_bilan?.Libelle ?? "?"})", maintenant);
+            ShowHeader();
+            ListingStatus.Text = "Enregistrées dans " + _dossier.Chemin;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            ListingStatus.Text = "Enregistrement impossible : " + ex.Message;
+        }
     }
 }
