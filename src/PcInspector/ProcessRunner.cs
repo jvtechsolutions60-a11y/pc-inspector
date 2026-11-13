@@ -104,8 +104,7 @@ public static class ProcessRunner
     private static void TryAdd(BlockingCollection<string> queue, string text)
     {
         try { queue.Add(text); }
-        catch (InvalidOperationException) { } // file fermée après l'arrêt : ligne ignorée
-        catch (ObjectDisposedException) { }
+        catch (InvalidOperationException) { } // file fermée ou libérée après l'arrêt : ligne ignorée
     }
 
     /// <summary>Job Windows minimal : regroupe un programme et ses enfants pour pouvoir tous les arrêter.</summary>

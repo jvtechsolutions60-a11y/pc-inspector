@@ -145,7 +145,7 @@ internal static class Tools
             try
             {
                 Directory.CreateDirectory(logs);
-                var file = Path.Combine(logs, $"{DateTime.Now:yyyy-MM-dd HH-mm-ss} {SafeName(Path.GetFileName(source.TrimEnd('\\')))} {Guid.NewGuid().ToString("N").Substring(0, 4)}.log");
+                var file = Path.Combine(logs, $"{DateTime.Now:yyyy-MM-dd HH-mm-ss} {LogName(Path.GetFileName(source.TrimEnd('\\')))} {Guid.NewGuid().ToString("N").Substring(0, 4)}.log");
                 File.WriteAllLines(file, new[] { $"robocopy {RobocopyArguments(source, destination, neverOverwrite, excludeDirs, excludeFiles)}", $"Code de sortie : {result.ExitCode}", "" }.Concat(output));
                 result.FullLog = file;
             }
@@ -275,7 +275,7 @@ internal static class Tools
     /// <summary>Dossier où chaque copie enregistre la sortie complète de robocopy (choisi par la sauvegarde ou la restauration).</summary>
     public static string? FullLogFolder { get; set; }
 
-    private static string SafeName(string name)
+    private static string LogName(string name)
     {
         var clean = new string(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c).ToArray());
         return clean.Length == 0 ? "copie" : clean.Length > 40 ? clean.Substring(0, 40) : clean;
