@@ -288,6 +288,9 @@ public static class Benchmark
 
     // ---------- Disque ----------
 
+    /// <summary>Le test d'écriture (1 Go) n'a lieu qu'avec au moins 5 Go libres, connus.</summary>
+    internal static bool DiskWriteAllowed(long? freeBytes) => freeBytes is { } free && free >= 5L * 1024 * 1024 * 1024;
+
     /// <summary>Lecture : mesure de WinSAT. Écriture : 1 Go écrits sans cache Windows, puis effacés.</summary>
     private static void DiskWrite(InfoSection section, WinSatScores winsat)
     {
@@ -296,6 +299,17 @@ public static class Benchmark
         if (winsat.RandomRead is { } random) group.Add("Lecture aléatoire", $"{random:0.0} Mo/s");
 
         var path = Path.Combine(Path.GetTempPath(), "JVTECH-test-disque.tmp");
+        // Audit M01 : pas d'écriture de 1 Go sur un disque presque plein (le test le remplirait).
+        long? free = null;
+        try { free = new DriveInfo(Path.GetPathRoot(path)!).AvailableFreeSpace; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { }
+        if (!DiskWriteAllowed(free))
+        {
+            group.Add("Écriture séquentielle", "Non mesurée : moins de 5 Go libres sur le disque (rien n'a été écrit)");
+            group.Add("Repères", "Disque dur mécanique : 100 à 200 Mo/s · SSD SATA : 450 à 550 Mo/s · SSD NVMe : 1 500 Mo/s et plus");
+            section.Groups.Add(group);
+            return;
+        }
         try
         {
             const int block = 8 * 1024 * 1024;

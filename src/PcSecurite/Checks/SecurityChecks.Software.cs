@@ -241,5 +241,28 @@ public static partial class SecurityChecks
     }
 
     /// <summary>À appeler avant chaque analyse pour relire la liste des logiciels (le technicien a pu en désinstaller).</summary>
-    public static void ResetCache() { lock (ProgramsLock) _programs = null; }
+    public static void ResetCache()
+    {
+        lock (ProgramsLock) _programs = null;
+        PurgeLeftovers(Path.GetTempPath());
+    }
+
+    /// <summary>
+    /// Audit M02 : supprime les copies temporaires laissées par une analyse interrompue (fermeture forcée, plantage) :
+    /// copies de bases de mots de passe « jvtech-logins-*.db » et exports Wi-Fi « PcSecurite-wifi-* ». Chaque analyse
+    /// les efface déjà à la fin ; ceci rattrape les restes avant d'en créer de nouveaux. Renvoie le nombre supprimé.
+    /// </summary>
+    internal static int PurgeLeftovers(string tempFolder)
+    {
+        var removed = 0;
+        try
+        {
+            foreach (var file in Directory.GetFiles(tempFolder, "jvtech-logins-*"))
+                try { File.Delete(file); removed++; } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            foreach (var dir in Directory.GetDirectories(tempFolder, "PcSecurite-wifi-*"))
+                try { Directory.Delete(dir, true); removed++; } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        return removed;
+    }
 }

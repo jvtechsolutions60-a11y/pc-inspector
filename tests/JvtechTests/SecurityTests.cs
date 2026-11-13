@@ -87,3 +87,28 @@ public class SecurityTests
         Assert.IsFalse(SecurityChecks.IsJvtechTool(ours + @"\autre.exe", ours));
     }
 }
+
+/// <summary>Audit M02 : les copies temporaires d'une analyse interrompue sont effacées, le reste du dossier non.</summary>
+[TestClass]
+public class LeftoverPurgeTests
+{
+    [TestMethod]
+    public void OnlyJvtechCopiesRemoved()
+    {
+        var temp = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "jvtech-purge-" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(System.IO.Path.Combine(temp, "PcSecurite-wifi-abc"));
+        System.IO.File.WriteAllText(System.IO.Path.Combine(temp, "PcSecurite-wifi-abc", "Wi-Fi-Maison.xml"), "<x/>");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(temp, "jvtech-logins-123.db"), "copie");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(temp, "document-client.docx"), "à garder");
+        System.IO.Directory.CreateDirectory(System.IO.Path.Combine(temp, "AutreLogiciel"));
+        try
+        {
+            Assert.AreEqual(2, SecurityChecks.PurgeLeftovers(temp));
+            Assert.IsFalse(System.IO.File.Exists(System.IO.Path.Combine(temp, "jvtech-logins-123.db")));
+            Assert.IsFalse(System.IO.Directory.Exists(System.IO.Path.Combine(temp, "PcSecurite-wifi-abc")));
+            Assert.IsTrue(System.IO.File.Exists(System.IO.Path.Combine(temp, "document-client.docx")));
+            Assert.IsTrue(System.IO.Directory.Exists(System.IO.Path.Combine(temp, "AutreLogiciel")));
+        }
+        finally { System.IO.Directory.Delete(temp, true); }
+    }
+}

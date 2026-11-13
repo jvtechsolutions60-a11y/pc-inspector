@@ -73,3 +73,16 @@ public class GpuDriverTests
     public void UnknownDate_IsWarning() =>
         Assert.AreEqual(Severity.Warning, GpuDriver.Judge("NVIDIA GeForce RTX 3060", "NVIDIA", "32.0.15.6094", null, Today)!.Severity);
 }
+
+/// <summary>Audit M01 : le test d'écriture disque (1 Go) est sauté si l'espace libre est faible ou inconnu.</summary>
+[TestClass]
+public class DiskWriteGuardTests
+{
+    [DataTestMethod]
+    [DataRow(null, false)]
+    [DataRow(0L, false)]
+    [DataRow(4L * 1024 * 1024 * 1024, false)]
+    [DataRow(5L * 1024 * 1024 * 1024, true)]
+    [DataRow(200L * 1024 * 1024 * 1024, true)]
+    public void FreeSpaceRequired(long? free, bool allowed) => Assert.AreEqual(allowed, Benchmark.DiskWriteAllowed(free));
+}
