@@ -20,6 +20,25 @@ utilisé pour la migration.
 
 Comptes : un administrateur et un compte standard sur A et B.
 
+## Matrice : où tester quoi (audit I19)
+
+Une machine virtuelle suffit pour tout ce qui efface, installe ou casse : on la restaure en un clic (point de
+contrôle Hyper-V). Le PC réel est indispensable pour ce qui dépend du matériel.
+
+| Domaine | VM C (Hyper-V) | PC réel A/B/D | Pourquoi |
+|---|---|---|---|
+| PXE, Windows PE, EFFACER, refus multi-disques | **Oui** (ajouter un 2e disque virtuel pour 2.1c) | Une fois sur A à la fin | Effacement : jamais d'abord sur du vrai matériel |
+| Préparation revente, Sysprep, Win11Debloat | **Oui** (point de contrôle avant) | Une fois sur A ou B | Irréversible sans image |
+| Restauration PC Migration (fichiers divergents, profils verrouillés) | **Oui** | B | Données : copie de test seulement |
+| Santé disques SMART / NVMe, RAID / RST / USB | Non (disques virtuels sans SMART) | **A, B, D** | Matériel |
+| Températures, benchmarks, pilote GPU | Non | **A, B** | Matériel |
+| Batterie, Wi-Fi | Non | **A** | Matériel |
+| PC Sécurité, comptes standard / admin | Oui | A, B | Les deux suffisent |
+| Arrêt des programmes bloqués (job Windows, I12/I13) | **Oui** | — | Logique Windows, sans matériel |
+
+Preuve à garder pour chaque scénario : date, version (v1.0.N), repère du PC, résultat, et la capture ou le journal
+(`Journaux pour le support`). Le tableau de suivi en bas de page fait foi ; un scénario sans preuve n'est pas validé.
+
 ## Scénarios
 
 ### 1. Préparation revente (PC Maintenance `/preparation`) — critique
@@ -50,6 +69,10 @@ Comptes : un administrateur et un compte standard sur A et B.
 | 2.6 | Ouvrir serveur.ini | Pas de mot de passe ni de jeton en clair (`MotDePasseProtege`, `JetonProtege`) |
 | 2.7 | `icacls C:\JVTECH-PXE` | Seuls Administrateurs et SYSTEM |
 | 2.8 | Ouvrir une session Windows avec jvtechpxe | Impossible (pas dans le groupe Utilisateurs) |
+| 2.9 | « Accepter les PC » ouvert : démarrer en PXE un PC jamais vu | Question « Autoriser ce PC ? » sur le serveur ; Non = le PC ne reçoit rien |
+| 2.10 | `net user jvtechpxe` hors préparation, puis pendant une préparation | « Compte actif : Non », puis « Oui » ; de nouveau « Non » quelques minutes après la fin |
+| 2.11 | Mettre à jour l'image avec une mise à jour plus ancienne que celle déjà intégrée | Refus « plus ancienne », image inchangée |
+| 2.12 | Copier serveur.ini vers un autre PC Windows et lancer le serveur | Alerte « secrets illisibles », image à repréparer, aucun PC accepté |
 
 ### 3. PC Migration — critique
 | # | Scénario | Résultat attendu |
@@ -67,6 +90,8 @@ Comptes : un administrateur et un compte standard sur A et B.
 | 3.11 | Sur B, un `Documents\devis.docx` différent (plus ancien) de celui de la sauvegarde | Celui de B intact ; version de l'ancien PC dans « Fichiers de l'ancien PC en double (…) » ; listé dans le rapport |
 | 3.12 | Même nom, même date, contenu différent | Les deux versions gardées |
 | 3.13 | Chrome ouvert sur B (profil verrouillé) pendant la restauration des navigateurs, refuser de le fermer puis forcer | Chrome « NON restauré », profil de B intact, aucune fusion |
+| 3.14 | Sauvegarde puis modifier un octet d'un fichier sauvegardé avant la fin du contrôle (ou disque défectueux) | « CONTRÔLE ÉCHOUÉ », jamais « VÉRIFIÉS » |
+| 3.15 | Sauvegarde avec plus de 200 fichiers en erreur | Rapport limité à 200 lignes + lien vers la liste complète dans « Journaux robocopy » |
 
 ### 4. Diagnostic disques (PC Inspector)
 | # | Scénario | Résultat attendu |
@@ -85,6 +110,11 @@ Comptes : un administrateur et un compte standard sur A et B.
 | 5.4 | Nettoyage du cache Windows Update | Services `wuauserv` et `bits` redémarrés à la fin (vérifier `services.msc`) |
 | 5.5 | « Arrêter après l'étape » pendant une opération longue | Arrêt propre après l'étape en cours |
 | 5.6 | AdwCleaner avec Internet coupé en cours de téléchargement | Pas de fichier `.part` restant, message clair |
+| 5.7 | Préparation revente en VM : vérifier le plan d'alimentation avant/après (`powercfg /list`) | Même plan actif qu'au départ, aucun plan « JVTECH » restant |
+| 5.8 | Ouvrir un sysprep.exe à la main avec des arguments pendant la préparation | Cette fenêtre n'est pas fermée par PC Maintenance |
+| 5.9 | Nettoyage : un `.docx` et un fichier en lecture seule dans `%TEMP%` | `.docx` déplacé dans « JVTECH - mis de côté », fichier en lecture seule laissé |
+| 5.10 | Modifier une ligne de `Win11Debloat.ps1` dans le kit, lancer la préparation | Win11Debloat « non lancé par sécurité », la préparation continue |
+| 5.11 | Lancer une opération dont le programme se bloque (ex. DISM sans réseau avec délai court) | Programme et ses enfants arrêtés au délai, logiciel toujours réactif |
 
 ### 6. PC Sécurité
 | # | Scénario | Résultat attendu |
@@ -93,6 +123,7 @@ Comptes : un administrateur et un compte standard sur A et B.
 | 6.2 | Compte standard | Points illisibles en « NON VÉRIFIÉ », pas en rouge |
 | 6.3 | DNS d'entreprise ou de VPN | « À AMÉLIORER », pas « URGENT » |
 | 6.4 | Vérifier qu'aucun réglage n'est modifié (comparer un export `reg` avant/après) | Identique |
+| 6.5 | Fermer PC Sécurité (gestionnaire des tâches) pendant l'analyse, relancer une analyse | Aucun `jvtech-logins-*` ni `PcSecurite-wifi-*` dans `%TEMP%` après la 2e analyse |
 
 ### 7. Journaux et distribution
 | # | Scénario | Résultat attendu |
@@ -100,6 +131,9 @@ Comptes : un administrateur et un compte standard sur A et B.
 | 7.1 | Lanceur → « Journaux pour le support » | .zip créé, aucune ligne contenant un mot de passe |
 | 7.2 | Télécharger une version, comparer `Get-FileHash` avec SHA256SUMS.txt | Identique |
 | 7.3 | Mode clé USB : lancer depuis une clé | Rapports et journaux sur la clé |
+| 7.4 | `gh attestation verify` sur un .exe d'une version publiée | « Verification succeeded! » |
+| 7.5 | PC Inspector, disque avec moins de 5 Go libres | Écriture « non mesurée », rien écrit |
+| 7.6 | Cinebench modifié (ou non signé) dans Outils | « Non lancé », score par 7-Zip |
 
 ## Suivi
 
@@ -107,5 +141,5 @@ Comptes : un administrateur et un compte standard sur A et B.
 |---|---|---|---|---|---|
 | (à remplir) | | | | | |
 
-État au 10/11/2026 : **aucun de ces scénarios n'a encore été exécuté sur un PC réel.** Seuls la compilation et les
+État au 13/11/2026 : **aucun de ces scénarios n'a encore été exécuté sur un PC réel.** Seuls la compilation et les
 tests automatisés ont été vérifiés.

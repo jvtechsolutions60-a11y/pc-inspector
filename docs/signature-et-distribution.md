@@ -12,7 +12,12 @@
 - **Fichiers téléchargés par les logiciels** : AdwCleaner (PC Maintenance) et les mises à jour intégrées à l'image
   PXE ne sont lancés ou intégrés que s'ils portent une signature Authenticode valide de l'éditeur (Malwarebytes,
   Microsoft). AdwCleaner est téléchargé dans un fichier `.part` puis renommé seulement s'il est complet et signé.
-- **Win11Debloat** : version figée (`WIN11DEBLOAT` dans build.yml), la compilation échoue si le script attendu manque.
+- **Win11Debloat** : téléchargé par son commit, empreinte des scripts contrôlée par la CI et par PC Maintenance avant
+  lancement (refus si différent). Voir `THIRD-PARTY-NOTICES.md`.
+- **Attestation de provenance** (depuis le 13/11/2026) : chaque fichier publié sur `main` porte une attestation signée
+  (Sigstore) qui prouve qu'il vient de la compilation GitHub de ce dépôt. Vérification : `docs/verification-telechargement.md`.
+- **Chaîne de compilation** : actions GitHub épinglées par SHA de commit, droits en lecture seule sauf pour l'étape
+  de publication.
 
 ## Ce qui manque : la signature de code des .exe JVTECH
 
