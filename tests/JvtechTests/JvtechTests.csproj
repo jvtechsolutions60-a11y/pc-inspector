@@ -36,6 +36,7 @@
     <ProjectReference Include="..\..\src\PcMaintenance\PcMaintenance.csproj" Aliases="maintenance" />
     <ProjectReference Include="..\..\src\PcMigration\PcMigration.csproj" Aliases="migration" />
     <ProjectReference Include="..\..\src\JvtechServeur\JvtechServeur.csproj" Aliases="serveur" />
+    <ProjectReference Include="..\..\src\JvtechSonde\JvtechSonde.csproj" Aliases="sonde" />
   </ItemGroup>
 
 </Project>

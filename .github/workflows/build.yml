@@ -46,6 +46,13 @@ jobs:
       - name: Compiler le lanceur JVTECH Outils
         run: dotnet build src/JvtechOutils/JvtechOutils.csproj -c Release -o publish/lanceur -p:Version=${{ env.VERSION }}
 
+      # JVTECH Sonde : le .exe, son sonde.ini d'exemple et le module optionnel « capteurs » (LibreHardwareMonitor).
+      - name: Compiler JVTECH Sonde
+        run: dotnet build src/JvtechSonde/JvtechSonde.csproj -c Release -o publish/sonde-build -p:Version=${{ env.VERSION }}
+
+      - name: Compiler le module capteurs de JVTECH Sonde
+        run: dotnet build src/JvtechSonde.Capteurs/JvtechSonde.Capteurs.csproj -c Release -o publish/sonde-capteurs -p:Version=${{ env.VERSION }}
+
       - name: Compiler JVTECH Serveur PXE
         run: dotnet build src/JvtechServeur/JvtechServeur.csproj -c Release -o publish/serveur-build -p:Version=${{ env.VERSION }}
 
@@ -55,6 +62,16 @@ jobs:
           New-Item -ItemType Directory -Force publish/outils | Out-Null
           Copy-Item publish/inspector/PcInspector.exe, publish/securite/PcSecurite.exe, publish/maintenance/PcMaintenance.exe, publish/migration/PcMigration.exe, publish/lanceur/JvtechOutils.exe publish/outils/
           Compress-Archive -Path publish/outils/* -DestinationPath publish/JVTECH-Outils-v${{ env.VERSION }}.zip
+
+      # Sonde à installer sur les PC sous contrat : JvtechSonde.exe + sonde.ini + capteurs\ (DLL seulement).
+      - name: Préparer JVTECH Sonde
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path publish/sonde/capteurs | Out-Null
+          Copy-Item publish/sonde-build/JvtechSonde.exe, publish/sonde-build/sonde.ini, docs/sonde.md -Destination publish/sonde/
+          Copy-Item publish/sonde-capteurs/*.dll -Destination publish/sonde/capteurs/
+          if (-not (Test-Path publish/sonde/capteurs/LibreHardwareMonitorLib.dll)) { throw 'LibreHardwareMonitorLib.dll introuvable' }
+          Compress-Archive -Path publish/sonde/* -DestinationPath publish/JVTECH-Sonde-v${{ env.VERSION }}.zip
 
       # Serveur PXE du mini PC de l'atelier : le serveur, et à côté le kit qu'il ajoute à l'installation de Windows
       # (autounattend.xml, PC Maintenance et ses réglages, recopiés par Windows dans C:\JVTECH).
@@ -78,7 +95,7 @@ jobs:
       - name: Empreintes SHA-256
         shell: pwsh
         run: |
-          $files = @(Get-ChildItem publish/*.zip) + @(Get-ChildItem publish/outils/*.exe)
+          $files = @(Get-ChildItem publish/*.zip) + @(Get-ChildItem publish/outils/*.exe) + @(Get-Item publish/sonde/JvtechSonde.exe)
           $lines = $files | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name }
           Set-Content -Path publish/SHA256SUMS.txt -Value $lines -Encoding utf8NoBOM
           Copy-Item publish/SHA256SUMS.txt publish/outils/
@@ -90,6 +107,11 @@ jobs:
           path: |
             publish/outils/*.exe
             publish/outils/SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JVTECH-Sonde-v${{ env.VERSION }}
+          path: publish/sonde/
 
       - uses: actions/upload-artifact@v4
         with:
@@ -106,9 +128,11 @@ jobs:
           body: |
             PC Inspector, PC Sécurité, PC Maintenance, PC Migration et le lanceur JVTECH Outils, version v${{ env.VERSION }}.
             Télécharger le .zip, le décompresser (sur une clé USB pour le mode clé USB) et lancer JvtechOutils.exe.
+            Contrôle quotidien des PC sous contrat : JVTECH-Sonde (voir sonde.md dans le .zip).
             Préparation revente par le réseau (PXE) : JVTECH-Serveur-PXE, à installer sur le mini PC de l'atelier (voir LISEZMOI.txt).
           files: |
             publish/JVTECH-Outils-v${{ env.VERSION }}.zip
             publish/JVTECH-Serveur-PXE-v${{ env.VERSION }}.zip
+            publish/JVTECH-Sonde-v${{ env.VERSION }}.zip
             publish/outils/*.exe
             publish/SHA256SUMS.txt
