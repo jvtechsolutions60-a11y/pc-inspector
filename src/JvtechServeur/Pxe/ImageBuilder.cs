@@ -70,6 +70,7 @@ internal static class ImageBuilder
 
         config.ServerAddress = server.ToString();
         config.WinPeVersion = WinPeScriptVersion;
+        config.SecretsLost = false;
         config.LastUpdate = "";
         config.LastUpdateDate = null;
         config.Save();

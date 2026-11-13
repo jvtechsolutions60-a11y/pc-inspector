@@ -66,6 +66,13 @@ public partial class MainWindow : Window
             Log($"Suivi des postes indisponible (port {ServerConfig.StatusPort}) : {ex.Message}");
         }
 
+        if (_config.SecretsLost)
+        {
+            Log("ALERTE : mot de passe du partage ou jeton du suivi illisible sur ce PC (serveur.ini copié depuis un autre PC ou abîmé). Refaire « Préparer depuis une ISO » : un nouveau mot de passe et un nouveau jeton seront créés.");
+            MessageBox.Show(this, "Les secrets du serveur (mot de passe du partage, jeton du suivi) ne peuvent pas être lus sur ce PC.\n\n" +
+                "Refaites « Préparer depuis une ISO » : de nouveaux secrets seront créés et Windows PE sera refait avec eux.",
+                "JVTECH Serveur PXE", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
         RefreshImage();
         RefreshStats();
         if (_config.ImageReady) StartServer();
@@ -150,15 +157,61 @@ public partial class MainWindow : Window
         _dhcp = null;
         _tftp = null;
         _acceptUntil = DateTime.MinValue;
+        lock (_approved) { _approved.Clear(); _asked.Clear(); }
+        if (Idle()) SetShareAccount(false);
         AddressBox.IsEnabled = true;
         RefreshHeader();
     }
 
     /// <summary>
-    /// Seuls les PC démarrés sur le réseau pendant la fenêtre « Accepter les PC » reçoivent l'ordre de démarrer :
-    /// un PC de l'atelier qui démarrerait sur le réseau par hasard n'est jamais effacé.
+    /// Seuls les PC démarrés sur le réseau pendant la fenêtre « Accepter les PC » ET autorisés un par un par le
+    /// technicien (adresse MAC, pour cette fenêtre seulement) reçoivent l'ordre de démarrer (audit I11). Un PC de
+    /// l'atelier qui démarrerait sur le réseau par hasard n'est jamais effacé ; sur le PC, EFFACER doit encore être tapé.
     /// </summary>
-    private bool Accept(string mac) => DateTime.Now < _acceptUntil;
+    private bool Accept(string mac)
+    {
+        if (DateTime.Now >= _acceptUntil) return false;
+        lock (_approved)
+        {
+            if (_approved.Contains(mac)) return true;
+            if (!_asked.Add(mac)) return false;
+        }
+        Dispatcher.BeginInvoke(new Action(() => AskApproval(mac)));
+        return false;
+    }
+
+    private readonly HashSet<string> _approved = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _asked = new(StringComparer.OrdinalIgnoreCase);
+
+    private void AskApproval(string mac)
+    {
+        Log($"{mac} demande à démarrer sur le réseau : en attente de votre accord.");
+        var yes = MessageBox.Show(this,
+            $"Un PC demande à démarrer sur le serveur.\n\nAdresse MAC : {mac}\n\n" +
+            "Vérifiez que c'est bien le PC à préparer (étiquette sous le PC, ou adresse affichée à l'écran du démarrage réseau). " +
+            "Autoriser ce PC ? (sur le PC, il faudra encore taper EFFACER)",
+            "JVTECH Serveur PXE", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
+        lock (_approved)
+        {
+            if (yes && DateTime.Now < _acceptUntil) _approved.Add(mac);
+            else _asked.Remove(mac); // refusé : redemandé s'il redémarre
+        }
+        Log(yes ? $"{mac} autorisé : il démarrera au prochain essai (relancer le démarrage réseau s'il a abandonné)." : $"{mac} refusé.");
+    }
+
+    /// <summary>
+    /// Compte du partage (dont le mot de passe est dans Windows PE) actif seulement quand on prépare des PC (audit I08) :
+    /// activé avec « Accepter les PC », désactivé quand plus rien n'est en cours.
+    /// </summary>
+    private void SetShareAccount(bool active)
+    {
+        if (_shareActive == active) return;
+        var (code, _) = Tools.Run(Tools.System32("net.exe"), $"user {ServerConfig.ShareUser} /active:{(active ? "yes" : "no")}", null, TimeSpan.FromSeconds(30));
+        if (code == 0) _shareActive = active;
+        Log(code == 0 ? $"Compte du partage {(active ? "activé" : "désactivé")}." : $"Compte du partage : changement impossible (code {code}).");
+    }
+
+    private bool? _shareActive;
 
     private void AcceptButton_Click(object sender, RoutedEventArgs e)
     {
@@ -168,7 +221,9 @@ public partial class MainWindow : Window
             if (_dhcp is null) return;
         }
         _acceptUntil = DateTime.Now < _acceptUntil ? DateTime.MinValue : DateTime.Now + AcceptDuration;
-        Log(_acceptUntil > DateTime.Now ? "PC acceptés pendant 30 minutes." : "Les PC ne sont plus acceptés.");
+        lock (_approved) { _approved.Clear(); _asked.Clear(); }
+        if (_acceptUntil > DateTime.Now) SetShareAccount(true);
+        Log(_acceptUntil > DateTime.Now ? "PC acceptés pendant 30 minutes, après votre accord pour chacun." : "Les PC ne sont plus acceptés.");
         RefreshHeader();
     }
 
@@ -185,7 +240,7 @@ public partial class MainWindow : Window
         AcceptButton.IsEnabled = !_busy && _config.ImageReady;
         ServerButton.IsEnabled = !_busy;
         AcceptText.Text = accepting
-            ? $"PC acceptés jusqu'à {_acceptUntil:HH:mm} : tout PC démarré sur le réseau sera EFFACÉ et réinstallé."
+            ? $"PC acceptés jusqu'à {_acceptUntil:HH:mm}, un par un après votre accord : un PC autorisé, sur lequel on tape EFFACER, sera effacé et réinstallé."
             : "Les PC ne sont pas acceptés : aucun PC ne peut être effacé par erreur.";
     }
 
@@ -197,6 +252,9 @@ public partial class MainWindow : Window
             _lastMinute = DateTime.Now;
             _postes.Tick();
             RefreshStats();
+            // Plus rien en cours (fenêtre fermée, aucun PC en installation) : compte du partage désactivé.
+            if (Idle()) SetShareAccount(false);
+            else if (_postes.Items.Any(p => p.Finished is null && p.State == "En cours")) SetShareAccount(true);
         }
         // Vérification une fois par jour, intégration automatique quand l'atelier est calme.
         if (!_busy && (_config.LastCheck is null || DateTime.Now - _config.LastCheck > TimeSpan.FromHours(20)))

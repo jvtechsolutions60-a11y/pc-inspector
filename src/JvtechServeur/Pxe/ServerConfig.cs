@@ -50,7 +50,10 @@ internal sealed class ServerConfig
     /// Image complète ET Windows PE avec le script actuel : une image plus ancienne (sans confirmation EFFACER ni refus
     /// des PC à plusieurs disques) n'est plus utilisée, il faut la refaire depuis l'ISO.
     /// </summary>
-    public bool ImageReady => WinPeVersion >= ImageBuilder.WinPeScriptVersion &&
+    /// <summary>Mot de passe du partage ou jeton du suivi présents dans serveur.ini mais impossibles à déchiffrer sur ce PC.</summary>
+    public bool SecretsLost { get; set; }
+
+    public bool ImageReady => !SecretsLost && WinPeVersion >= ImageBuilder.WinPeScriptVersion &&
         File.Exists(Path.Combine(TftpFolder, "bootmgfw.efi")) && File.Exists(Path.Combine(TftpFolder, @"Boot\BCD"))
         && File.Exists(Path.Combine(TftpFolder, @"Boot\boot.wim")) && File.Exists(Path.Combine(InstallFolder, "setup.exe"));
 
@@ -68,6 +71,10 @@ internal sealed class ServerConfig
             config.SharePassword = values.TryGetValue("MotDePasseProtege", out var protectedPw) ? Unprotect(protectedPw)
                 : values.TryGetValue("MotDePasse", out var pw) ? pw : "";
             config.ReportToken = values.TryGetValue("JetonProtege", out var token) ? Unprotect(token) : "";
+            // Secrets présents mais illisibles (fichier copié depuis un autre PC, abîmé) : on ne repart pas en silence
+            // avec un nouveau jeton (audit I16) ; l'image doit être refaite, ce qui régénère tout de façon cohérente.
+            config.SecretsLost = (protectedPw is { Length: > 0 } && config.SharePassword.Length == 0)
+                                 || (token is { Length: > 0 } && config.ReportToken.Length == 0);
             var legacy = values.ContainsKey("MotDePasse");
             if (config.ReportToken.Length == 0 || legacy)
             {
@@ -83,6 +90,8 @@ internal sealed class ServerConfig
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         if (config.ReportToken.Length == 0) { config.ReportToken = StatusPolicy.NewToken(); loadedForMigration = true; }
+        // Image à refaire même après réenregistrement du fichier avec un nouveau jeton.
+        if (config.SecretsLost) config.WinPeVersion = 0;
         // Mot de passe en clair d'une ancienne version, ou jeton créé : on réécrit le fichier chiffré tout de suite.
         if (loadedForMigration)
         {

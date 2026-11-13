@@ -43,3 +43,25 @@ public class PxeScriptTests
         Assert.IsTrue(lines.Skip(test + 1).Take(label - test - 1).Contains("wpeutil shutdown"));
     }
 }
+
+/// <summary>Mises à jour intégrées à l'image : HTTPS chez Microsoft seulement, jamais de retour en arrière (audit I15).</summary>
+[TestClass]
+public class ImageUpdaterTests
+{
+    [DataTestMethod]
+    [DataRow("KB5066835", "", null)]
+    [DataRow("KB5066835", "KB5065426", null)]
+    [DataRow("KB5065426", "KB5066835", "refus")]
+    [DataRow("KB5066835", "KB5066835", "refus")]
+    [DataRow("", "KB5066835", "refus")]
+    public void Downgrade(string candidate, string last, string? expected) =>
+        Assert.AreEqual(expected is null, ImageUpdater.Downgrade(candidate, last) is null);
+
+    [DataTestMethod]
+    [DataRow("http://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2026/11/windows11.0-kb5066835-x64.msu", "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2026/11/windows11.0-kb5066835-x64.msu")]
+    [DataRow("https://catalog.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/a/public/windows11.0-kb5066835-x64.msu", "https://catalog.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/a/public/windows11.0-kb5066835-x64.msu")]
+    [DataRow("http://exemple.com/windows11.0-kb5066835-x64.msu", null)]
+    [DataRow("ftp://download.windowsupdate.com/x.msu", null)]
+    [DataRow("pas une adresse", null)]
+    public void SecureUrl(string url, string? expected) => Assert.AreEqual(expected, ImageUpdater.SecureUrl(url));
+}

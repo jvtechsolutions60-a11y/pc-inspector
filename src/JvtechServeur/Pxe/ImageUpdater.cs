@@ -73,9 +73,54 @@ internal static class ImageUpdater
     /// <summary>Télécharge la mise à jour et l'intègre à chaque édition de install.wim. Renvoie null si tout va bien.</summary>
     public static string? Apply(Update update, ServerConfig config, Action<string> log, Action<string> status)
     {
-        var folder = Path.Combine(ServerConfig.WorkFolder, "MiseAJour");
-        if (Directory.Exists(folder)) Directory.Delete(folder, true);
+        // Une seule intégration à la fois (audit I14).
+        if (!System.Threading.Monitor.TryEnter(ApplyLock)) return "Une intégration de mise à jour est déjà en cours.";
+        try { return ApplyLocked(update, config, log, status); }
+        finally { System.Threading.Monitor.Exit(ApplyLock); }
+    }
+
+    private static readonly object ApplyLock = new();
+
+    /// <summary>
+    /// Refuse une mise à jour déjà intégrée ou plus ancienne que la dernière intégrée (audit I15 : pas de retour en
+    /// arrière, même avec un paquet authentique). Null si elle peut être intégrée.
+    /// </summary>
+    internal static string? Downgrade(string candidateKb, string lastKb)
+    {
+        static int? Number(string kb) => Regex.Match(kb ?? "", @"KB(\d+)") is { Success: true } m && int.TryParse(m.Groups[1].Value, out var n) ? n : null;
+        var candidate = Number(candidateKb);
+        if (candidate is null) return "numéro KB de la mise à jour illisible";
+        var last = Number(lastKb);
+        if (last is not null && candidate <= last) return $"{candidateKb} n'est pas plus récente que {lastKb}, déjà intégrée";
+        return null;
+    }
+
+    /// <summary>Lien de téléchargement en HTTPS (les serveurs de Windows Update l'acceptent) ; autre chose : refusé.</summary>
+    internal static string? SecureUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return null;
+        if (uri.Scheme == Uri.UriSchemeHttp) uri = new UriBuilder(uri) { Scheme = Uri.UriSchemeHttps, Port = -1 }.Uri;
+        if (uri.Scheme != Uri.UriSchemeHttps) return null;
+        var host = uri.Host.ToLowerInvariant();
+        return host.EndsWith(".windowsupdate.com") || host.EndsWith(".microsoft.com") || host == "windowsupdate.com" ? uri.ToString() : null;
+    }
+
+    private static string? ApplyLocked(Update update, ServerConfig config, Action<string> log, Action<string> status)
+    {
+        if (Downgrade(update.Kb, config.LastUpdate) is { } refused) return "Mise à jour refusée : " + refused + ".";
+        // Dossier propre à cette intégration : on ne vide jamais un dossier qui pourrait servir à autre chose.
+        var folder = Path.Combine(ServerConfig.WorkFolder, "MiseAJour-" + Guid.NewGuid().ToString("N").Substring(0, 8));
         Directory.CreateDirectory(folder);
+        try { return Integrate(update, config, folder, log, status); }
+        finally
+        {
+            try { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
+    }
+
+    private static string? Integrate(Update update, ServerConfig config, string folder, Action<string> log, Action<string> status)
+    {
 
         status($"Téléchargement de {update.Kb}…");
         var urls = DownloadUrls(update.Id, log);
@@ -83,13 +128,19 @@ internal static class ImageUpdater
         try
         {
             using var web = Client();
-            foreach (var url in urls)
+            foreach (var link in urls)
             {
+                if (SecureUrl(link) is not { } url) return $"Lien de téléchargement refusé (ni HTTPS ni serveur Microsoft) : {link}";
                 var name = Path.GetFileName(new Uri(url).LocalPath);
+                // Le fichier doit être celui de la mise à jour choisie (bon KB, 64 bits).
+                if (name.IndexOf(update.Kb, StringComparison.OrdinalIgnoreCase) < 0 && !name.StartsWith("windows11.0-", StringComparison.OrdinalIgnoreCase))
+                    return $"{name} ne correspond pas à {update.Kb} : mise à jour non intégrée.";
+                if (name.IndexOf("x64", StringComparison.OrdinalIgnoreCase) < 0)
+                    return $"{name} n'est pas la version 64 bits : mise à jour non intégrée.";
                 log("Téléchargement de " + name);
                 var file = Path.Combine(folder, name);
                 web.DownloadFile(url, file);
-                // Certains liens du catalogue sont en http : on n'intègre que des fichiers signés par Microsoft, intacts.
+                // Téléchargé en HTTPS, puis on n'intègre que des fichiers signés par Microsoft, intacts.
                 if (!PcInspector.Authenticode.IsSignedBy(file, "Microsoft"))
                 {
                     File.Delete(file);
@@ -133,7 +184,6 @@ internal static class ImageUpdater
         var exported = indexes.All(i => Tools.Run(dism, $"/Export-Image /SourceImageFile:\"{InstallWim}\" /SourceIndex:{i} /DestinationImageFile:\"{compact}\" /Compress:max", log, TimeSpan.FromHours(1)).Code == 0);
         if (exported) File.Copy(compact, InstallWim, true);
         if (File.Exists(compact)) File.Delete(compact);
-        Directory.Delete(folder, true);
 
         config.LastUpdate = update.Kb;
         config.LastUpdateDate = DateTime.Today;
