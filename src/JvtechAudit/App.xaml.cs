@@ -7,8 +7,8 @@ public partial class App : Application
 {
     public App()
     {
-        // Lecture seule stricte : une erreur imprévue est affichée, jamais écrite sur le PC du client.
-        // (Les journaux d'Audit iront sur la clé USB, lot 2.)
+        // Lecture seule stricte : une erreur imprévue est affichée, jamais écrite sur le PC du client
+        // (pas de journal : la seule écriture d'Audit est le rapport exporté, voir ExportRapport.cs).
         DispatcherUnhandledException += OnError;
     }
 

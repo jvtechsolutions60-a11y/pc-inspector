@@ -113,10 +113,29 @@ public class SeparationTests
     [DataRow("JvtechAudit")]
     public void LectureSeule_AucunAppelQuiModifie(string project)
     {
-        var files = SourceFiles(project);
+        // Seule exception : l'export du rapport d'Audit, à l'endroit choisi par le technicien (vérifié à part ci-dessous).
+        var files = SourceFiles(project).Where(f => !(project == "JvtechAudit" && Path.GetFileName(f) == ExportAudit)).ToList();
         Assert.IsTrue(files.Count > 0, "aucun fichier trouvé pour " + project);
         var problems = files.SelectMany(f => Violations(File.ReadAllText(f)).Select(v => Path.GetFileName(f) + " " + v)).ToList();
         Assert.AreEqual(0, problems.Count, string.Join(Environment.NewLine, problems));
+    }
+
+    private const string ExportAudit = "ExportRapport.cs";
+
+    [TestMethod]
+    public void Audit_SeuleEcriture_LeRapportChoisiParLeTechnicien()
+    {
+        var chemin = Path.Combine(Root, "src", "JvtechAudit", ExportAudit);
+        var code = File.ReadAllText(chemin);
+        var ecritures = Violations(code).ToList();
+        Assert.AreEqual(1, ecritures.Count, string.Join(Environment.NewLine, ecritures));
+        StringAssert.Contains(ecritures[0], "File.WriteAllText(dialogue.FileName");
+        StringAssert.Contains(code, "new SaveFileDialog");
+        StringAssert.Contains(code, "if (dialogue.ShowDialog(proprietaire) != true) return null;");
+        // Personne d'autre dans Audit n'ouvre de fenêtre « Enregistrer sous » ni n'écrit de fichier.
+        var autres = SourceFiles("JvtechAudit").Where(f => Path.GetFileName(f) != ExportAudit)
+            .Where(f => File.ReadAllText(f).Contains("SaveFileDialog")).Select(Path.GetFileName).ToList();
+        Assert.AreEqual(0, autres.Count, string.Join(", ", autres));
     }
 
     [TestMethod]
