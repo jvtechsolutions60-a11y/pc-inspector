@@ -30,6 +30,9 @@ Garder le dossier `Atelier\<V…>` de chaque essai : c'est la preuve.
 | R19 | Finalisation en mode audit, statut Prêt, n° V… tapé | Sysprep, extinction, au démarrage suivant : écran de premier démarrage (OOBE), pas de retour en mode audit | |
 | R20 | Après R19 : vérifier le PC | Logiciels toujours là, aucune donnée effacée en dehors de ce que fait Sysprep, fichiers de réponse renommés en `.jvtech` | |
 | R21 | Sysprep qui échoue (application du Store mise à jour pour le compte) | Échec affiché avec la fin de `setuperr.log`, PC pas éteint | |
+| R22 | « Tout lancer » sur un PC fraîchement installé, en mode audit | Une seule confirmation ; mises à jour, redémarrage(s) faits seuls, relance seule, 7-Zip + VLC, contrôles, puis arrêt sur les tests manuels | |
+| R23 | Après R22 : faire les tests manuels et « Enregistrer les tests » | Fiche, annonce et rapport enregistrés seuls, écran Finalisation affiché ; Sysprep pas lancé sans confirmation | |
+| R24 | « Arrêter » pendant « Tout lancer », puis relancer | L'action en cours se termine, puis arrêt ; la relance reprend là où il s'était arrêté | |
 
 Limites connues à vérifier pendant la recette :
 - La relance automatique utilise RunOnce du compte : fiable en mode audit (compte Administrateur intégré) ;
