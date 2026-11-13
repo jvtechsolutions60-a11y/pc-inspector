@@ -58,6 +58,9 @@ Au 13/11/2026 (v1.0.105) : **aucune ligne n'est « Validé »**. Aucun essai ré
 | La bibliothèque commune `JvtechLecture` n'écrit ni registre, ni service, ni réglage Windows | `SeparationTests` (code source et dépendances) | — |
 | JVTECH Audit n'inclut pas `JvtechAtelier.Actions` et ne demande pas les droits administrateur | `SeparationTests` | T11, T22 : à faire |
 | Une action d'Atelier note l'état avant, l'état après, le code retour et la durée | `ActionJournalTests` | Lot 1 |
+| JVTECH Audit n'écrit qu'un fichier : le rapport exporté, à l'endroit choisi dans « Enregistrer sous » | `SeparationTests.Audit_SeuleEcriture_LeRapportChoisiParLeTechnicien` | T22 : à faire |
+| Le rapport d'Audit ne contient ni mot de passe, ni clé BitLocker, ni secret Wi-Fi (jamais lus) ; anonymisation possible | `V2RapportAuditTests` | T25 : à faire |
+| Audit ne déclare jamais « Conforme » une information non lue (WMI muet, droits) ; poste administré sans fausse anomalie | `V2AuditTests` (RienDeLu, T05) | T05, T11 : à faire |
 
 ## Comment ajouter une preuve d'essai réel
 
