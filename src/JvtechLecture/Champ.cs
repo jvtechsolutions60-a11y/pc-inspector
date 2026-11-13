@@ -22,10 +22,14 @@ public sealed class Champ
 
     public Champ(string nom, string? brut, string? source = null)
     {
+        Id = nom;
         Nom = nom;
         Detecte = Nettoyer(brut);
         Source = source;
     }
+
+    /// <summary>Identifiant stable (« modele », « serie »…) pour l'enregistrement ; par défaut le nom affiché.</summary>
+    public string Id { get; init; }
 
     public string Nom { get; }
 
@@ -63,6 +67,20 @@ public sealed class Champ
         Corrige = propre;
         CorrigePar = string.IsNullOrWhiteSpace(operateur) ? "?" : operateur.Trim();
         CorrigeLe = quand;
+    }
+
+    /// <summary>Recharge une correction déjà enregistrée (dossier du PC), sans perdre qui l'a faite ni quand.</summary>
+    public void Restaurer(string? corrige, string? par, DateTime? le)
+    {
+        var propre = Nettoyer(corrige);
+        if (propre is null || string.Equals(propre, Detecte, StringComparison.Ordinal))
+        {
+            AnnulerCorrection();
+            return;
+        }
+        Corrige = propre;
+        CorrigePar = string.IsNullOrWhiteSpace(par) ? "?" : par!.Trim();
+        CorrigeLe = le;
     }
 
     public void AnnulerCorrection()

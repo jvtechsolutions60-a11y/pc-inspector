@@ -21,4 +21,9 @@
     <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
   </ItemGroup>
 
+  <!-- Les actions s'appuient sur la bibliothèque en lecture seule (jamais l'inverse) -->
+  <ItemGroup>
+    <ProjectReference Include="..\JvtechLecture\JvtechLecture.csproj" />
+  </ItemGroup>
+
 </Project>

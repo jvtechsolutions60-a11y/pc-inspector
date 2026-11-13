@@ -19,7 +19,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Reference Include="System.Management" />
+  </ItemGroup>
+
+  <!-- Code v1 repris tel quel (lecture seule) -->
+  <ItemGroup>
     <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
+    <Compile Include="..\PcInspector\Collectors\Wmi.cs" Link="Shared\Wmi.cs" />
   </ItemGroup>
 
 </Project>

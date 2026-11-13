@@ -1,48 +1,98 @@
 <Window x:Class="JvtechAtelier.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="JVTECH Atelier" Width="1100" Height="720" MinWidth="900" MinHeight="560"
-        WindowStartupLocation="CenterScreen" Background="{StaticResource ContentBrush}" FontFamily="Segoe UI">
+        Title="JVTECH Atelier" Width="1180" Height="760" MinWidth="900" MinHeight="560"
+        WindowStartupLocation="CenterScreen" Background="{StaticResource ContentBrush}" FontFamily="Segoe UI"
+        Loaded="Window_Loaded">
     <DockPanel>
-        <Border DockPanel.Dock="Top" Background="{StaticResource HeaderBrush}" Padding="28,18">
-            <StackPanel>
-                <TextBlock Text="JVTECH ATELIER" Style="{StaticResource AppName}"/>
-                <TextBlock x:Name="VersionText" Style="{StaticResource AppSubtitle}"/>
-            </StackPanel>
+        <Border DockPanel.Dock="Top" Background="{StaticResource HeaderBrush}" Padding="28,16">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock x:Name="PcTitle" Foreground="White" FontSize="16" FontWeight="Bold" TextAlignment="Right"/>
+                    <TextBlock x:Name="FolderText" Style="{StaticResource AppSubtitle}" TextAlignment="Right"/>
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock Text="JVTECH ATELIER" Style="{StaticResource AppName}"/>
+                    <TextBlock x:Name="VersionText" Style="{StaticResource AppSubtitle}"/>
+                </StackPanel>
+            </DockPanel>
         </Border>
 
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="24,20">
-                <!-- Les 6 étapes du parcours (cahier § 3.2), actives au lot 1 -->
-                <ItemsControl x:Name="Steps">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <UniformGrid Rows="1"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Style="{StaticResource Card}" Margin="0,0,8,0">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Title}" Style="{StaticResource CardTitle}"/>
-                                    <TextBlock Text="{Binding State}" Style="{StaticResource CardDetail}"/>
-                                </StackPanel>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+        <!-- Les 6 étapes du parcours (cahier § 3.2) -->
+        <ItemsControl x:Name="Steps" DockPanel.Dock="Top" Margin="24,16,16,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Rows="1"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Style="{StaticResource Card}" Margin="0,0,8,0" BorderBrush="{Binding Border}" BorderThickness="{Binding Thickness}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding Title}" Style="{StaticResource CardTitle}" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding State}" Style="{StaticResource CardDetail}"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
 
-                <Border Style="{StaticResource Card}" Margin="0,16,0,0" BorderBrush="{StaticResource WarningBrush}" BorderThickness="2">
+        <Grid Margin="24,16,24,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="320"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Étape 1 : identification -->
+            <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,16,0" Padding="18,14">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Identification du PC" Style="{StaticResource PageTitle}"/>
+                    <TextBlock DockPanel.Dock="Top" Style="{StaticResource Hint}" Margin="0,4,0,12"
+                               Text="Valeurs lues sur le PC. Corriger dans la colonne « Valeur retenue » : la valeur détectée reste gardée dans le dossier et la fiche interne. Ce qui n'est pas lu reste « Non détecté »."/>
+
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                        <StackPanel Margin="0,0,16,0">
+                            <TextBlock Text="N° d'inventaire (V…)" Style="{StaticResource CardTitle}"/>
+                            <TextBox x:Name="InventoryBox" Width="140" Margin="0,2,0,0" ToolTip="Numéro VENTE NANTERRE, par exemple V1042. Laisser vide s'il n'est pas encore attribué."/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,16,0">
+                            <TextBlock Text="Technicien" Style="{StaticResource CardTitle}"/>
+                            <TextBox x:Name="OperatorBox" Width="160" Margin="0,2,0,0" ToolTip="Nom noté à côté de chaque correction"/>
+                        </StackPanel>
+                        <Button x:Name="ReloadButton" Content="Relire le PC" Margin="0,16,8,0" Click="Reload_Click"/>
+                        <Button x:Name="SaveButton" Content="Enregistrer le dossier" Style="{StaticResource PrimaryButton}" Margin="0,16,0,0" Click="Save_Click"/>
+                    </WrapPanel>
+
+                    <TextBlock DockPanel.Dock="Bottom" x:Name="StatusText" Style="{StaticResource Hint}" Margin="0,10,0,0"/>
+
+                    <DataGrid x:Name="FieldsGrid" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                              HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource BorderBrush}"
+                              BorderBrush="{StaticResource BorderBrush}" Background="White" RowHeaderWidth="0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Information" Binding="{Binding Nom}" IsReadOnly="True" Width="130"/>
+                            <DataGridTextColumn Header="Détecté" Binding="{Binding Detecte}" IsReadOnly="True" Width="*"/>
+                            <DataGridTextColumn Header="Valeur retenue (modifiable)" Binding="{Binding Retenu, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                            <DataGridTextColumn Header="Source" Binding="{Binding Source}" IsReadOnly="True" Width="150"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </Border>
+
+            <StackPanel Grid.Column="1">
+                <Border Style="{StaticResource Card}" BorderBrush="{StaticResource WarningBrush}" BorderThickness="2">
                     <StackPanel>
                         <TextBlock Text="STATUT AVANT VENTE" Style="{StaticResource CardTitle}"/>
                         <TextBlock x:Name="SaleStatus" Style="{StaticResource PageTitle}"/>
-                        <TextBlock x:Name="SaleDetail" Style="{StaticResource CardDetail}" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="SaleDetail" Style="{StaticResource CardDetail}"/>
                     </StackPanel>
                 </Border>
-
-                <TextBlock Style="{StaticResource Hint}" Margin="2,16,0,0" TextWrapping="Wrap"
-                           Text="Version d'aperçu (lot 0) : aucune action n'est disponible, rien n'est modifié sur ce PC. Le parcours arrive au lot 1."/>
+                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock Text="FINALISATION" Style="{StaticResource CardTitle}"/>
+                        <TextBlock x:Name="FinalizeText" Style="{StaticResource CardDetail}"/>
+                    </StackPanel>
+                </Border>
             </StackPanel>
-        </ScrollViewer>
+        </Grid>
     </DockPanel>
 </Window>

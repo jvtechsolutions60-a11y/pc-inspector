@@ -23,7 +23,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Reference Include="System.Management" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
+    <Compile Include="..\PcInspector\Collectors\Wmi.cs" Link="Shared\Wmi.cs" />
     <Page Include="..\PcInspector\Theme.xaml" Link="Theme.xaml" />
     <Compile Include="..\JvtechLecture\**\*.cs" Exclude="..\JvtechLecture\obj\**;..\JvtechLecture\bin\**" LinkBase="Lecture" />
   </ItemGroup>
