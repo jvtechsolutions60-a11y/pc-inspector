@@ -134,6 +134,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write     # attestation de provenance (Sigstore), audit I10
+      attestations: write
     env:
       VERSION: 1.0.${{ github.run_number }}
     steps:
@@ -141,6 +143,15 @@ jobs:
         with:
           name: publication
           path: publish
+
+      # Attestation de provenance signée (gratuite, Sigstore) : prouve que chaque fichier vient de cette compilation
+      # de ce dépôt. Vérification : gh attestation verify PcMaintenance.exe -R jvtechsolutions60-a11y/pc-inspector
+      - uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
+        with:
+          subject-path: |
+            publish/JVTECH-Outils-v${{ env.VERSION }}.zip
+            publish/JVTECH-Serveur-PXE-v${{ env.VERSION }}.zip
+            publish/outils/*.exe
 
       # Une version publiée par compilation, que les logiciels consultent pour signaler une mise à jour.
       - name: Publier la version

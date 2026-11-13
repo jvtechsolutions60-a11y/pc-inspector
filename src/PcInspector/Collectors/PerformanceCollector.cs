@@ -345,6 +345,7 @@ public static class Benchmark
         var group = new InfoGroup("Processeur (Cinebench, en points)");
         var cinebench = FindTool("Cinebench.exe");
         using var sampler = new Sampler();
+        if (cinebench is not null && Unsigned(cinebench, group)) cinebench = null;
         if (cinebench is null)
         {
             // Cinebench est facultatif (1 Go, non redistribuable) : le score processeur vient alors de 7-Zip.
@@ -481,6 +482,7 @@ public static class Benchmark
             group.Add("Résultat", $"Blender Benchmark absent : télécharger « benchmark-launcher-cli » sur opendata.blender.org et le mettre dans {ToolsFolder}");
             return null;
         }
+        if (Unsigned(cli, group)) return null;
 
         var workDir = Path.GetDirectoryName(cli)!;
         List<string> Cli(string args, TimeSpan timeout)
@@ -560,6 +562,21 @@ public static class Benchmark
             >= 9 => "Carte graphique dédiée : score à confirmer avec Blender Benchmark",
             _ => "Graphique intégré : jeux légers uniquement",
         };
+    }
+
+    /// <summary>
+    /// Audit I09/I20 : un outil déposé à la main n'est lancé que s'il porte une signature Authenticode valide
+    /// (fichier non modifié depuis sa signature par l'éditeur). Sinon : ligne d'explication et outil non lancé.
+    /// </summary>
+    private static bool Unsigned(string exe, InfoGroup group)
+    {
+        if (Authenticode.IsSigned(exe))
+        {
+            group.Add("Signature", Authenticode.Publisher(exe) ?? "valide");
+            return false;
+        }
+        group.Add("Non lancé", $"{Path.GetFileName(exe)} n'a pas de signature valide de son éditeur (fichier modifié ou d'origine inconnue). Le retélécharger sur le site officiel.");
+        return true;
     }
 
     private static string? FindTool(string exe)
