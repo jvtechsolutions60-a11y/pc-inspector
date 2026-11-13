@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Jvtech.Lecture;
+using Jvtech.Lecture.Regles;
 
 namespace Jvtech.Atelier.Dossier;
 
@@ -18,6 +19,7 @@ public sealed class DossierPc
     public const string FichierInventaire = "inventaire.ini";
     public const string FichierJournal = "journal.txt";
     public const string FichierReglages = "atelier.ini";
+    public const string FichierTests = "tests.ini";
 
     private DossierPc(string chemin, string identifiant)
     {
@@ -28,23 +30,8 @@ public sealed class DossierPc
     public string Chemin { get; private set; }
     public string Identifiant { get; private set; }
 
-    /// <summary>
-    /// Racine des dossiers : clé « Dossiers= » de atelier.ini (à côté du .exe), sinon le dossier « Atelier » à côté
-    /// du .exe. Une ligne vide ou commentée (« ; ») est ignorée.
-    /// </summary>
-    public static string Racine(string dossierExe)
-    {
-        var reglages = Path.Combine(dossierExe, FichierReglages);
-        if (File.Exists(reglages))
-            foreach (var ligne in File.ReadAllLines(reglages, Encoding.UTF8))
-            {
-                var t = ligne.Trim();
-                if (t.StartsWith(";") || !t.StartsWith("Dossiers=", StringComparison.OrdinalIgnoreCase)) continue;
-                var valeur = t.Substring("Dossiers=".Length).Trim().Trim('"');
-                if (valeur.Length > 0) return valeur;
-            }
-        return Path.Combine(dossierExe, "Atelier");
-    }
+    /// <summary>Racine des dossiers : « Dossiers= » de atelier.ini, sinon le dossier « Atelier » à côté du .exe.</summary>
+    public static string Racine(string dossierExe) => ReglagesAtelier.Lire(dossierExe).Racine(dossierExe);
 
     /// <summary>Ouvre le dossier s'il existe, sinon le crée.</summary>
     public static DossierPc OuvrirOuCreer(string racine, string identifiant)
@@ -177,6 +164,61 @@ public sealed class DossierPc
         foreach (var c in champs)
             if (corrections.TryGetValue(c.Id, out var corr))
                 c.Restaurer(corr.Corrige, corr.Par, corr.Le);
+    }
+
+    /// <summary>Enregistre les résultats des tests manuels (preuve : technicien, date, remarque).</summary>
+    public void EnregistrerTests(IEnumerable<ResultatTestManuel> resultats)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("; Tests manuels JVTECH Atelier");
+        foreach (var r in resultats)
+        {
+            sb.AppendLine($"[test:{r.Id}]");
+            sb.AppendLine("resultat=" + r.Resultat);
+            sb.AppendLine("portee=" + r.PorteeEchec);
+            sb.AppendLine("remarque=" + Echapper(r.Remarque));
+            sb.AppendLine("technicien=" + Echapper(r.Technicien));
+            sb.AppendLine("le=" + (r.Le?.ToString("s", CultureInfo.InvariantCulture) ?? ""));
+            sb.AppendLine();
+        }
+        EcrireAtomique(Path.Combine(Chemin, FichierTests), sb.ToString());
+    }
+
+    public Dictionary<string, ResultatTestManuel> LireTests()
+    {
+        var tests = new Dictionary<string, ResultatTestManuel>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (section, valeurs) in LireSections(Path.Combine(Chemin, FichierTests)))
+        {
+            if (!section.StartsWith("test:", StringComparison.OrdinalIgnoreCase)) continue;
+            var id = section.Substring(5);
+            Enum.TryParse<ResultatTest>(Lire(valeurs, "resultat"), out var resultat);
+            if (!Enum.TryParse<Portee>(Lire(valeurs, "portee"), out var portee)) portee = Portee.Bloquante;
+            DateTime? le = DateTime.TryParse(Lire(valeurs, "le"), CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
+            tests[id] = new ResultatTestManuel(id, resultat, portee, Lire(valeurs, "remarque"), Lire(valeurs, "technicien"), le);
+        }
+        return tests;
+    }
+
+    private static IEnumerable<(string Section, Dictionary<string, string> Valeurs)> LireSections(string fichier)
+    {
+        if (!File.Exists(fichier)) yield break;
+        string? section = null;
+        var valeurs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var brut in File.ReadAllLines(fichier, Encoding.UTF8))
+        {
+            var ligne = brut.Trim();
+            if (ligne.Length == 0 || ligne.StartsWith(";")) continue;
+            if (ligne.StartsWith("[") && ligne.EndsWith("]"))
+            {
+                if (section is not null) yield return (section, valeurs);
+                section = ligne.Substring(1, ligne.Length - 2);
+                valeurs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                continue;
+            }
+            var egal = ligne.IndexOf('=');
+            if (egal > 0) valeurs[ligne.Substring(0, egal)] = ligne.Substring(egal + 1);
+        }
+        if (section is not null) yield return (section, valeurs);
     }
 
     private static string? Lire(Dictionary<string, string> valeurs, string cle) =>

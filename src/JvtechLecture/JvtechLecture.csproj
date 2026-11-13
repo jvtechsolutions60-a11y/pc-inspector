@@ -26,6 +26,8 @@
   <ItemGroup>
     <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
     <Compile Include="..\PcInspector\Collectors\Wmi.cs" Link="Shared\Wmi.cs" />
+    <Compile Include="..\PcInspector\Collectors\DiskHealth.cs" Link="Shared\DiskHealth.cs" />
+    <Compile Include="..\PcInspector\Models\Health.cs" Link="Shared\Health.cs" />
   </ItemGroup>
 
 </Project>

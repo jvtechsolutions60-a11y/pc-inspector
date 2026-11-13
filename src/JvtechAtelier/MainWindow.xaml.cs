@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using Jvtech.Atelier.Dossier;
 using Jvtech.Lecture;
@@ -14,72 +14,64 @@ using PcInspector;
 
 namespace JvtechAtelier;
 
-/// <summary>Une ligne de l'inventaire : la valeur détectée (figée) et la valeur retenue (modifiable).</summary>
-public sealed class LigneChamp : INotifyPropertyChanged
-{
-    public LigneChamp(Champ champ)
-    {
-        Champ = champ;
-        _retenu = champ.Valeur ?? "";
-    }
-
-    public Champ Champ { get; }
-    public string Nom => Champ.Nom;
-    public string Detecte => Champ.Detecte ?? Jvtech.Lecture.Champ.NonDetecte;
-    public string Source => Champ.Source ?? "";
-
-    private string _retenu;
-    public string Retenu
-    {
-        get => _retenu;
-        set { _retenu = value ?? ""; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Retenu))); }
-    }
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-}
-
 public partial class MainWindow : Window
 {
     private static readonly string[] StepNames =
         { "1 · Identification", "2 · Préparation", "3 · Tests", "4 · Fiche", "5 · Annonce", "6 · Finalisation" };
+    private static readonly int[] StepsAvailable = { 0, 2 };
 
     private readonly ModeWindows _mode = Installation.Lire();
-    private readonly string _racine = DossierPc.Racine(AppPaths.ExeFolder);
+    private readonly ReglagesAtelier _reglages = ReglagesAtelier.Lire(AppPaths.ExeFolder);
+    private readonly string _racine;
     private List<LigneChamp> _lignes = new();
+    private List<LigneTest> _tests = new();
+    private List<Controle> _auto = new();
     private DossierPc? _dossier;
+    private bool _portable;
+    private int _step;
 
     public MainWindow()
     {
         InitializeComponent();
+        _racine = _reglages.Racine(AppPaths.ExeFolder);
         Title = "JVTECH Atelier " + AppInfo.Version;
         VersionText.Text = $"{AppInfo.Version} · {Installation.Libelle(_mode)}";
+        OperatorBox.Text = _reglages.Technicien ?? "";
         FinalizeText.Text = Installation.FinalisationPermise(_mode)
             ? "Sysprep pourra être proposé à la fin (Windows en mode audit), après confirmation à part."
             : "Sysprep ne sera pas proposé : Windows n'est pas en mode audit. La finalisation depuis une session normale est à l'étude.";
-        ShowSteps(0);
+        ShowStep(0);
         ShowSaleStatus();
     }
 
-    private void ShowSteps(int current)
+    // ---------- Étapes ----------
+
+    private void ShowStep(int step)
     {
+        _step = step;
         var accent = (Brush)FindResource("AccentBrush");
         var border = (Brush)FindResource("BorderBrush");
         Steps.ItemsSource = StepNames.Select((n, i) => new
         {
+            Index = i,
             Title = n.ToUpperInvariant(),
-            State = i == current ? "⟳ En cours" : i < current ? "✓ Terminé" : "○ À venir",
-            Border = i == current ? accent : border,
-            Thickness = new Thickness(i == current ? 2 : 1),
+            State = i == step ? "● Affichée" : StepsAvailable.Contains(i) ? "○ Ouvrir" : "À venir",
+            Enabled = StepsAvailable.Contains(i),
+            Border = i == step ? accent : border,
+            Thickness = new Thickness(i == step ? 2 : 1),
         }).ToList();
+        IdentPanel.Visibility = step == 0 ? Visibility.Visible : Visibility.Collapsed;
+        TestsPanel.Visibility = step == 2 ? Visibility.Visible : Visibility.Collapsed;
+        LaterPanel.Visibility = StepsAvailable.Contains(step) ? Visibility.Collapsed : Visibility.Visible;
+        LaterTitle.Text = StepNames[step];
     }
 
-    private void ShowSaleStatus()
+    private void Step_Click(object sender, RoutedEventArgs e)
     {
-        // Les contrôles arrivent avec l'étape Tests : pour l'instant la règle donne « Incomplet », jamais « Prêt ».
-        var bilan = RegleVente.Evaluer(Array.Empty<Controle>(), new[] { "disque", "batterie", "memoire", "tests-manuels" });
-        SaleStatus.Text = bilan.Libelle;
-        SaleDetail.Text = string.Join(Environment.NewLine, bilan.Manquants.Select(m => "○ " + m + " : non fait"));
+        if (sender is Button { Tag: int step }) ShowStep(step);
     }
+
+    // ---------- Identification ----------
 
     private async void Window_Loaded(object sender, RoutedEventArgs e) => await ReadPcAsync();
 
@@ -92,17 +84,24 @@ public partial class MainWindow : Window
         try
         {
             var champs = await Task.Run(() => Inventaire.Lire());
+            _portable = await Task.Run(() => LectureControles.EstPortable());
             var serie = champs.FirstOrDefault(c => c.Id == "serie")?.Detecte;
             _dossier = await Task.Run(() => DossierPc.Trouver(_racine, serie));
+            Dictionary<string, ResultatTestManuel> resultats = new();
             if (_dossier is not null)
             {
                 var (inventaire, corrections) = _dossier.LireInventaire();
                 DossierPc.AppliquerCorrections(champs, corrections);
                 if (string.IsNullOrWhiteSpace(InventoryBox.Text)) InventoryBox.Text = inventaire ?? "";
+                resultats = _dossier.LireTests();
             }
             _lignes = champs.Select(c => new LigneChamp(c)).ToList();
             FieldsGrid.ItemsSource = _lignes;
+            _tests = TestsManuels.Applicables(_portable)
+                .Select(t => new LigneTest(t, resultats.TryGetValue(t.Id, out var r) ? r : null)).ToList();
+            ManualTests.ItemsSource = _tests;
             ShowHeader();
+            ShowSaleStatus();
             StatusText.Text = _dossier is null
                 ? "Nouveau PC : le dossier sera créé à l'enregistrement."
                 : $"Dossier existant repris : {_dossier.Chemin}";
@@ -123,7 +122,7 @@ public partial class MainWindow : Window
         var inventaire = IdentifiantAtelier.NormaliserInventaire(InventoryBox.Text);
         var modele = $"{Valeur("fabricant")} {Valeur("modele")}".Trim();
         PcTitle.Text = string.Join(" · ", new[] { inventaire, modele.Length > 0 ? modele : Champ.NonDetecte }.Where(t => !string.IsNullOrEmpty(t)));
-        FolderText.Text = _dossier is null ? $"Dossiers : {_racine}" : $"Dossier : {_dossier.Chemin}";
+        FolderText.Text = (_dossier is null ? $"Dossiers : {_racine}" : $"Dossier : {_dossier.Chemin}") + (_portable ? " · portable" : " · PC fixe");
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)
@@ -136,7 +135,7 @@ public partial class MainWindow : Window
             return;
         }
         var technicien = OperatorBox.Text.Trim();
-        var corrige = _lignes.Any(l => Champ.Nettoyer(l.Retenu) != (l.Champ.Detecte));
+        var corrige = _lignes.Any(l => Champ.Nettoyer(l.Retenu) != l.Champ.Valeur);
         if (corrige && technicien.Length == 0)
         {
             StatusText.Text = "Indiquer le nom du technicien : il est noté à côté de chaque correction.";
@@ -150,27 +149,17 @@ public partial class MainWindow : Window
             foreach (var l in _lignes)
             {
                 var avant = l.Champ.Valeur;
-                if (Champ.Nettoyer(l.Retenu) is null || Champ.Nettoyer(l.Retenu) == l.Champ.Detecte) l.Champ.AnnulerCorrection();
-                else if (Champ.Nettoyer(l.Retenu) != l.Champ.Corrige) l.Champ.Corriger(l.Retenu, technicien, maintenant);
+                var saisi = Champ.Nettoyer(l.Retenu);
+                if (saisi is null || saisi == l.Champ.Detecte) l.Champ.AnnulerCorrection();
+                else if (saisi != l.Champ.Corrige) l.Champ.Corriger(saisi, technicien, maintenant);
                 if (avant != l.Champ.Valeur)
                     changements.Add($"Correction {l.Champ.Id} : « {avant ?? Champ.NonDetecte} » → « {l.Champ.Affichage} » (détecté : « {l.Champ.Detecte ?? Champ.NonDetecte} », {technicien})");
             }
 
+            EnsureFolder(maintenant);
+            foreach (var ligne in changements) _dossier!.Journaliser(ligne, maintenant);
             var inventaire = IdentifiantAtelier.NormaliserInventaire(InventoryBox.Text);
-            var serie = _lignes.FirstOrDefault(l => l.Champ.Id == "serie")?.Champ.Detecte;
-            var identifiant = IdentifiantAtelier.Calculer(inventaire, serie, maintenant);
-            if (_dossier is null)
-            {
-                _dossier = DossierPc.OuvrirOuCreer(_racine, identifiant);
-                _dossier.Journaliser($"Dossier créé ({Installation.Libelle(_mode)}, {AppInfo.Product} {AppInfo.Version})", maintenant);
-            }
-            else if (inventaire is not null && !string.Equals(_dossier.Identifiant, inventaire, StringComparison.OrdinalIgnoreCase))
-            {
-                _dossier.Renommer(inventaire);
-            }
-
-            foreach (var ligne in changements) _dossier.Journaliser(ligne, maintenant);
-            _dossier.EnregistrerInventaire(inventaire, _lignes.Select(l => l.Champ));
+            _dossier!.EnregistrerInventaire(inventaire, _lignes.Select(l => l.Champ));
             _lignes.ForEach(l => l.Retenu = l.Champ.Valeur ?? "");
             InventoryBox.Text = inventaire ?? "";
             ShowHeader();
@@ -180,5 +169,121 @@ public partial class MainWindow : Window
         {
             StatusText.Text = "Enregistrement impossible : " + ex.Message;
         }
+    }
+
+    /// <summary>Crée le dossier du PC s'il n'existe pas, et le renomme en V… si le numéro vient d'être saisi.</summary>
+    private void EnsureFolder(DateTime maintenant)
+    {
+        var inventaire = IdentifiantAtelier.NormaliserInventaire(InventoryBox.Text);
+        var serie = _lignes.FirstOrDefault(l => l.Champ.Id == "serie")?.Champ.Detecte;
+        if (_dossier is null)
+        {
+            _dossier = DossierPc.OuvrirOuCreer(_racine, IdentifiantAtelier.Calculer(inventaire, serie, maintenant));
+            _dossier.Journaliser($"Dossier créé ({Installation.Libelle(_mode)}, {AppInfo.Product} {AppInfo.Version})", maintenant);
+            _dossier.EnregistrerInventaire(inventaire, _lignes.Select(l => l.Champ));
+        }
+        else if (inventaire is not null && !string.Equals(_dossier.Identifiant, inventaire, StringComparison.OrdinalIgnoreCase))
+        {
+            _dossier.Renommer(inventaire);
+        }
+    }
+
+    // ---------- Tests ----------
+
+    private async void RunChecks_Click(object sender, RoutedEventArgs e)
+    {
+        RunChecksButton.IsEnabled = false;
+        TestsStatus.Text = "Contrôles en cours (disques, mémoire, batterie)…";
+        try
+        {
+            var seuils = _reglages.Seuils;
+            var portable = _portable;
+            _auto = await Task.Run(() =>
+            {
+                var memoire = LectureControles.DernierDiagnosticMemoire();
+                return new List<Controle>
+                {
+                    RegleControles.Disques(LectureControles.Disques()),
+                    RegleControles.MemoireRapide(LectureControles.NombreBarrettes(), memoire, LectureControles.ErreursMemoireMaterielles()),
+                    RegleControles.MemoireApprofondi(memoire),
+                    RegleControles.Batterie(LectureControles.Batterie(portable), seuils),
+                };
+            });
+            AutoChecks.ItemsSource = _auto.Select(c => new LigneControle(c)).ToList();
+            if (_dossier is not null)
+                foreach (var c in _auto) _dossier.Journaliser($"Contrôle {c.Id} : {Libelles.De(c.Statut)} : {c.Constat}");
+            TestsStatus.Text = $"Contrôles faits à {DateTime.Now:HH:mm}." + (_dossier is null ? " Enregistrer l'identification pour les garder dans le dossier." : "");
+            ShowSaleStatus();
+        }
+        catch (Exception ex)
+        {
+            TestsStatus.Text = "Contrôles impossibles : " + ex.Message;
+        }
+        finally
+        {
+            RunChecksButton.IsEnabled = true;
+        }
+    }
+
+    private void OpenPeripheralTest_Click(object sender, RoutedEventArgs e) =>
+        new PeripheralTestWindow { Owner = this }.Show();
+
+    private void SaveTests_Click(object sender, RoutedEventArgs e)
+    {
+        var technicien = OperatorBox.Text.Trim();
+        if (technicien.Length == 0)
+        {
+            TestsStatus.Text = "Indiquer le nom du technicien (étape Identification) : il est noté avec chaque test.";
+            return;
+        }
+        try
+        {
+            var maintenant = DateTime.Now;
+            EnsureFolder(maintenant);
+            foreach (var t in _tests)
+            {
+                var remarque = string.IsNullOrWhiteSpace(t.Remarque) ? null : t.Remarque.Trim();
+                var avant = t.Enregistre;
+                var inchange = avant is not null && avant.Resultat == t.Resultat && avant.PorteeEchec == t.PorteeEchec && avant.Remarque == remarque;
+                if (inchange) continue;
+                t.Enregistre = new ResultatTestManuel(t.Test.Id, t.Resultat, t.PorteeEchec, remarque, technicien, maintenant);
+                _dossier!.Journaliser($"Test {t.Test.Id} : {t.Resultat}" + (t.Resultat == ResultatTest.Echec ? $" ({t.PorteeEchec})" : "") + (remarque is null ? "" : $" : {remarque}") + $" ({technicien})", maintenant);
+            }
+            _dossier!.EnregistrerTests(_tests.Where(t => t.Enregistre is not null).Select(t => t.Enregistre!));
+            ShowHeader();
+            ShowSaleStatus();
+            TestsStatus.Text = $"Tests enregistrés dans {_dossier.Chemin}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            TestsStatus.Text = "Enregistrement impossible : " + ex.Message;
+        }
+    }
+
+    // ---------- Statut avant vente ----------
+
+    private void ShowSaleStatus()
+    {
+        var controles = new List<Controle>(_auto);
+        if (_auto.Count == 0)
+            controles.AddRange(new[]
+            {
+                Controle.NonRealise(RegleControles.IdDisque, "Santé des disques"),
+                Controle.NonRealise(RegleControles.IdMemoire, "Mémoire (contrôle rapide)"),
+                Controle.NonRealise(RegleControles.IdBatterie, "Batterie"),
+            });
+        controles.AddRange(_tests.Select(t => TestsManuels.EnControle(t.Test, t.Enregistre)));
+        var bilan = RegleVente.Evaluer(controles, TestsManuels.Obligatoires(_portable));
+        SaleStatus.Text = bilan.Libelle;
+        SaleCard.BorderBrush = (Brush)FindResource(bilan.Statut switch
+        {
+            StatutVente.Pret => "OkBrush",
+            StatutVente.Bloque => "DangerBrush",
+            _ => "WarningBrush",
+        });
+        var lignes = bilan.Bloquants.Select(b => $"✕ {b.Titre} : {b.Constat}")
+            .Concat(bilan.Manquants.Select(m => $"○ {m} : non fait ou à vérifier"))
+            .Concat(bilan.Reserves.Select(r => $"? Réserve, {r.Titre} : {r.Constat}"));
+        SaleDetail.Text = string.Join(Environment.NewLine, lignes);
     }
 }

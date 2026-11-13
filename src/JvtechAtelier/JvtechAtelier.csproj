@@ -17,8 +17,9 @@
     <Company>JVTECH Solutions</Company>
     <Version>2.0.0</Version>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <!-- Lot 0 : sans droits administrateur. Ils seront demandés à l'étape qui en a besoin (lot 1). -->
-    <ApplicationManifest>..\JvtechAudit\app.manifest</ApplicationManifest>
+    <!-- Droits administrateur au lancement : santé des disques (SMART), Windows Update, logiciels, diagnostic mémoire.
+         Atelier ne tourne que sur les PC de l'atelier ; en mode audit, Windows ouvre déjà la session administrateur. -->
+    <ApplicationManifest>..\PcInspector\app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,9 +29,14 @@
   <ItemGroup>
     <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
     <Compile Include="..\PcInspector\Collectors\Wmi.cs" Link="Shared\Wmi.cs" />
+    <Compile Include="..\PcInspector\Collectors\DiskHealth.cs" Link="Shared\DiskHealth.cs" />
+    <Compile Include="..\PcInspector\Models\Health.cs" Link="Shared\Health.cs" />
     <Page Include="..\PcInspector\Theme.xaml" Link="Theme.xaml" />
     <Compile Include="..\PcInspector\AppInfo.cs" Link="Shared\AppInfo.cs" />
     <Compile Include="..\PcInspector\CrashGuard.cs" Link="Shared\CrashGuard.cs" />
+    <!-- Fenêtre de test de PC Inspector, reprise telle quelle : écran, clavier, haut-parleurs, micro, webcam -->
+    <Page Include="..\PcInspector\PeripheralTestWindow.xaml" Link="PeripheralTestWindow.xaml" />
+    <Compile Include="..\PcInspector\PeripheralTestWindow.xaml.cs" Link="PeripheralTestWindow.xaml.cs" DependentUpon="PeripheralTestWindow.xaml" />
     <Compile Include="..\JvtechLecture\**\*.cs" Exclude="..\JvtechLecture\obj\**;..\JvtechLecture\bin\**" LinkBase="Lecture" />
     <Compile Include="..\JvtechAtelier.Actions\**\*.cs" Exclude="..\JvtechAtelier.Actions\obj\**;..\JvtechAtelier.Actions\bin\**" LinkBase="Actions" />
   </ItemGroup>
