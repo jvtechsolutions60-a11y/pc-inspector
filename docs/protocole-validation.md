@@ -32,11 +32,17 @@ Comptes : un administrateur et un compte standard sur A et B.
 | 1.5 | Copier etat.ini confirmé de B vers A, lancer `/preparation` sur A | Refus (la confirmation ne vaut que pour B) |
 | 1.6 | C, couper le courant pendant Windows Update | Reprise au redémarrage, journal cohérent |
 | 1.7 | Lancer en compte standard | Refus propre (droits), aucune action |
+| 1.8 | C en mode audit : relever `ImageState` (HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Setup\State) | Valeur dans la liste blanche (`…_RESEAL_TO_AUDIT` ou `UNDEPLOYABLE`) ; sinon la préparation est refusée (à signaler) |
+| 1.9 | B avec un plan d'alimentation personnalisé actif, préparation confirmée hors audit | À la fin : même plan actif, réglages identiques (`powercfg /list`, `/q`), plan temporaire supprimé |
+| 1.10 | B avec `DODownloadMode=3` déjà posé par une stratégie | À la fin : `DODownloadMode` toujours à 3 (REG_DWORD) |
 
 ### 2. Serveur PXE — critique
 | # | Scénario | Résultat attendu |
 |---|---|---|
-| 2.1 | Démarrage PXE de C, « Accepter les PC » ouvert | Installation, suivi visible dans le serveur |
+| 2.1 | Démarrage PXE de C, « Accepter les PC » ouvert, taper EFFACER | Installation, suivi visible dans le serveur |
+| 2.1b | Démarrage PXE de C, ne rien taper / taper autre chose | Le PC s'éteint, disque intact |
+| 2.1c | Démarrage PXE d'un PC à 2 disques (ou avec une clé USB) | Refus « pas exactement UN disque », PC éteint, disques intacts |
+| 2.1d | Serveur préparé avant le 13/11/2026 | « Serveur à préparer » : impossible d'accepter des PC avant d'avoir refait l'image |
 | 2.2 | « Accepter les PC » fermé depuis plus de 15 min | Le PC ne reçoit plus rien en TFTP |
 | 2.3 | Depuis un autre PC du réseau : `Invoke-WebRequest http://serveur:8081/jvtech/etat -Method Post -Body "Serie=X"` sans jeton | Refus 401, ligne de refus dans le journal, jeton jamais écrit |
 | 2.4 | Même requête depuis un autre sous-réseau (ou VPN) | Refus 403 |
@@ -58,6 +64,9 @@ Comptes : un administrateur et un compte standard sur A et B.
 | 3.8 | Fermer PC Migration (gestionnaire des tâches) pendant l'export des mots de passe, relancer | Dossier `AppData\Local\JVTECH-Migration-secrets` vidé au lancement |
 | 3.9 | Restaurer une sauvegarde faite avec une version antérieure (v1.0.8x) | Restauration normale |
 | 3.10 | Mauvais mot de passe à la restauration | Refus avant de commencer |
+| 3.11 | Sur B, un `Documents\devis.docx` différent (plus ancien) de celui de la sauvegarde | Celui de B intact ; version de l'ancien PC dans « Fichiers de l'ancien PC en double (…) » ; listé dans le rapport |
+| 3.12 | Même nom, même date, contenu différent | Les deux versions gardées |
+| 3.13 | Chrome ouvert sur B (profil verrouillé) pendant la restauration des navigateurs, refuser de le fermer puis forcer | Chrome « NON restauré », profil de B intact, aucune fusion |
 
 ### 4. Diagnostic disques (PC Inspector)
 | # | Scénario | Résultat attendu |
