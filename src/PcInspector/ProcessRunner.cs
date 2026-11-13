@@ -2,8 +2,11 @@ using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.Collections.Concurrent;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 
 namespace PcInspector;
 
@@ -55,24 +58,93 @@ public static class ProcessRunner
         if (process is null) return new ProcessResult(null, false, false);
 
         using (process)
+        using (var job = JobObject.Create())
         {
-            var gate = new object();
+            // Le programme et tout ce qu'il lance (PowerShell → DISM, installeur…) sont rangés dans un « job » Windows :
+            // en cas de délai dépassé, tout l'arbre est arrêté, pas seulement le premier programme (audit I12).
+            job?.Assign(process);
+
+            // Les lignes passent par une file lue par un seul fil : un appelant lent ne bloque ni la lecture des sorties
+            // ni l'arrêt du programme (audit I13). File bornée : si l'appelant ne suit plus, le programme attend.
+            // Pas de « using » : le fil de lecture peut encore la vider après le retour (délai dépassé).
+            var queue = new BlockingCollection<string>(10000);
+            Thread? reader = null;
             if (redirect)
             {
-                process.OutputDataReceived += (_, e) => { if (e.Data is not null) lock (gate) line!(e.Data); };
-                process.ErrorDataReceived += (_, e) => { if (e.Data is not null && includeErrors) lock (gate) line!(e.Data); };
+                reader = new Thread(() =>
+                {
+                    foreach (var text in queue.GetConsumingEnumerable())
+                    {
+                        try { line!(text); }
+                        catch (Exception ex) when (ex is not OutOfMemoryException) { }
+                    }
+                }) { IsBackground = true, Name = "Sortie " + Path.GetFileName(file) };
+                reader.Start();
+                process.OutputDataReceived += (_, e) => { if (e.Data is not null) TryAdd(queue, e.Data); };
+                process.ErrorDataReceived += (_, e) => { if (e.Data is not null && includeErrors) TryAdd(queue, e.Data); };
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
             }
             if (!process.WaitForExit((int)Math.Min(int.MaxValue, timeout.TotalMilliseconds)))
             {
-                try { process.Kill(); } catch (Exception ex) when (ex is InvalidOperationException or Win32Exception) { }
+                if (job is null || !job.Terminate())
+                    try { process.Kill(); } catch (Exception ex) when (ex is InvalidOperationException or Win32Exception) { }
+                queue.CompleteAdding();
+                reader?.Join(TimeSpan.FromSeconds(5));
                 return new ProcessResult(null, true, true);
             }
-            // Attend la fin de la lecture des sorties.
+            // Attend la fin de la lecture des sorties, puis que la file soit vidée (30 s au plus si l'appelant bloque).
             process.WaitForExit();
+            queue.CompleteAdding();
+            reader?.Join(TimeSpan.FromSeconds(30));
             return new ProcessResult(process.ExitCode, true, false);
         }
+    }
+
+    private static void TryAdd(BlockingCollection<string> queue, string text)
+    {
+        try { queue.Add(text); }
+        catch (InvalidOperationException) { } // file fermée après l'arrêt : ligne ignorée
+        catch (ObjectDisposedException) { }
+    }
+
+    /// <summary>Job Windows minimal : regroupe un programme et ses enfants pour pouvoir tous les arrêter.</summary>
+    private sealed class JobObject : IDisposable
+    {
+        private IntPtr _handle;
+        private JobObject(IntPtr handle) => _handle = handle;
+
+        public static JobObject? Create()
+        {
+            var handle = CreateJobObject(IntPtr.Zero, null);
+            return handle == IntPtr.Zero ? null : new JobObject(handle);
+        }
+
+        public void Assign(Process process)
+        {
+            try { AssignProcessToJobObject(_handle, process.Handle); }
+            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception) { }
+        }
+
+        public bool Terminate() => TerminateJobObject(_handle, 1);
+
+        // Pas de « tuer à la fermeture » : un programme qui lance volontairement un autre programme durable (installeur)
+        // ne doit pas le voir arrêté quand il se termine normalement. Seul le délai dépassé arrête l'arbre.
+        public void Dispose()
+        {
+            if (_handle == IntPtr.Zero) return;
+            CloseHandle(_handle);
+            _handle = IntPtr.Zero;
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr CreateJobObject(IntPtr attributes, string? name);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool TerminateJobObject(IntPtr job, uint exitCode);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr handle);
     }
 
     /// <summary>Script PowerShell encodé (pas de souci de guillemets), sortie en UTF-8.</summary>

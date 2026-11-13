@@ -148,3 +148,48 @@ public class SysprepWindowTests
     public void OnlyAuditWindow(string path, string commandLine, bool expected) =>
         Assert.AreEqual(expected, maintenance::PcMaintenance.Preparation.PreparationRunner.IsAuditSysprepWindow(path, commandLine, Official));
 }
+
+/// <summary>Empreinte des scripts Win11Debloat (audit I09) : même calcul que build.yml, journaux ignorés.</summary>
+[TestClass]
+public class Win11DebloatHashTests
+{
+    private static string Fixture()
+    {
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "jvtech-debloat-" + System.Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(System.IO.Path.Combine(dir, "Regfiles"));
+        System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, "Win11Debloat.ps1"), System.Text.Encoding.UTF8.GetBytes("Write-Host 1\n"));
+        System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, "Regfiles", "b.reg"), System.Text.Encoding.UTF8.GetBytes("Windows Registry Editor\n"));
+        return dir;
+    }
+
+    [TestMethod]
+    public void KnownValue_SameAsBuildScript()
+    {
+        var dir = Fixture();
+        try
+        {
+            // Valeur calculée hors de .NET (Python, même règle que build.yml) : les deux calculs doivent concorder.
+            Assert.AreEqual("706ae9c663a91b00bebd86927849daae6620736fb3c62a5dedd073e3c64a0d19", Win11Debloat.FolderHash(dir));
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    [TestMethod]
+    public void LogsIgnored_ScriptChangeDetected()
+    {
+        var dir = Fixture();
+        try
+        {
+            var before = Win11Debloat.FolderHash(dir);
+            System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "Win11Debloat.log"), "journal");
+            System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "LastUsedSettings.json"), "{}");
+            Assert.AreEqual(before, Win11Debloat.FolderHash(dir));
+            System.IO.File.AppendAllText(System.IO.Path.Combine(dir, "Win11Debloat.ps1"), "Remove-Item C:\\ -Recurse\n");
+            Assert.AreNotEqual(before, Win11Debloat.FolderHash(dir));
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    [TestMethod]
+    public void NoExpectedHash_InTestBuild() => Assert.AreEqual("", Win11Debloat.ExpectedHash);
+}

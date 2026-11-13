@@ -46,4 +46,8 @@
     <InternalsVisibleTo Include="JvtechTests" />
   </ItemGroup>
 
+  <!-- Empreinte des scripts de Win11Debloat (audit I09), passée par la CI : -p:Win11DebloatSha256=... -->
+  <ItemGroup>
+    <AssemblyMetadata Include="Win11DebloatSha256" Value="$(Win11DebloatSha256)" />
+  </ItemGroup>
 </Project>
