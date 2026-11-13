@@ -146,9 +146,21 @@ internal sealed class PreparationRunner
         }
 
         SetAutoStart();
-        // Pas de veille pendant la préparation ; les réglages d'origine sont remis à la fin.
-        foreach (var setting in new[] { "standby-timeout-ac 0", "monitor-timeout-ac 0", "hibernate-timeout-ac 0" })
-            Run("powercfg.exe", "/change " + setting, TimeSpan.FromSeconds(30));
+        // Relevé des réglages d'origine, une seule fois (une reprise après plantage ne doit pas relever nos propres valeurs).
+        if (!_state.Saved.ContainsKey(SavedDone))
+        {
+            SavePowerScheme();
+            _state.Saved[StorePolicyKey + "#AutoDownload"] = PolicyBackup.Read(StorePolicyKey, "AutoDownload");
+            _state.Saved[DeliveryPolicyKey + "#DODownloadMode"] = PolicyBackup.Read(DeliveryPolicyKey, "DODownloadMode");
+            _state.Saved[SavedDone] = "1";
+            _state.Save();
+        }
+        // Pas de veille pendant la préparation, sur un plan d'alimentation TEMPORAIRE (copie du plan actif) : le plan
+        // d'origine n'est jamais modifié, il est simplement réactivé à la fin et la copie supprimée.
+        if (_state.Saved.ContainsKey(SavedTempScheme))
+            foreach (var setting in new[] { "standby-timeout-ac 0", "monitor-timeout-ac 0", "hibernate-timeout-ac 0" })
+                Run("powercfg.exe", "/change " + setting, TimeSpan.FromSeconds(30));
+        else _log.Report("Plan d'alimentation temporaire impossible : la mise en veille n'est pas coupée (le plan du PC n'est pas modifié).");
         // Le Store met à jour ses applications pour le compte en cours, ce qui empêcherait Sysprep de finir.
         using (var key = Registry.LocalMachine.CreateSubKey(StorePolicyKey)) key?.SetValue("AutoDownload", 2, RegistryValueKind.DWord);
         // Les PC préparés en même temps s'échangent les mises à jour sur le réseau de l'atelier : téléchargées une seule fois.
@@ -272,24 +284,52 @@ internal sealed class PreparationRunner
             _permission.ResealAllowed ? "Remise au premier démarrage : le PC s'éteint." : "Préparation terminée.", finished: true, toCheck: missing.Count > 0);
     }
 
-    /// <summary>Remet ce qui avait été changé pour la préparation.</summary>
-    private void Restore()
+    private const string SavedDone = "Releve";
+    private const string SavedScheme = "PlanAlimentation";
+    private const string SavedTempScheme = "PlanTemporaire";
+
+    /// <summary>Copie le plan d'alimentation actif et active la copie (le plan d'origine reste intact).</summary>
+    private void SavePowerScheme()
     {
-        Run("powercfg.exe", "/restoredefaultschemes", TimeSpan.FromSeconds(30));
-        RemovePolicy(StorePolicyKey, "AutoDownload");
-        RemovePolicy(DeliveryPolicyKey, "DODownloadMode");
+        var original = PolicyBackup.ActivePowerScheme();
+        if (original is null) return;
+        var temp = Guid.NewGuid().ToString();
+        if (RunCode("powercfg.exe", $"/duplicatescheme {original} {temp}") != 0) return;
+        if (RunCode("powercfg.exe", "/setactive " + temp) != 0)
+        {
+            RunCode("powercfg.exe", "/delete " + temp);
+            return;
+        }
+        _state.Saved[SavedScheme] = original;
+        _state.Saved[SavedTempScheme] = temp;
+        _log.Report($"Plan d'alimentation d'origine {original} gardé ; plan temporaire {temp} pour la préparation.");
     }
 
-    private static void RemovePolicy(string path, string value)
+    /// <summary>Remet exactement ce qui avait été relevé avant la préparation.</summary>
+    private void Restore()
     {
-        try
+        if (_state.Saved.TryGetValue(SavedScheme, out var original) && _state.Saved.TryGetValue(SavedTempScheme, out var temp))
         {
-            using var key = Registry.LocalMachine.OpenSubKey(path, writable: true);
-            key?.DeleteValue(value, throwOnMissingValue: false);
-            if (key is not null && key.ValueCount == 0 && key.SubKeyCount == 0) Registry.LocalMachine.DeleteSubKey(path, throwOnMissingSubKey: false);
+            if (RunCode("powercfg.exe", "/setactive " + original) == 0) RunCode("powercfg.exe", "/delete " + temp);
+            else _log.Report($"Plan d'alimentation d'origine {original} non réactivé : à vérifier (plan temporaire {temp} laissé).");
         }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or System.Security.SecurityException) { }
+        foreach (var (path, value) in new[] { (StorePolicyKey, "AutoDownload"), (DeliveryPolicyKey, "DODownloadMode") })
+        {
+            // Pas de relevé (ancienne version de l'état) : on ne touche à rien plutôt que de deviner.
+            if (!_state.Saved.TryGetValue(path + "#" + value, out var before))
+            {
+                // Préparation commencée avec une ancienne version : en mode audit (installation neuve) la valeur
+                // n'existait pas ; hors mode audit, on ne devine pas et on laisse.
+                if (!_permission.ResealAllowed) { _log.Report($"{path}\\{value} : valeur d'origine inconnue, laissée."); continue; }
+                before = PolicyBackup.Absent;
+            }
+            var error = PolicyBackup.Restore(path, value, before);
+            if (error is not null) _log.Report($"{path}\\{value} : remise impossible ({error}).");
+        }
     }
+
+    private int? RunCode(string exe, string arguments) =>
+        PcInspector.ProcessRunner.Run(exe, arguments, null, TimeSpan.FromSeconds(30)).ExitCode;
 
     // ---------- Rapport ----------
 

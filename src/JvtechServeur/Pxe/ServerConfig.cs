@@ -43,7 +43,14 @@ internal sealed class ServerConfig
     /// <summary>Adresse choisie quand le mini PC a plusieurs cartes réseau.</summary>
     public string ServerAddress { get; set; } = "";
 
-    public bool ImageReady =>
+    /// <summary>Version du script Windows PE de l'image actuelle (0 = image d'avant le garde-fou des disques).</summary>
+    public int WinPeVersion { get; set; }
+
+    /// <summary>
+    /// Image complète ET Windows PE avec le script actuel : une image plus ancienne (sans confirmation EFFACER ni refus
+    /// des PC à plusieurs disques) n'est plus utilisée, il faut la refaire depuis l'ISO.
+    /// </summary>
+    public bool ImageReady => WinPeVersion >= ImageBuilder.WinPeScriptVersion &&
         File.Exists(Path.Combine(TftpFolder, "bootmgfw.efi")) && File.Exists(Path.Combine(TftpFolder, @"Boot\BCD"))
         && File.Exists(Path.Combine(TftpFolder, @"Boot\boot.wim")) && File.Exists(Path.Combine(InstallFolder, "setup.exe"));
 
@@ -72,6 +79,7 @@ internal sealed class ServerConfig
             config.LastCheck = values.TryGetValue("DerniereVerification", out var c) && DateTime.TryParse(c, out var check) ? check : null;
             config.AutoUpdate = !values.TryGetValue("MiseAJourAuto", out var auto) || auto != "0";
             config.ServerAddress = values.TryGetValue("Adresse", out var ip) ? ip : "";
+            config.WinPeVersion = values.TryGetValue("VersionWinPE", out var pe) && int.TryParse(pe, out var peVersion) ? peVersion : 0;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         if (config.ReportToken.Length == 0) { config.ReportToken = StatusPolicy.NewToken(); loadedForMigration = true; }
@@ -107,6 +115,7 @@ internal sealed class ServerConfig
             "DerniereVerification=" + (LastCheck?.ToString("yyyy-MM-dd HH:mm") ?? ""),
             "MiseAJourAuto=" + (AutoUpdate ? "1" : "0"),
             "Adresse=" + ServerAddress,
+            "VersionWinPE=" + WinPeVersion,
         });
     }
 

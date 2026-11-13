@@ -11,7 +11,10 @@ public class PreparationTests
     [DataTestMethod]
     [DataRow(1, "IMAGE_STATE_UNDEPLOYABLE", SetupMode.Audit)]
     [DataRow(1, "IMAGE_STATE_SPECIALIZE_RESEAL_TO_AUDIT", SetupMode.Audit)]
-    [DataRow(1, null, SetupMode.Audit)]
+    [DataRow(1, "IMAGE_STATE_GENERALIZE_RESEAL_TO_AUDIT", SetupMode.Audit)]
+    [DataRow(1, null, SetupMode.Unknown)]                          // ImageState absent : on ne devine pas (audit C02)
+    [DataRow(1, "", SetupMode.Unknown)]
+    [DataRow(1, "valeur inattendue", SetupMode.Unknown)]
     [DataRow(1, "IMAGE_STATE_COMPLETE", SetupMode.Unknown)]       // indicateurs contradictoires : refus
     [DataRow(null, "IMAGE_STATE_UNDEPLOYABLE", SetupMode.Unknown)] // ImageState seul : on ne devine pas
     [DataRow(0, "IMAGE_STATE_COMPLETE", SetupMode.Normal)]
@@ -100,4 +103,31 @@ public class PreparationTests
         Assert.AreEqual(8, PreparationOptions.Parse(new[] { "PassagesMax=-3" }).MaxRounds);
         Assert.AreEqual(3, PreparationOptions.Parse(new[] { "PassagesMax=3" }).MaxRounds);
     }
+}
+
+/// <summary>Relevé et remise exacte des valeurs de registre changées par la préparation (audit I02).</summary>
+[TestClass]
+public class PolicyBackupTests
+{
+    [DataTestMethod]
+    [DataRow(Microsoft.Win32.RegistryValueKind.DWord, 2)]
+    [DataRow(Microsoft.Win32.RegistryValueKind.DWord, -1)]
+    [DataRow(Microsoft.Win32.RegistryValueKind.String, "valeur | avec : séparateurs")]
+    public void EncodeDecode_RoundTrip(Microsoft.Win32.RegistryValueKind kind, object value)
+    {
+        var decoded = PolicyBackup.Decode(PolicyBackup.Encode(kind, value));
+        Assert.IsNotNull(decoded);
+        Assert.AreEqual(kind, decoded!.Value.Kind);
+        Assert.AreEqual(value, decoded.Value.Value);
+    }
+
+    [DataTestMethod]
+    [DataRow("Autre:Binary")]
+    [DataRow("DWord:pas un nombre")]
+    [DataRow("n'importe quoi")]
+    public void UnknownSnapshot_IsNotRestored(string text) => Assert.IsNull(PolicyBackup.Decode(text));
+
+    [TestMethod]
+    public void Snapshot_HasNoPipe_SoEtatIniKeepsIt() =>
+        Assert.IsFalse(PolicyBackup.Encode(Microsoft.Win32.RegistryValueKind.String, "a|b").Contains("|"));
 }

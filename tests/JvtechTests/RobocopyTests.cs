@@ -122,15 +122,46 @@ public class RobocopyTests
     [TestMethod]
     public void Arguments_NeverDeleteOrMove()
     {
-        foreach (var keepNewer in new[] { false, true })
+        foreach (var neverOverwrite in new[] { false, true })
         {
-            var args = Tools.RobocopyArguments(@"C:\Users\Client\Documents", @"E:\Sauvegarde\Documents", keepNewer,
+            var args = Tools.RobocopyArguments(@"C:\Users\Client\Documents", @"E:\Sauvegarde\Documents", neverOverwrite,
                 new[] { "AppData" }, new[] { "*.tmp" }).ToUpperInvariant();
             foreach (var forbidden in Tools.ForbiddenSwitches)
                 Assert.IsFalse(args.Split(' ').Contains(forbidden), $"{forbidden} ne doit jamais être utilisé");
             StringAssert.Contains(args, "/E ");
             StringAssert.Contains(args, "/BYTES");
-            Assert.AreEqual(keepNewer, args.Contains(" /XO"));
+            // Restauration : aucun fichier existant remplacé, ni plus ancien (/XO), ni plus récent (/XN), ni modifié (/XC).
+            foreach (var skip in new[] { " /XO", " /XN", " /XC" }) Assert.AreEqual(neverOverwrite, args.Contains(skip), skip);
+        }
+    }
+
+    [TestMethod]
+    public void Conflicts_BothVersionsKept_NothingReplaced()
+    {
+        var root = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "jvtech-test-" + Guid.NewGuid().ToString("N"));
+        var source = System.IO.Path.Combine(root, "sauvegarde");
+        var target = System.IO.Path.Combine(root, "nouveau");
+        try
+        {
+            System.IO.Directory.CreateDirectory(System.IO.Path.Combine(source, "Factures"));
+            System.IO.Directory.CreateDirectory(System.IO.Path.Combine(target, "Factures"));
+            System.IO.File.WriteAllText(System.IO.Path.Combine(source, "Factures", "devis.txt"), "version ancien PC");
+            System.IO.File.WriteAllText(System.IO.Path.Combine(target, "Factures", "devis.txt"), "version nouveau PC, différente");
+            System.IO.File.SetLastWriteTimeUtc(System.IO.Path.Combine(target, "Factures", "devis.txt"), new DateTime(2020, 1, 1));
+            System.IO.File.WriteAllText(System.IO.Path.Combine(source, "identique.txt"), "même");
+            System.IO.File.WriteAllText(System.IO.Path.Combine(target, "identique.txt"), "même");
+            System.IO.File.SetLastWriteTimeUtc(System.IO.Path.Combine(target, "identique.txt"), System.IO.File.GetLastWriteTimeUtc(System.IO.Path.Combine(source, "identique.txt")));
+            System.IO.File.WriteAllText(System.IO.Path.Combine(source, "nouveau-fichier.txt"), "seul");
+
+            var saved = Tools.SaveConflicts(source, target, "En double", new Progress<string>());
+
+            CollectionAssert.AreEqual(new[] { System.IO.Path.Combine("Factures", "devis.txt") }, saved);
+            Assert.AreEqual("version nouveau PC, différente", System.IO.File.ReadAllText(System.IO.Path.Combine(target, "Factures", "devis.txt")));
+            Assert.AreEqual("version ancien PC", System.IO.File.ReadAllText(System.IO.Path.Combine(target, "En double", "Factures", "devis.txt")));
+        }
+        finally
+        {
+            try { System.IO.Directory.Delete(root, true); } catch (System.IO.IOException) { }
         }
     }
 

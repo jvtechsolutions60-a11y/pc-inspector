@@ -92,3 +92,20 @@ public class VaultTests
         Assert.AreEqual("Livebox-1234", Backup.WiFiNameFromXml("<WLANProfile xmlns=\"http://www.microsoft.com/networking/WLAN/profile/v1\"><name>Livebox-1234</name></WLANProfile>"));
     }
 }
+
+/// <summary>Dossier des secrets de migration : uniquement SYSTEM, Administrateurs et le client (audit I06).</summary>
+[TestClass]
+public class SecretsFolderTests
+{
+    private static readonly System.Security.Principal.SecurityIdentifier System_ = new(System.Security.Principal.WellKnownSidType.LocalSystemSid, null);
+    private static readonly System.Security.Principal.SecurityIdentifier Admins = new(System.Security.Principal.WellKnownSidType.BuiltinAdministratorsSid, null);
+    private static readonly System.Security.Principal.SecurityIdentifier Everyone = new(System.Security.Principal.WellKnownSidType.WorldSid, null);
+
+    [TestMethod]
+    public void OnlyAllowedAccounts_Accepted() =>
+        Assert.IsTrue(migration::PcMigration.Migration.Secrets.HasOnlyAllowed(new[] { System_, Admins }, new[] { System_, Admins }));
+
+    [TestMethod]
+    public void ExtraAccount_Refused() =>
+        Assert.IsFalse(migration::PcMigration.Migration.Secrets.HasOnlyAllowed(new[] { System_, Everyone }, new[] { System_, Admins }));
+}

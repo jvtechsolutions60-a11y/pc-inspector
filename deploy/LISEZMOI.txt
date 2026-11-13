@@ -5,7 +5,8 @@ JVTECH SERVEUR PXE · PRÉPARATION REVENTE
 --------------
 Préparer les PC d'achat-revente par le réseau, sans clé USB et sans rester devant.
 On démarre le PC sur le réseau (touche F12), et il
-  1. efface le disque et installe Windows 11 en français, sans aucune question ;
+  1. affiche son disque et demande au technicien de taper EFFACER (seule question), puis efface le disque
+     et installe Windows 11 en français ;
   2. nettoie Windows avec Win11Debloat (applications, Copilot, Recall, Bing, widgets, publicités, télémétrie)
      puis retire les applications des fabricants (liste dans Kit\JVTECH\debloat.ini) ;
   3. installe les pilotes et le BIOS du constructeur (Dell, Lenovo, HP) ;
@@ -14,8 +15,11 @@ On démarre le PC sur le réseau (touche F12), et il
   6. se remet au premier démarrage et s'éteint : l'acheteur choisit sa langue et crée son propre compte.
 Le serveur affiche tous les PC en cours, leur étape, et garde les rapports et les statistiques.
 
-ATTENTION : un PC accepté par le serveur est entièrement effacé (disque 0).
+ATTENTION : un PC accepté par le serveur, sur lequel on tape EFFACER, est entièrement effacé (disque 0).
 Le serveur n'accepte les PC que pendant 30 minutes après un clic sur « Accepter les PC ».
+Garde-fous sur le PC : sans EFFACER tapé au clavier, il s'éteint sans rien effacer ; s'il a plusieurs disques
+(ou une clé USB branchée), il refuse et s'éteint : débrancher le disque en trop.
+Conseillé : un réseau (ou switch) réservé à la préparation, sans PC de clients branchés dessus.
 
 Installer le serveur sur le mini PC (une seule fois)
 ---------------------------------------------------
@@ -49,8 +53,10 @@ Préparer un PC
 6. Quand le PC s'est éteint, il est prêt. Le rapport est sur le serveur (bouton « Rapport »,
    ou C:\JVTECH-PXE\Rapports).
 
-Le PC a plusieurs disques ? Windows est installé sur le disque 0 : débrancher le disque en trop
-si ce n'est pas le bon, ou vérifier après coup dans le rapport.
+Le PC a plusieurs disques (ou une clé USB branchée) ? Il refuse et s'éteint sans rien effacer :
+débrancher le disque ou la clé en trop, puis redémarrer sur le réseau.
+Serveur préparé avec une version d'avant le 13/11/2026 ? Il affiche « Serveur à préparer » : refaire
+« Préparer depuis une ISO » une fois, pour avoir les garde-fous (EFFACER, un seul disque).
 
 Réglages
 --------

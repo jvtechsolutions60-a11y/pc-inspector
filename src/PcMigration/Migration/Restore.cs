@@ -75,11 +75,16 @@ internal static class Restore
         if (folder is null) return "Non fait : dossier inconnu sur ce PC";
         var source = Path.Combine(ctx.Layout.Folders, key);
         ctx.Log.Report($"    {source} → {folder.Path}");
-        // Un fichier plus récent déjà présent sur le nouveau PC est gardé ; rien n'est supprimé.
-        var result = Tools.Robocopy(source, folder.Path, ctx.Log, keepNewer: true);
+        // Aucun fichier déjà présent sur le nouveau PC n'est remplacé ; rien n'est supprimé.
+        var result = Tools.Robocopy(source, folder.Path, ctx.Log, neverOverwrite: true);
         ctx.Check(folder.Label, result);
-        // « Présents » : copiés maintenant, ou déjà là (identiques ou plus récents sur le nouveau PC, gardés).
-        return result.Summary("présents") + $" dans {folder.Path}";
+        // Même nom, contenu différent : la version de l'ancien PC est mise à part, les deux sont gardées.
+        var conflictFolder = $"Fichiers de l'ancien PC en double ({DateTime.Now:yyyy-MM-dd HH-mm})";
+        var conflicts = Tools.SaveConflicts(source, folder.Path, conflictFolder, ctx.Log);
+        if (conflicts.Count > 0) ctx.Report.Detail($"{folder.Label} : fichiers en double (version de l'ancien PC dans « {conflictFolder} »)", conflicts);
+        // « Présents » : copiés maintenant, ou déjà là (gardés tels quels).
+        return result.Summary("présents") + $" dans {folder.Path}"
+               + (conflicts.Count > 0 ? $" ; {conflicts.Count} fichier(s) déjà présent(s) et différent(s) : les deux versions gardées (« {conflictFolder} »)" : "");
     }
 
     // ---------- Navigateurs ----------
@@ -101,7 +106,12 @@ internal static class Restore
                 try { Directory.Move(target, aside); ctx.Log.Report($"    Profil {browser.Name} existant mis de côté : {aside}"); }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    ctx.Log.Report($"    Profil {browser.Name} existant gardé (fusion) : {ex.Message}");
+                    // Jamais de fusion dans un profil existant : on passe ce navigateur, rien n'est touché.
+                    ctx.Log.Report($"    Profil {browser.Name} existant impossible à mettre de côté : {ex.Message}");
+                    var skipped = $"{browser.Name} : NON restauré (profil existant verrouillé ou protégé, laissé intact ; fermer {browser.Name}, redémarrer et relancer la restauration des navigateurs)";
+                    lock (ctx.Problems) ctx.Problems.Add(skipped);
+                    done.Add(skipped);
+                    continue;
                 }
             }
             var result = Tools.Robocopy(dir, target, ctx.Log);
@@ -122,11 +132,12 @@ internal static class Restore
             if (ctx.Stop()) break;
             var key = Path.GetFileName(file).Split('.')[0];
             var browser = Browser.ByKey(key) ?? Browser.ByKey("Edge")!;
-            var plain = Vault.Decrypt(file, ctx.Password!);
-            if (plain is null) { done.Add($"{browser.Name} : mot de passe de la sauvegarde incorrect"); continue; }
             // Le navigateur n'importe qu'un fichier : il est posé dans le dossier local réservé (pas le Bureau, qui peut
-            // être synchronisé avec OneDrive), puis effacé dès l'import fini, même en cas d'erreur.
+            // être synchronisé avec OneDrive), puis effacé dès l'import fini, même en cas d'erreur. Si ce dossier ne
+            // peut pas être protégé, Secrets.Create lève une erreur AVANT tout déchiffrement : rien en clair.
             var csv = Path.Combine(Secrets.Create(ctx.Profile), $"Mots de passe {browser.Name} - à importer puis effacé.csv");
+            var plain = Vault.Decrypt(file, ctx.Password!);
+            if (plain is null) { Secrets.Cleanup(ctx.Profile); done.Add($"{browser.Name} : mot de passe de la sauvegarde incorrect"); continue; }
             File.WriteAllBytes(csv, plain);
             Array.Clear(plain, 0, plain.Length);
             try
@@ -203,7 +214,7 @@ internal static class Restore
         var signatures = Path.Combine(ctx.Layout.Outlook, "Signatures");
         if (Directory.Exists(signatures))
         {
-            var result = Tools.Robocopy(signatures, Path.Combine(ctx.Profile.Roaming, @"Microsoft\Signatures"), ctx.Log, keepNewer: true);
+            var result = Tools.Robocopy(signatures, Path.Combine(ctx.Profile.Roaming, @"Microsoft\Signatures"), ctx.Log, neverOverwrite: true);
             parts.Add($"signatures remises ({result.Source.Files} fichiers)");
         }
         var pstFolder = Path.Combine(ctx.Layout.Outlook, "PST");

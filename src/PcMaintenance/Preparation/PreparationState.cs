@@ -35,6 +35,11 @@ internal sealed class PreparationState
     public string? ConfirmedMachine { get; set; }
     public List<(string Step, string Result)> Results { get; } = new();
     public List<(string Title, string Line)> Details { get; } = new();
+    /// <summary>
+    /// Réglages du PC relevés AVANT que la préparation les change (plan d'alimentation actif, valeurs de stratégie),
+    /// pour les remettre exactement à la fin. Relevés une seule fois : une reprise après plantage ne les écrase pas.
+    /// </summary>
+    public Dictionary<string, string> Saved { get; } = new(StringComparer.Ordinal);
 
     public static string FilePath => Path.Combine(AppPaths.ExeFolder, "etat.ini");
     public static string LogPath => Path.Combine(AppPaths.ExeFolder, "preparation.log");
@@ -56,6 +61,7 @@ internal sealed class PreparationState
                 case "HorsAudit": state.ConfirmedMachine = value.Trim(); break;
                 case "Result" when value.Split('|') is { Length: 2 } r: state.Results.Add((r[0], r[1])); break;
                 case "Detail" when value.Split('|') is { Length: 2 } d: state.Details.Add((d[0], d[1])); break;
+                case "Avant" when value.Split('|') is { Length: 2 } a: state.Saved[a[0]] = a[1]; break;
             }
         }
         return state;
@@ -72,6 +78,7 @@ internal sealed class PreparationState
         if (!string.IsNullOrWhiteSpace(ConfirmedMachine)) lines.Add("HorsAudit=" + Clean(ConfirmedMachine!));
         lines.AddRange(Results.Select(r => $"Result={Clean(r.Step)}|{Clean(r.Result)}"));
         lines.AddRange(Details.Select(d => $"Detail={Clean(d.Title)}|{Clean(d.Line)}"));
+        lines.AddRange(Saved.Select(a => $"Avant={Clean(a.Key)}|{Clean(a.Value)}"));
         File.WriteAllLines(FilePath, lines);
     }
 

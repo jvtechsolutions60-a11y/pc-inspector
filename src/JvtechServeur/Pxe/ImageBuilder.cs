@@ -69,6 +69,7 @@ internal static class ImageBuilder
         if (boot is not null) return boot;
 
         config.ServerAddress = server.ToString();
+        config.WinPeVersion = WinPeScriptVersion;
         config.LastUpdate = "";
         config.LastUpdateDate = null;
         config.Save();
@@ -246,8 +247,47 @@ if (Get-SmbShare -Name '{ServerConfig.ShareName}' -ErrorAction SilentlyContinue)
         return null;
     }
 
+    /// <summary>Augmentée à chaque changement du script Windows PE : une image plus ancienne doit être refaite.</summary>
+    public const int WinPeScriptVersion = 2;
+
+    /// <summary>
+    /// Partie du script Windows PE qui protège les disques : liste les disques (diskpart, présent dans tout Windows PE),
+    /// refuse s'il n'y en a pas exactement un, affiche le détail du disque 0 et exige que le technicien tape EFFACER.
+    /// Toute autre réponse éteint le PC sans rien effacer. Les lignes « Disk 0 » / « Disque 0 » sont comptées pour
+    /// fonctionner avec un Windows PE anglais ou français.
+    /// </summary>
+    internal static readonly string WinPeDiskCheck = string.Join("\r\n",
+        @"(echo list disk)>X:\jv-liste.txt",
+        @"diskpart /s X:\jv-liste.txt >X:\jv-disques.txt 2>&1",
+        "set DISQUES=0",
+        @"for /f %%n in ('findstr /r /c:""^  Dis[a-z]* [0-9]"" X:\jv-disques.txt ^| find /c /v """"') do set DISQUES=%%n",
+        "echo   Disques trouves : %DISQUES%",
+        @"findstr /r /c:""^  Dis[a-z]* [0-9]"" X:\jv-disques.txt",
+        "echo.",
+        @"if ""%DISQUES%""==""1"" goto unseuldisque",
+        "color 4F",
+        "echo   ARRET : ce PC n'a pas exactement UN disque. Rien n'a ete efface.",
+        "echo   Debrancher les autres disques (et les cles USB), puis redemarrer sur le reseau.",
+        "echo.",
+        "pause",
+        "wpeutil shutdown",
+        "exit",
+        ":unseuldisque",
+        @"(echo select disk 0& echo detail disk)>X:\jv-detail.txt",
+        @"diskpart /s X:\jv-detail.txt | findstr /v /i /c:""DiskPart"" /c:""Copyright"" /c:""ordinateur"" /c:""computer""",
+        "echo.",
+        "set REPONSE=",
+        "set /p REPONSE=   Pour EFFACER ce disque et installer Windows, taper EFFACER puis Entree (autre chose : annuler) : ",
+        @"if /i ""%REPONSE%""==""EFFACER"" goto confirme",
+        "echo   Annule : rien n'a ete efface. Le PC va s'eteindre.",
+        "ping -n 6 127.0.0.1 >nul",
+        "wpeutil shutdown",
+        "exit",
+        ":confirme",
+        "echo   Confirme : installation.");
+
     /// <summary>Script lancé par Windows PE : connexion au partage (par nom puis par adresse) et installation.</summary>
-    private static string WinPeScript(IPAddress server, string password)
+    internal static string WinPeScript(IPAddress server, string password)
     {
         var name = Environment.MachineName;
         return string.Join("\r\n",
@@ -256,9 +296,11 @@ if (Get-SmbShare -Name '{ServerConfig.ShareName}' -ErrorAction SilentlyContinue)
             "color 1F",
             "echo.",
             "echo   INSTALLATION AUTOMATIQUE JVTECH",
-            "echo   Ce PC va etre EFFACE puis Windows 11 reinstalle.",
-            "echo   Pour annuler : eteindre le PC maintenant.",
+            "echo   Si vous continuez, ce PC sera EFFACE puis Windows 11 reinstalle.",
             "echo.",
+            // Garde-fou sur le poste lui-même (audit C01) : rien ne s'efface sans un technicien devant ce PC, et jamais
+            // sur un PC à plusieurs disques (le disque 0 pourrait être un disque de données).
+            WinPeDiskCheck,
             "wpeutil WaitForNetwork >nul 2>&1",
             "set ESSAI=0",
             ":connexion",

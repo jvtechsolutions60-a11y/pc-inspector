@@ -115,15 +115,15 @@ internal static class Tools
 
     /// <summary>
     /// Copie un dossier avec robocopy (chemins longs, reprises, plusieurs fichiers à la fois). Rien n'est supprimé à la
-    /// destination ; en restauration, un fichier plus récent déjà présent est gardé.
+    /// destination ; en restauration (<paramref name="neverOverwrite"/>), aucun fichier déjà présent n'est remplacé.
     /// </summary>
-    public static CopyResult Robocopy(string source, string destination, IProgress<string> log, bool keepNewer = false,
+    public static CopyResult Robocopy(string source, string destination, IProgress<string> log, bool neverOverwrite = false,
         IReadOnlyCollection<string>? excludeDirs = null, IReadOnlyCollection<string>? excludeFiles = null)
     {
         var result = new CopyResult();
         Directory.CreateDirectory(destination);
         var output = new List<string>();
-        result.ExitCode = Run("robocopy.exe", RobocopyArguments(source, destination, keepNewer, excludeDirs, excludeFiles), output, TimeSpan.FromHours(12)) ?? -1;
+        result.ExitCode = Run("robocopy.exe", RobocopyArguments(source, destination, neverOverwrite, excludeDirs, excludeFiles), output, TimeSpan.FromHours(12)) ?? -1;
         // Seulement le résumé final et les erreurs : pas la liste des fichiers.
         foreach (var line in output.Where(l => l.Trim().Length > 0 && (l.Contains("ERR") || l.Contains("ERREUR") || l.Contains(":"))).Take(30))
             log.Report("      " + line.Trim());
@@ -135,23 +135,79 @@ internal static class Tools
             result.Source = Measure(source, excludeDirs?.ToList());
             result.Copied = Measure(destination, excludeDirs?.ToList());
             // En restauration, la destination contenait déjà des fichiers : le recomptage ne prouve rien.
-            if (keepNewer) result.Unverified = true;
+            if (neverOverwrite) result.Unverified = true;
         }
         return result;
+    }
+
+    /// <summary>
+    /// Après une restauration sans écrasement : les fichiers de la sauvegarde qui existaient déjà à la destination avec
+    /// un contenu différent (taille ou date) sont copiés à part dans <c>destination\{folderName}</c>, à la même place
+    /// relative. Les deux versions sont donc gardées. Rien n'est remplacé ni supprimé. Renvoie les chemins relatifs.
+    /// </summary>
+    public static List<string> SaveConflicts(string source, string destination, string folderName, IProgress<string> log)
+    {
+        var saved = new List<string>();
+        var conflictRoot = Path.Combine(destination, folderName);
+        foreach (var relative in FindConflicts(source, destination))
+        {
+            var target = Path.Combine(conflictRoot, relative);
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                if (!File.Exists(target)) File.Copy(Path.Combine(source, relative), target, overwrite: false);
+                saved.Add(relative);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                log.Report($"      En double non copié : {relative} ({ex.Message})");
+            }
+        }
+        return saved;
+    }
+
+    /// <summary>Fichiers présents des deux côtés avec une taille ou une date différente (tolérance 2 s, comme robocopy).</summary>
+    internal static IEnumerable<string> FindConflicts(string source, string destination)
+    {
+        var stack = new Stack<string>();
+        stack.Push(source);
+        while (stack.Count > 0)
+        {
+            var dir = stack.Pop();
+            FileInfo[] files;
+            DirectoryInfo[] subs;
+            try
+            {
+                var info = new DirectoryInfo(dir);
+                files = info.GetFiles();
+                subs = info.GetDirectories();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { continue; }
+            foreach (var file in files)
+            {
+                var relative = file.FullName.Substring(source.TrimEnd('\\').Length + 1);
+                var other = new FileInfo(Path.Combine(destination, relative));
+                if (!other.Exists) continue;
+                if (other.Length != file.Length || Math.Abs((other.LastWriteTimeUtc - file.LastWriteTimeUtc).TotalSeconds) > 2)
+                    yield return relative;
+            }
+            foreach (var sub in subs)
+                if ((sub.Attributes & FileAttributes.ReparsePoint) == 0) stack.Push(sub.FullName);
+        }
     }
 
     /// <summary>Options qui suppriment ou déplacent des fichiers : jamais utilisées par PC Migration.</summary>
     internal static readonly string[] ForbiddenSwitches = { "/MIR", "/PURGE", "/MOV", "/MOVE" };
 
     /// <summary>
-    /// Arguments de robocopy. /E copie sans rien supprimer ; /XO (restauration) garde le fichier le plus récent déjà
-    /// présent ; /BYTES donne des tailles exactes dans le résumé (sinon « 1.2 g », arrondi et différent selon la langue).
+    /// Arguments de robocopy. /E copie sans rien supprimer ; en restauration, /XC /XN /XO : un fichier déjà présent
+    /// n'est JAMAIS remplacé, qu'il soit plus ancien, plus récent ou de même date (voir <see cref="SaveConflicts"/>) ; /BYTES donne des tailles exactes dans le résumé (sinon « 1.2 g », arrondi et différent selon la langue).
     /// </summary>
-    internal static string RobocopyArguments(string source, string destination, bool keepNewer,
+    internal static string RobocopyArguments(string source, string destination, bool neverOverwrite,
         IReadOnlyCollection<string>? excludeDirs = null, IReadOnlyCollection<string>? excludeFiles = null)
     {
         var args = new StringBuilder($"{Quote(source)} {Quote(destination)} /E /COPY:DAT /DCOPY:T /R:1 /W:1 /XJ /MT:8 /NP /NFL /NDL /NJH /BYTES");
-        if (keepNewer) args.Append(" /XO");
+        if (neverOverwrite) args.Append(" /XC /XN /XO");
         if (excludeDirs is { Count: > 0 }) args.Append(" /XD ").Append(string.Join(" ", excludeDirs.Select(Quote)));
         if (excludeFiles is { Count: > 0 }) args.Append(" /XF ").Append(string.Join(" ", excludeFiles.Select(Quote)));
         return args.ToString();

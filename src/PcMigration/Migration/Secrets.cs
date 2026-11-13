@@ -25,29 +25,51 @@ internal static class Secrets
 
     public static string FolderFor(UserProfile profile) => Path.Combine(profile.Local, FolderName);
 
-    /// <summary>Crée le dossier (vide) avec des droits restreints.</summary>
+    /// <summary>
+    /// Crée le dossier (vide) avec des droits restreints, puis RELIT les droits obtenus. Si les droits ne peuvent pas
+    /// être posés ou ne sont pas ceux attendus, le dossier est supprimé et une erreur est levée : aucun secret en clair
+    /// n'est alors écrit (l'étape est notée « non faite »).
+    /// </summary>
     public static string Create(UserProfile profile)
     {
         var folder = FolderFor(profile);
         Cleanup(profile);
         Directory.CreateDirectory(folder);
+        var allowed = new[]
+            {
+                new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
+                new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
+                TryParse(profile.Sid),
+            }.Where(s => s is not null).Select(s => s!).ToList();
+        string? problem;
         try
         {
             var security = new DirectorySecurity();
             security.SetAccessRuleProtection(true, false);
             var inherit = InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
-            foreach (var sid in new[]
-                     {
-                         new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
-                         new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
-                         TryParse(profile.Sid),
-                     }.Where(s => s is not null))
-                security.AddAccessRule(new FileSystemAccessRule(sid!, FileSystemRights.FullControl, inherit, PropagationFlags.None, AccessControlType.Allow));
+            foreach (var sid in allowed)
+                security.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl, inherit, PropagationFlags.None, AccessControlType.Allow));
             Directory.SetAccessControl(folder, security);
+
+            var actual = Directory.GetAccessControl(folder);
+            var sids = actual.GetAccessRules(true, true, typeof(SecurityIdentifier)).Cast<FileSystemAccessRule>()
+                .Where(r => r.AccessControlType == AccessControlType.Allow)
+                .Select(r => (SecurityIdentifier)r.IdentityReference).ToList();
+            problem = !actual.AreAccessRulesProtected ? "héritage des droits non coupé"
+                : HasOnlyAllowed(sids, allowed) ? null : "droits inattendus sur le dossier";
         }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException or IOException or ArgumentException) { /* dossier quand même local et vidé */ }
-        return folder;
+        catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException or IOException or ArgumentException or PrivilegeNotHeldException or IdentityNotMappedException)
+        {
+            problem = ex.Message;
+        }
+        if (problem is null) return folder;
+        Cleanup(profile);
+        throw new InvalidOperationException($"dossier protégé pour les secrets impossible à créer ({problem}) : rien n'a été écrit en clair");
     }
+
+    /// <summary>Vrai si chaque autorisation vise un compte permis (SYSTEM, Administrateurs, le client).</summary>
+    internal static bool HasOnlyAllowed(IEnumerable<SecurityIdentifier> granted, IReadOnlyCollection<SecurityIdentifier> allowed) =>
+        granted.All(allowed.Contains);
 
     /// <summary>Écrase et supprime tout ce qui reste dans le dossier de passage, puis le dossier. Ne lève jamais d'erreur.</summary>
     public static void Cleanup(UserProfile profile)

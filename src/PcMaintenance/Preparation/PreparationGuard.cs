@@ -56,15 +56,16 @@ internal static class PreparationGuard
     /// <summary>
     /// AuditInProgress = 1 (HKLM\SYSTEM\Setup) est posé par Windows pendant le mode audit. ImageState confirme :
     /// IMAGE_STATE_COMPLETE = Windows installé et en service ; les états « …_TO_AUDIT » et UNDEPLOYABLE = mode audit.
-    /// Les deux doivent être d'accord, sinon « inconnu » (donc refus).
+    /// Mode audit SEULEMENT si les deux le disent (ImageState dans la liste blanche) ; ImageState absent, vide ou
+    /// inattendu avec AuditInProgress = 1 : « inconnu », donc refus (le technicien peut confirmer, sans Sysprep).
     /// </summary>
     internal static SetupMode Classify(int? auditInProgress, string? imageState)
     {
         var state = (imageState ?? "").Trim().ToUpperInvariant();
-        var stateSaysAudit = state is "IMAGE_STATE_UNDEPLOYABLE" or "IMAGE_STATE_SPECIALIZE_RESEAL_TO_AUDIT";
+        var stateSaysAudit = state is "IMAGE_STATE_UNDEPLOYABLE" or "IMAGE_STATE_SPECIALIZE_RESEAL_TO_AUDIT" or "IMAGE_STATE_GENERALIZE_RESEAL_TO_AUDIT";
         var stateSaysNormal = state == "IMAGE_STATE_COMPLETE";
 
-        if (auditInProgress == 1) return stateSaysNormal ? SetupMode.Unknown : SetupMode.Audit;
+        if (auditInProgress == 1) return stateSaysAudit ? SetupMode.Audit : SetupMode.Unknown;
         if (stateSaysAudit) return SetupMode.Unknown; // ImageState dit audit mais Windows ne l'indique pas : on ne devine pas.
         if (stateSaysNormal || auditInProgress == 0) return SetupMode.Normal;
         return SetupMode.Unknown;
