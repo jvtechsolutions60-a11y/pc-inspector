@@ -37,6 +37,11 @@
     <!-- Fenêtre de test de PC Inspector, reprise telle quelle : écran, clavier, haut-parleurs, micro, webcam -->
     <Page Include="..\PcInspector\PeripheralTestWindow.xaml" Link="PeripheralTestWindow.xaml" />
     <Compile Include="..\PcInspector\PeripheralTestWindow.xaml.cs" Link="PeripheralTestWindow.xaml.cs" DependentUpon="PeripheralTestWindow.xaml" />
+    <!-- Repris de PC Inspector et PC Maintenance, tels quels : Windows Update (agent COM) et winget -->
+    <Compile Include="..\PcInspector\WindowsState.cs" Link="Shared\WindowsState.cs" />
+    <Compile Include="..\PcInspector\WingetShell.cs" Link="Shared\WingetShell.cs" />
+    <Compile Include="..\PcMaintenance\Maintenance\WindowsUpdate.cs" Link="Shared\WindowsUpdate.cs" />
+    <Compile Include="..\PcMaintenance\Maintenance\Winget.cs" Link="Shared\Winget.cs" />
     <Compile Include="..\JvtechLecture\**\*.cs" Exclude="..\JvtechLecture\obj\**;..\JvtechLecture\bin\**" LinkBase="Lecture" />
     <Compile Include="..\JvtechAtelier.Actions\**\*.cs" Exclude="..\JvtechAtelier.Actions\obj\**;..\JvtechAtelier.Actions\bin\**" LinkBase="Actions" />
   </ItemGroup>

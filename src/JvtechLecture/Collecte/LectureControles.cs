@@ -46,6 +46,29 @@ public static class LectureControles
         return new MesureBatterie(portable, nombre, nominale, actuelle, cycles);
     }
 
+    // Codes du Gestionnaire de périphériques qui ne signalent pas un pilote : 22 = désactivé, 45 = non branché.
+    private static readonly HashSet<ulong> CodesSansProbleme = new() { 0, 22, 45 };
+
+    /// <summary>
+    /// Périphériques en erreur (pilote manquant ou en défaut), par leur nom. Null si la liste n'a pas pu être lue.
+    /// </summary>
+    public static IReadOnlyList<string>? PeripheriquesEnErreur()
+    {
+        try
+        {
+            return Wmi.Query("SELECT Name, PNPClass, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE ConfigManagerErrorCode <> 0")
+                .Where(d => d.ULong("ConfigManagerErrorCode") is { } code && !CodesSansProbleme.Contains(code))
+                .Select(d => $"{d.Str("Name") ?? "Périphérique inconnu"} (code {d.ULong("ConfigManagerErrorCode")})")
+                .Distinct()
+                .OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+        }
+        catch (Exception ex) when (ex is System.Management.ManagementException or System.Runtime.InteropServices.COMException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
     public static int NombreBarrettes() => Wmi.QueryOptional("SELECT Capacity FROM Win32_PhysicalMemory").Count(m => m.ULong("Capacity") is > 0);
 
     /// <summary>Dernier résultat du diagnostic mémoire de Windows (événements 1101 : aucune erreur, 1102 : erreurs).</summary>

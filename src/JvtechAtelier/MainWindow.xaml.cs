@@ -2,11 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Runtime.InteropServices;
 using System.Windows.Media;
+using Jvtech.Atelier.Actions;
+using Jvtech.Atelier.Actions.Preparation;
 using Jvtech.Atelier.Dossier;
 using Jvtech.Lecture;
 using Jvtech.Lecture.Collecte;
@@ -19,7 +22,7 @@ public partial class MainWindow : Window
 {
     private static readonly string[] StepNames =
         { "1 · Identification", "2 · Préparation", "3 · Tests", "4 · Fiche", "5 · Annonce", "6 · Finalisation" };
-    private static readonly int[] StepsAvailable = { 0, 2, 3, 4 };
+    private static readonly int[] StepsAvailable = { 0, 1, 2, 3, 4 };
 
     private readonly ModeWindows _mode = Installation.Lire();
     private readonly ReglagesAtelier _reglages = ReglagesAtelier.Lire(AppPaths.ExeFolder);
@@ -33,6 +36,12 @@ public partial class MainWindow : Window
     private List<Controle> _controles = new();
     private bool _portable;
     private int _step;
+    private EtatPreparation? _prep;
+    private Controle? _pilotes;
+    private readonly List<LigneLogiciel> _logiciels = PackAtelier.Logiciels.Select(l => new LigneLogiciel(l)).ToList();
+    private readonly List<ActionRecord> _actions = new();
+    private CancellationTokenSource? _arret;
+    private readonly bool _reprendre = Reprise.Demandee(Environment.GetCommandLineArgs());
 
     public MainWindow()
     {
@@ -44,6 +53,7 @@ public partial class MainWindow : Window
         FinalizeText.Text = Installation.FinalisationPermise(_mode)
             ? "Sysprep pourra être proposé à la fin (Windows en mode audit), après confirmation à part."
             : "Sysprep ne sera pas proposé : Windows n'est pas en mode audit. La finalisation depuis une session normale est à l'étude.";
+        SoftwareList.ItemsSource = _logiciels;
         ShowStep(0);
         ShowSaleStatus();
     }
@@ -65,6 +75,7 @@ public partial class MainWindow : Window
             Thickness = new Thickness(i == step ? 2 : 1),
         }).ToList();
         IdentPanel.Visibility = step == 0 ? Visibility.Visible : Visibility.Collapsed;
+        PrepPanel.Visibility = step == 1 ? Visibility.Visible : Visibility.Collapsed;
         TestsPanel.Visibility = step == 2 ? Visibility.Visible : Visibility.Collapsed;
         ListingPanel.Visibility = step is 3 or 4 ? Visibility.Visible : Visibility.Collapsed;
         if (step is 3 or 4 && ListingText.Text.Length == 0) Compose();
@@ -79,7 +90,19 @@ public partial class MainWindow : Window
 
     // ---------- Identification ----------
 
-    private async void Window_Loaded(object sender, RoutedEventArgs e) => await ReadPcAsync();
+    private async void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        await ReadPcAsync();
+        // Relancé par Windows après un redémarrage demandé par la préparation : passe suivante, sans autre clic.
+        if (_reprendre && _dossier is not null && _prep is { RepriseProgrammee: true })
+        {
+            _prep = _prep with { RepriseProgrammee = false };
+            _dossier.EnregistrerPreparation(_prep);
+            _dossier.Journaliser("Reprise de la préparation après redémarrage");
+            ShowStep(1);
+            await RunUpdatePassAsync();
+        }
+    }
 
     private async void Reload_Click(object sender, RoutedEventArgs e) => await ReadPcAsync();
 
@@ -100,6 +123,7 @@ public partial class MainWindow : Window
                 DossierPc.AppliquerCorrections(champs, corrections);
                 if (string.IsNullOrWhiteSpace(InventoryBox.Text)) InventoryBox.Text = inventaire ?? "";
                 resultats = _dossier.LireTests();
+                _prep = _dossier.LirePreparation();
             }
             _lignes = champs.Select(c => new LigneChamp(c)).ToList();
             FieldsGrid.ItemsSource = _lignes;
@@ -107,6 +131,7 @@ public partial class MainWindow : Window
                 .Select(t => new LigneTest(t, resultats.TryGetValue(t.Id, out var r) ? r : null)).ToList();
             ManualTests.ItemsSource = _tests;
             ShowHeader();
+            ShowPreparation();
             ShowSaleStatus();
             StatusText.Text = _dossier is null
                 ? "Nouveau PC : le dossier sera créé à l'enregistrement."
@@ -213,8 +238,10 @@ public partial class MainWindow : Window
                     RegleControles.MemoireRapide(LectureControles.NombreBarrettes(), memoire, LectureControles.ErreursMemoireMaterielles()),
                     RegleControles.MemoireApprofondi(memoire),
                     RegleControles.Batterie(_batterie = LectureControles.Batterie(portable), seuils),
+                    PlanPreparation.Pilotes(LectureControles.PeripheriquesEnErreur()),
                 };
             });
+            _pilotes = _auto.FirstOrDefault(c => c.Id == PlanPreparation.IdPilotes);
             AutoChecks.ItemsSource = _auto.Select(c => new LigneControle(c)).ToList();
             if (_dossier is not null)
                 foreach (var c in _auto) _dossier.Journaliser($"Contrôle {c.Id} : {Libelles.De(c.Statut)} : {c.Constat}");
@@ -279,7 +306,14 @@ public partial class MainWindow : Window
                 Controle.NonRealise(RegleControles.IdBatterie, "Batterie"),
             });
         controles.AddRange(_tests.Select(t => TestsManuels.EnControle(t.Test, t.Enregistre)));
-        var bilan = _bilan = RegleVente.Evaluer(controles, TestsManuels.Obligatoires(_portable));
+        // Pilotes relus depuis la préparation : la lecture la plus récente remplace celle des contrôles.
+        if (_pilotes is not null)
+        {
+            controles.RemoveAll(c => c.Id == PlanPreparation.IdPilotes);
+            controles.Add(_pilotes);
+        }
+        controles.Add(PlanPreparation.EnControle(_prep));
+        var bilan = _bilan = RegleVente.Evaluer(controles, PlanPreparation.Obligatoires(_portable));
         _controles = controles;
         SaleStatus.Text = bilan.Libelle;
         SaleCard.BorderBrush = (Brush)FindResource(bilan.Statut switch
@@ -300,7 +334,7 @@ public partial class MainWindow : Window
         IdentifiantAtelier.NormaliserInventaire(InventoryBox.Text),
         _lignes.Select(l => l.Champ).ToList(),
         _controles,
-        _bilan ?? RegleVente.Evaluer(_controles, TestsManuels.Obligatoires(_portable)),
+        _bilan ?? RegleVente.Evaluer(_controles, PlanPreparation.Obligatoires(_portable)),
         _batterie,
         ConditionBox.Text,
         NotesBox.Text);
@@ -354,6 +388,262 @@ public partial class MainWindow : Window
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
             ListingStatus.Text = "Enregistrement impossible : " + ex.Message;
+        }
+    }
+
+    // ---------- Préparation ----------
+
+    private void ShowPreparation()
+    {
+        var etat = _prep;
+        UpdateState.Text = etat is null || etat.Passes == 0
+            ? "Pas encore lancées."
+            : $"{etat.Passes} passe(s), {etat.MisesAJourInstallees} mise(s) à jour installée(s)"
+              + (etat.MisesAJourEchouees > 0 ? $", {etat.MisesAJourEchouees} échec(s)" : "")
+              + (etat.DerniereSuite is { } suite ? $". Suite : {PlanPreparation.Libelle(suite)}." : ".")
+              + (etat.DernierDetail is { } d ? Environment.NewLine + "Dernière passe : " + d : "");
+        RebootButton.Visibility = etat?.DerniereSuite == SuitePasse.Redemarrer ? Visibility.Visible : Visibility.Collapsed;
+        UpdateButton.Content = etat?.DerniereSuite is SuitePasse.Terminee ? "Vérifier à nouveau les mises à jour" : "Lancer une passe Windows Update";
+        if (_pilotes is not null) DriversState.Text = $"{Libelles.De(_pilotes.Statut)} : {_pilotes.Constat}";
+        PrepActions.ItemsSource = _actions.AsEnumerable().Reverse().Select(a => new LigneAction(a)).ToList();
+    }
+
+    /// <summary>Lance des actions l'une après l'autre, chacune tracée dans le journal du dossier. Une seule série à la fois.</summary>
+    private async Task<List<(IActionAtelier Action, ActionRecord Trace)>> RunActionsAsync(IReadOnlyList<IActionAtelier> actions)
+    {
+        var faites = new List<(IActionAtelier, ActionRecord)>();
+        if (_arret is not null) return faites;
+        EnsureFolder(DateTime.Now);
+        _arret = new CancellationTokenSource();
+        SetPrepButtons(false);
+        try
+        {
+            foreach (var action in actions)
+            {
+                if (_arret.IsCancellationRequested) break;
+                PrepStatus.Text = $"En cours : {action.Libelle}…";
+                var jeton = _arret.Token;
+                var trace = await Task.Run(() => ActionJournal.Lancer(action, jeton));
+                _actions.Add(trace);
+                _dossier!.Journaliser("Action " + trace.Ligne());
+                faites.Add((action, trace));
+                ShowPreparation();
+            }
+            PrepStatus.Text = _arret.IsCancellationRequested ? "Arrêté à la demande du technicien." : $"Terminé à {DateTime.Now:HH:mm}.";
+        }
+        finally
+        {
+            _arret.Dispose();
+            _arret = null;
+            SetPrepButtons(true);
+        }
+        return faites;
+    }
+
+    private void SetPrepButtons(bool actif)
+    {
+        UpdateButton.IsEnabled = SoftwareButton.IsEnabled = MemoryButton.IsEnabled = RebootButton.IsEnabled = DriversButton.IsEnabled = actif;
+        StopPrepButton.IsEnabled = !actif;
+    }
+
+    private void StopPrep_Click(object sender, RoutedEventArgs e)
+    {
+        _arret?.Cancel();
+        PrepStatus.Text = "Arrêt demandé : l'action en cours se termine d'abord (une mise à jour n'est jamais coupée en plein milieu).";
+    }
+
+    private async void RunUpdates_Click(object sender, RoutedEventArgs e) => await RunUpdatePassAsync();
+
+    /// <summary>Passes Windows Update enchaînées tant qu'il n'y a pas besoin de redémarrer, dans la limite prévue.</summary>
+    private async Task RunUpdatePassAsync()
+    {
+        try
+        {
+            while (true)
+            {
+                var etat = _prep ?? new EtatPreparation();
+                if (etat.RepriseProgrammee) AnnulerReprise();
+                // Après « Terminée », une vérification repart à zéro passe pour ne pas buter sur la limite.
+                var passe = etat.DerniereSuite == SuitePasse.Terminee ? 1 : etat.Passes + 1;
+                var maj = new MisesAJourWindows(passe, t => Dispatcher.BeginInvoke(new Action(() => PrepStatus.Text = $"Windows Update, passe {passe} : {t}")));
+                var faites = await RunActionsAsync(new IActionAtelier[] { maj });
+                if (faites.Count == 0 || faites[0].Trace.Resultat == ResultatAction.Annule || faites[0].Trace.Resultat == ResultatAction.NonLance) break;
+
+                _prep = etat with
+                {
+                    Passes = etat.DerniereSuite == SuitePasse.Terminee ? etat.Passes + 1 : passe,
+                    MisesAJourInstallees = etat.MisesAJourInstallees + maj.Installees,
+                    MisesAJourEchouees = maj.Echecs.Count,
+                    DerniereSuite = maj.Suite,
+                    DernierDetail = faites[0].Trace.Detail,
+                    RepriseProgrammee = false,
+                    MisAJourLe = DateTime.Now,
+                };
+                _dossier!.EnregistrerPreparation(_prep);
+                ShowPreparation();
+                ShowSaleStatus();
+                if (maj.Suite != SuitePasse.NouvellePasse) break;
+            }
+            if (_prep?.DerniereSuite == SuitePasse.Redemarrer)
+                PrepStatus.Text = "Redémarrage nécessaire : cliquer sur « Redémarrer et reprendre » (la clé USB doit rester branchée).";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            PrepStatus.Text = "Préparation impossible : " + ex.Message;
+        }
+    }
+
+    /// <summary>Passe lancée à la main : l'éventuelle relance automatique n'a plus lieu d'être.</summary>
+    private static void AnnulerReprise()
+    {
+        try { Reprise.Annuler(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { }
+    }
+
+    private void Reboot_Click(object sender, RoutedEventArgs e)
+    {
+        if (_dossier is null || _prep is null) return;
+        var choix = MessageBox.Show(this,
+            "Le PC va redémarrer dans 30 secondes. JVTECH Atelier se relancera à l'ouverture de session et fera la passe suivante.\n\nLa clé USB doit rester branchée. Fermer les autres programmes avant de continuer.",
+            "Redémarrer et reprendre", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+        if (choix != MessageBoxResult.OK) return;
+        try
+        {
+            var exe = System.Reflection.Assembly.GetEntryAssembly()!.Location;
+            Reprise.Programmer(exe);
+            _prep = _prep with { RepriseProgrammee = true };
+            _dossier.EnregistrerPreparation(_prep);
+            _dossier.Journaliser($"Redémarrage demandé par le technicien, reprise programmée ({Reprise.Commande(exe)})");
+            if (!Reprise.Redemarrer())
+            {
+                Reprise.Annuler();
+                _prep = _prep with { RepriseProgrammee = false };
+                _dossier.EnregistrerPreparation(_prep);
+                _dossier.Journaliser("Redémarrage refusé par Windows : reprise annulée");
+                PrepStatus.Text = "Windows a refusé le redémarrage : redémarrer à la main, puis relancer JVTECH Atelier.";
+                return;
+            }
+            PrepStatus.Text = "Redémarrage dans 30 secondes (annulable avec « shutdown /a »).";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException)
+        {
+            PrepStatus.Text = "Reprise impossible à programmer : " + ex.Message;
+        }
+    }
+
+    private async void InstallSoftware_Click(object sender, RoutedEventArgs e)
+    {
+        var choisis = _logiciels.Where(l => l.Coche).Select(l => l.Logiciel).ToList();
+        if (choisis.Count == 0)
+        {
+            PrepStatus.Text = "Aucun logiciel coché.";
+            return;
+        }
+        try
+        {
+            var actions = choisis.Select(l => (IActionAtelier)new InstallationLogiciel(l, t => Dispatcher.BeginInvoke(new Action(() => PrepStatus.Text = $"{l.Nom} : {t}")))).ToList();
+            var faites = await RunActionsAsync(actions);
+            var resultats = new Dictionary<string, ActionRecord>();
+            foreach (var (action, trace) in faites) resultats[action.Id] = trace;
+
+            // Pack de base réussi seulement si 7-Zip et VLC sont installés (ou déjà là). Un logiciel du pack non relancé
+            // garde le résultat précédent ; une option en échec est notée dans le journal, sans bloquer la vente.
+            var etat = _prep ?? new EtatPreparation();
+            if (PackAtelier.DeBase.Any(b => resultats.ContainsKey("logiciel:" + b.Id)))
+            {
+                var manquants = new List<string>();
+                foreach (var b in PackAtelier.DeBase)
+                {
+                    if (resultats.TryGetValue("logiciel:" + b.Id, out var r))
+                    {
+                        if (r.Resultat != ResultatAction.Reussi) manquants.Add($"{b.Nom} : {r.Detail}");
+                    }
+                    else if (etat.PackReussi != true) manquants.Add($"{b.Nom} non installé");
+                }
+                _prep = etat with
+                {
+                    PackReussi = manquants.Count == 0,
+                    PackDetail = manquants.Count == 0 ? "7-Zip et VLC installés" : string.Join(" ; ", manquants),
+                    MisAJourLe = DateTime.Now,
+                };
+                _dossier!.EnregistrerPreparation(_prep);
+            }
+            ShowPreparation();
+            ShowSaleStatus();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            PrepStatus.Text = "Installation impossible : " + ex.Message;
+        }
+    }
+
+    private async void ReadDrivers_Click(object sender, RoutedEventArgs e)
+    {
+        DriversButton.IsEnabled = false;
+        try
+        {
+            _pilotes = PlanPreparation.Pilotes(await Task.Run(() => LectureControles.PeripheriquesEnErreur()));
+            _dossier?.Journaliser($"Contrôle {_pilotes.Id} : {Libelles.De(_pilotes.Statut)} : {_pilotes.Constat}");
+            ShowPreparation();
+            ShowSaleStatus();
+        }
+        finally
+        {
+            DriversButton.IsEnabled = _arret is null;
+        }
+    }
+
+    private void OpenDeviceManager_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("devmgmt.msc") { UseShellExecute = true })?.Dispose();
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            PrepStatus.Text = "Gestionnaire de périphériques introuvable : " + ex.Message;
+        }
+    }
+
+    private async void RunMemoryDiagnostic_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await RunActionsAsync(new IActionAtelier[] { new DiagnosticMemoireWindows() });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            PrepStatus.Text = "Diagnostic impossible : " + ex.Message;
+        }
+    }
+
+    private void AcceptPrep_Click(object sender, RoutedEventArgs e)
+    {
+        var technicien = OperatorBox.Text.Trim();
+        var raison = AcceptReason.Text.Trim();
+        if (technicien.Length == 0 || raison.Length == 0)
+        {
+            PrepStatus.Text = "Indiquer le technicien (étape Identification) et une raison pour accepter la préparation en l'état.";
+            return;
+        }
+        if (_prep is null || (_prep.Passes == 0 && _prep.PackReussi is null))
+        {
+            PrepStatus.Text = "Lancer d'abord les mises à jour et le pack de base : on n'accepte qu'une préparation tentée.";
+            return;
+        }
+        try
+        {
+            var maintenant = DateTime.Now;
+            _prep = _prep with { AccepteePar = technicien, AccepteeLe = maintenant, RaisonAcceptation = raison, MisAJourLe = maintenant };
+            _dossier!.EnregistrerPreparation(_prep);
+            _dossier.Journaliser($"Préparation acceptée en l'état par {technicien} : {raison}", maintenant);
+            ShowPreparation();
+            ShowSaleStatus();
+            PrepStatus.Text = "Acceptation notée dans le dossier.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            PrepStatus.Text = "Enregistrement impossible : " + ex.Message;
         }
     }
 }

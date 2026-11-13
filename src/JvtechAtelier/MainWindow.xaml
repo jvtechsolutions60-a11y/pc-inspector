@@ -105,6 +105,78 @@
                 </DockPanel>
             </Border>
 
+            <!-- Étape 2 : préparation (seule étape qui modifie Windows, sauf Sysprep) -->
+            <Border x:Name="PrepPanel" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,16,0" Padding="18,14" Visibility="Collapsed">
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Top">
+                        <Button DockPanel.Dock="Right" x:Name="StopPrepButton" Content="Arrêter après l'action en cours" IsEnabled="False" Click="StopPrep_Click"/>
+                        <TextBlock Text="Préparation" Style="{StaticResource PageTitle}"/>
+                    </DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Style="{StaticResource Hint}" Margin="0,4,0,8"
+                               Text="N'efface rien et ne lance pas Sysprep. Chaque action est notée dans le journal du dossier : état avant, état après, code retour, durée. Brancher le chargeur et laisser la clé USB en place."/>
+                    <TextBlock DockPanel.Dock="Bottom" x:Name="PrepStatus" Style="{StaticResource Hint}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock Text="Mises à jour Windows" Style="{StaticResource SectionTitle}"/>
+                            <TextBlock x:Name="UpdateState" Style="{StaticResource CardDetail}" Margin="0,0,0,6"/>
+                            <WrapPanel Margin="0,0,0,4">
+                                <Button x:Name="UpdateButton" Content="Lancer une passe Windows Update" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" Click="RunUpdates_Click"/>
+                                <Button x:Name="RebootButton" Content="Redémarrer et reprendre" Visibility="Collapsed" Click="Reboot_Click"
+                                        ToolTip="Atelier se relance à l'ouverture de session (clé USB branchée) et fait la passe suivante."/>
+                            </WrapPanel>
+
+                            <TextBlock Text="Logiciels" Style="{StaticResource SectionTitle}" Margin="0,14,0,0"/>
+                            <ItemsControl x:Name="SoftwareList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox Content="{Binding Nom}" IsChecked="{Binding Coche, Mode=TwoWay}" Margin="0,2"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Button x:Name="SoftwareButton" Content="Installer les logiciels cochés (winget)" HorizontalAlignment="Left" Margin="0,6,0,0" Click="InstallSoftware_Click"/>
+
+                            <TextBlock Text="Pilotes" Style="{StaticResource SectionTitle}" Margin="0,14,0,0"/>
+                            <TextBlock x:Name="DriversState" Style="{StaticResource CardDetail}" Margin="0,0,0,6" TextWrapping="Wrap"
+                                       Text="Les pilotes proposés par Windows Update sont installés avec les mises à jour. Relire ensuite les périphériques en erreur."/>
+                            <WrapPanel>
+                                <Button x:Name="DriversButton" Content="Relire les périphériques" Margin="0,0,8,0" Click="ReadDrivers_Click"/>
+                                <Button Content="Ouvrir le Gestionnaire de périphériques" Style="{StaticResource LinkButton}" Click="OpenDeviceManager_Click"/>
+                            </WrapPanel>
+
+                            <TextBlock Text="Mémoire : diagnostic approfondi" Style="{StaticResource SectionTitle}" Margin="0,14,0,0"/>
+                            <TextBlock Style="{StaticResource CardDetail}" Margin="0,0,0,6" TextWrapping="Wrap"
+                                       Text="Outil de Windows, avec redémarrage (choisi dans sa fenêtre). Le résultat est relu dans « Contrôles et tests ». Distinct du contrôle rapide, qui ne garantit pas l'absence de défaut."/>
+                            <Button x:Name="MemoryButton" Content="Ouvrir le diagnostic mémoire de Windows" HorizontalAlignment="Left" Click="RunMemoryDiagnostic_Click"/>
+
+                            <TextBlock Text="Accepter en l'état" Style="{StaticResource SectionTitle}" Margin="0,14,0,0"/>
+                            <TextBlock Style="{StaticResource CardDetail}" Margin="0,0,0,6" TextWrapping="Wrap"
+                                       Text="Si une mise à jour reste en échec ou si un logiciel ne s'installe pas : le noter ici, avec une raison. Le nom du technicien et l'heure sont gardés dans le dossier."/>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="Accepter la préparation en l'état" Margin="8,0,0,0" Click="AcceptPrep_Click"/>
+                                <TextBox x:Name="AcceptReason" ToolTip="Raison (ex. : KB5034441 en échec connu, sans effet sur l'usage)"/>
+                            </DockPanel>
+
+                            <TextBlock Text="Actions de cette session" Style="{StaticResource SectionTitle}" Margin="0,14,0,0"/>
+                            <ItemsControl x:Name="PrepActions">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="0,0,0,8">
+                                            <Border DockPanel.Dock="Left" Background="{Binding PillBrush}" CornerRadius="10" Padding="8,2" Margin="0,0,10,0" VerticalAlignment="Top" Width="120">
+                                                <TextBlock Text="{Binding PillText}" FontSize="12" FontWeight="SemiBold" Foreground="{Binding PillForeground}" TextAlignment="Center"/>
+                                            </Border>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Titre}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
+                                                <TextBlock Text="{Binding Constat}" Style="{StaticResource CardDetail}"/>
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
             <!-- Étape 3 : tests -->
             <Border x:Name="TestsPanel" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,16,0" Padding="18,14" Visibility="Collapsed">
                 <DockPanel>

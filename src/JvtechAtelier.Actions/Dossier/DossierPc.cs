@@ -20,6 +20,7 @@ public sealed class DossierPc
     public const string FichierJournal = "journal.txt";
     public const string FichierReglages = "atelier.ini";
     public const string FichierTests = "tests.ini";
+    public const string FichierPreparation = "preparation.ini";
 
     private DossierPc(string chemin, string identifiant)
     {
@@ -177,6 +178,17 @@ public sealed class DossierPc
     }
 
     /// <summary>Enregistre les résultats des tests manuels (preuve : technicien, date, remarque).</summary>
+    /// <summary>Avancement de la préparation (passes Windows Update, pack), relu après un redémarrage.</summary>
+    public void EnregistrerPreparation(EtatPreparation etat) =>
+        EcrireAtomique(Path.Combine(Chemin, FichierPreparation), etat.Ecrire());
+
+    /// <summary>Null si la préparation n'a jamais été lancée sur ce PC.</summary>
+    public EtatPreparation? LirePreparation()
+    {
+        var fichier = Path.Combine(Chemin, FichierPreparation);
+        return File.Exists(fichier) ? EtatPreparation.Lire(File.ReadAllText(fichier, Encoding.UTF8)) : null;
+    }
+
     public void EnregistrerTests(IEnumerable<ResultatTestManuel> resultats)
     {
         var sb = new StringBuilder();

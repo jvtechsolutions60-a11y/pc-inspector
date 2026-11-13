@@ -111,3 +111,58 @@ public sealed class LigneTest : Notifiant
     public ResultatTest Resultat => (ResultatTest)ResultatIndex;
     public Portee PorteeEchec => PorteeIndex == 1 ? Portee.ReserveCommerciale : Portee.Bloquante;
 }
+
+/// <summary>Une action de préparation déjà lancée, avec son résultat réel (code retour, durée).</summary>
+public sealed class LigneAction
+{
+    public LigneAction(Jvtech.Atelier.Actions.ActionRecord r) => Record = r;
+
+    public Jvtech.Atelier.Actions.ActionRecord Record { get; }
+    public string Titre => Record.Libelle;
+    public string Constat => $"{Record.Detail} · {Record.Debut:HH:mm} · {Duree}";
+    private string Duree => Record.Duree.TotalMinutes >= 1 ? $"{Record.Duree.TotalMinutes:0} min" : $"{Record.Duree.TotalSeconds:0} s";
+
+    public string PillText => Record.Resultat switch
+    {
+        Jvtech.Atelier.Actions.ResultatAction.Reussi => "Réussi",
+        Jvtech.Atelier.Actions.ResultatAction.Echec => "Échec",
+        Jvtech.Atelier.Actions.ResultatAction.Annule => "Arrêté",
+        _ => "Non lancé",
+    };
+
+    public Brush PillBrush => Couleur(Record.Resultat switch
+    {
+        Jvtech.Atelier.Actions.ResultatAction.Reussi => "#DCFCE7",
+        Jvtech.Atelier.Actions.ResultatAction.Echec => "#FEE2E2",
+        _ => "#E2E8F0",
+    });
+
+    public Brush PillForeground => Couleur(Record.Resultat switch
+    {
+        Jvtech.Atelier.Actions.ResultatAction.Reussi => "#14532D",
+        Jvtech.Atelier.Actions.ResultatAction.Echec => "#7F1D1D",
+        _ => "#334155",
+    });
+
+    private static Brush Couleur(string hex) => (Brush)new BrushConverter().ConvertFromString(hex)!;
+}
+
+/// <summary>Un logiciel à cocher (pack de base coché, options décochées).</summary>
+public sealed class LigneLogiciel : Notifiant
+{
+    public LigneLogiciel(Jvtech.Atelier.Actions.Preparation.Logiciel l)
+    {
+        Logiciel = l;
+        _coche = l.DeBase;
+    }
+
+    public Jvtech.Atelier.Actions.Preparation.Logiciel Logiciel { get; }
+    public string Nom => Logiciel.DeBase ? $"{Logiciel.Nom} (pack de base)" : $"{Logiciel.Nom} (option)";
+
+    private bool _coche;
+    public bool Coche
+    {
+        get => _coche;
+        set { _coche = value; Changer(); }
+    }
+}

@@ -19,6 +19,15 @@
 
   <ItemGroup>
     <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
+    <!-- Repris de PC Inspector et PC Maintenance, tels quels : Windows Update (agent COM) et winget -->
+    <Compile Include="..\PcInspector\WindowsState.cs" Link="Shared\WindowsState.cs" />
+    <Compile Include="..\PcInspector\WingetShell.cs" Link="Shared\WingetShell.cs" />
+    <Compile Include="..\PcMaintenance\Maintenance\WindowsUpdate.cs" Link="Shared\WindowsUpdate.cs" />
+    <Compile Include="..\PcMaintenance\Maintenance\Winget.cs" Link="Shared\Winget.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Management" />
   </ItemGroup>
 
   <!-- Les actions s'appuient sur la bibliothèque en lecture seule (jamais l'inverse) -->

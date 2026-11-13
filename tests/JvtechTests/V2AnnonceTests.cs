@@ -58,7 +58,7 @@ public class AnnonceTests
         var t = Annonce.Composer(Donnees(champs: Champs(complet: false)));
         Assert.AreEqual("V1042 · Lenovo ThinkPad T480 · i5-8350U · 16 Go", t.Titre);
         Assert.IsFalse(t.Description.Contains(Champ.NonDetecte));
-        Assert.IsFalse(t.Description.Contains("Écran"), "écran non détecté : pas de ligne inventée");
+        Assert.IsFalse(t.Description.Contains("- Écran :"), "écran non détecté : pas de ligne inventée");
     }
 
     [TestMethod]
