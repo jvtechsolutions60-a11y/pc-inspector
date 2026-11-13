@@ -376,7 +376,8 @@ public static class RegleAudit
 
         foreach (var x in internes)
         {
-            if (x.Sante is not { } s || !s.Lu)
+            var s = x.Sante;
+            if (s is null || !s.Lu)
                 points.Add(new(Statut.AVerifier, $"{Nom(x)} : santé non vérifiée ({s?.Raison ?? "compteurs SMART non lus"})"));
             else if (s.Critiques.Count > 0)
             {
