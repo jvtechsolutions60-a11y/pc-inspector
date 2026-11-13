@@ -44,6 +44,9 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _arret;
     private string? _empreinteComposee;
     private readonly bool _reprendre = Reprise.Demandee(Environment.GetCommandLineArgs());
+    private bool _autoEnCours;
+    private bool _autoArret;
+    private bool _logicielsTentes;
 
     public MainWindow()
     {
@@ -135,11 +138,16 @@ public partial class MainWindow : Window
         // Relancé par Windows après un redémarrage demandé par la préparation : passe suivante, sans autre clic.
         if (_reprendre && _dossier is not null && _prep is { RepriseProgrammee: true })
         {
+            var tout = _prep.ToutLancer;
             _prep = _prep with { RepriseProgrammee = false };
             _dossier.EnregistrerPreparation(_prep);
-            _dossier.Journaliser("Reprise de la préparation après redémarrage");
-            ShowStep(1);
-            await RunUpdatePassAsync();
+            _dossier.Journaliser("Reprise de la préparation après redémarrage" + (tout ? " (Tout lancer)" : ""));
+            if (tout) await ToutLancerAsync();
+            else
+            {
+                ShowStep(1);
+                await RunUpdatePassAsync();
+            }
         }
     }
 
@@ -260,7 +268,9 @@ public partial class MainWindow : Window
 
     // ---------- Tests ----------
 
-    private async void RunChecks_Click(object sender, RoutedEventArgs e)
+    private async void RunChecks_Click(object sender, RoutedEventArgs e) => await RunChecksAsync();
+
+    private async Task RunChecksAsync()
     {
         RunChecksButton.IsEnabled = false;
         TestsStatus.Text = "Contrôles en cours (disques, mémoire, batterie)…";
@@ -325,6 +335,7 @@ public partial class MainWindow : Window
             ShowHeader();
             ShowSaleStatus();
             TestsStatus.Text = $"Tests enregistrés dans {_dossier.Chemin}";
+            if (_prep?.ToutLancer == true && TestsFaits() && !_autoEnCours) _ = ToutLancerAsync();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
@@ -412,7 +423,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SaveListing_Click(object sender, RoutedEventArgs e)
+    private void SaveListing_Click(object sender, RoutedEventArgs e) => SaveListing();
+
+    private bool SaveListing()
     {
         try
         {
@@ -430,10 +443,12 @@ public partial class MainWindow : Window
             ShowHeader();
             ListingStatus.Text = "Fiche interne, annonce et rapport (rapport.html, imprimable en PDF) enregistrés dans " + _dossier.Chemin;
             RefreshSteps();
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
             ListingStatus.Text = "Enregistrement impossible : " + ex.Message;
+            return false;
         }
     }
 
@@ -495,6 +510,7 @@ public partial class MainWindow : Window
     private void StopPrep_Click(object sender, RoutedEventArgs e)
     {
         _arret?.Cancel();
+        _autoArret = true;
         PrepStatus.Text = "Arrêt demandé : l'action en cours se termine d'abord (une mise à jour n'est jamais coupée en plein milieu).";
     }
 
@@ -553,6 +569,13 @@ public partial class MainWindow : Window
             "Le PC va redémarrer dans 30 secondes. JVTECH Atelier se relancera à l'ouverture de session et fera la passe suivante.\n\nLa clé USB doit rester branchée. Fermer les autres programmes avant de continuer.",
             "Redémarrer et reprendre", MessageBoxButton.OKCancel, MessageBoxImage.Question);
         if (choix != MessageBoxResult.OK) return;
+        RedemarrerEtReprendre();
+    }
+
+    /// <summary>Programme la relance d'Atelier puis redémarre dans 30 s. Faux si Windows refuse.</summary>
+    private bool RedemarrerEtReprendre()
+    {
+        if (_dossier is null || _prep is null) return false;
         try
         {
             var exe = System.Reflection.Assembly.GetEntryAssembly()!.Location;
@@ -567,17 +590,21 @@ public partial class MainWindow : Window
                 _dossier.EnregistrerPreparation(_prep);
                 _dossier.Journaliser("Redémarrage refusé par Windows : reprise annulée");
                 PrepStatus.Text = "Windows a refusé le redémarrage : redémarrer à la main, puis relancer JVTECH Atelier.";
-                return;
+                return false;
             }
             PrepStatus.Text = "Redémarrage dans 30 secondes (annulable avec « shutdown /a »).";
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException)
         {
             PrepStatus.Text = "Reprise impossible à programmer : " + ex.Message;
+            return false;
         }
     }
 
-    private async void InstallSoftware_Click(object sender, RoutedEventArgs e)
+    private async void InstallSoftware_Click(object sender, RoutedEventArgs e) => await InstallSoftwareAsync();
+
+    private async Task InstallSoftwareAsync()
     {
         var choisis = _logiciels.Where(l => l.Coche).Select(l => l.Logiciel).ToList();
         if (choisis.Count == 0)
@@ -690,6 +717,114 @@ public partial class MainWindow : Window
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             PrepStatus.Text = "Enregistrement impossible : " + ex.Message;
+        }
+    }
+
+    // ---------- Tout lancer ----------
+
+    private bool TestsFaits() => _tests.Count > 0 && _tests.All(t => t.Enregistre is { Resultat: not ResultatTest.NonTeste });
+
+    private bool FicheAJour()
+    {
+        ShowSaleStatus();
+        try { return _dossier?.LireEmpreinteFiche() is { } e && _bilan is not null && e == _bilan.Empreinte; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
+    }
+
+    private void Auto(string texte)
+    {
+        AutoBar.Visibility = Visibility.Visible;
+        AutoText.Text = texte;
+    }
+
+    private async void ToutLancer_Click(object sender, RoutedEventArgs e)
+    {
+        if (_autoEnCours) return;
+        var choix = MessageBox.Show(this,
+            "JVTECH Atelier va enchaîner seul :\n• les mises à jour Windows, avec les redémarrages nécessaires (il se relance tout seul) ;\n• 7-Zip, VLC et les logiciels cochés ;\n• les contrôles des disques, de la mémoire, de la batterie et des pilotes.\n\nIl s'arrêtera pour les tests manuels, puis enregistrera la fiche, l'annonce et le rapport. Sysprep n'est jamais lancé sans ta confirmation à part.\n\nLa clé USB doit rester branchée. Continuer ?",
+            "Tout lancer", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+        if (choix != MessageBoxResult.OK) return;
+        await ToutLancerAsync();
+    }
+
+    /// <summary>Enchaîne les étapes d'après <see cref="ParcoursAuto"/>. Une étape qui revient deux fois de suite n'a pas abouti : arrêt.</summary>
+    private async Task ToutLancerAsync()
+    {
+        if (_autoEnCours) return;
+        _autoEnCours = true;
+        _autoArret = false;
+        ToutButton.IsEnabled = false;
+        try
+        {
+            EnsureFolder(DateTime.Now);
+            _prep = (_prep ?? new EtatPreparation()) with { ToutLancer = true };
+            _dossier!.EnregistrerPreparation(_prep);
+            _dossier.Journaliser("Tout lancer : début");
+            EtapeAuto? precedente = null;
+            while (!_autoArret)
+            {
+                var etape = ParcoursAuto.Prochaine(_prep, _logicielsTentes, _auto.Count > 0, TestsFaits(), FicheAJour());
+                if (etape == precedente && etape is not (EtapeAuto.TestsManuels or EtapeAuto.Termine))
+                {
+                    Auto($"Arrêté : « {ParcoursAuto.Libelle(etape)} » n'a pas abouti. Voir l'étape concernée, puis relancer « Tout lancer ».");
+                    _dossier.Journaliser($"Tout lancer : arrêt, {ParcoursAuto.Libelle(etape)} n'a pas abouti");
+                    return;
+                }
+                precedente = etape;
+                Auto("Tout lancer : " + ParcoursAuto.Libelle(etape) + "…");
+                switch (etape)
+                {
+                    case EtapeAuto.MisesAJour:
+                        ShowStep(1);
+                        await RunUpdatePassAsync();
+                        break;
+                    case EtapeAuto.Redemarrer:
+                        ShowStep(1);
+                        if (RedemarrerEtReprendre())
+                            Auto("Redémarrage dans 30 secondes. JVTECH Atelier se relancera tout seul et continuera (clé USB branchée).");
+                        else
+                            Auto("Windows a refusé le redémarrage : redémarrer à la main, puis relancer JVTECH Atelier et « Tout lancer ».");
+                        return;
+                    case EtapeAuto.Logiciels:
+                        ShowStep(1);
+                        _logicielsTentes = true;
+                        await InstallSoftwareAsync();
+                        break;
+                    case EtapeAuto.Controles:
+                        ShowStep(2);
+                        await RunChecksAsync();
+                        break;
+                    case EtapeAuto.TestsManuels:
+                        ShowStep(2);
+                        Auto("À toi : fais les tests manuels (« Tester les périphériques » aide), puis « Enregistrer les tests ». La fiche, l'annonce et le rapport se feront seuls ensuite.");
+                        return;
+                    case EtapeAuto.Fiche:
+                        ShowStep(3);
+                        Compose();
+                        SaveListing();
+                        break;
+                    case EtapeAuto.Termine:
+                        _prep = _prep with { ToutLancer = false };
+                        _dossier.EnregistrerPreparation(_prep);
+                        _dossier.Journaliser($"Tout lancer : terminé ({_bilan?.Empreinte})");
+                        var sansV = IdentifiantAtelier.NormaliserInventaire(_dossier.LireInventaire().Inventaire) is null;
+                        ShowStep(5);
+                        Auto($"Terminé : {_bilan?.Libelle}. Annonce prête dans l'étape Annonce."
+                             + (sansV ? " Saisir le n° V… (Identification) avant la finalisation." : "")
+                             + (Installation.FinalisationPermise(_mode) ? " Sysprep : à confirmer dans Finalisation." : ""));
+                        return;
+                }
+            }
+            Auto("Tout lancer arrêté à ta demande. Relancer « Tout lancer » pour continuer là où il s'est arrêté.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            Auto("Tout lancer impossible : " + ex.Message);
+        }
+        finally
+        {
+            _autoEnCours = false;
+            ToutButton.IsEnabled = true;
         }
     }
 

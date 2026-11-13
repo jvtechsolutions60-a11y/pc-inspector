@@ -40,6 +40,9 @@ public sealed record EtatPreparation
     /// <summary>Atelier se relancera seul à l'ouverture de session pour faire la passe suivante.</summary>
     public bool RepriseProgrammee { get; init; }
 
+    /// <summary>« Tout lancer » en cours : après un redémarrage, Atelier reprend toute la suite, pas seulement les mises à jour.</summary>
+    public bool ToutLancer { get; init; }
+
     /// <summary>Le technicien accepte la préparation malgré un arrêt (mise à jour bloquée…) : nom, heure, raison.</summary>
     public string? AccepteePar { get; init; }
     public DateTime? AccepteeLe { get; init; }
@@ -62,6 +65,7 @@ public sealed record EtatPreparation
         L("pack_reussi", PackReussi);
         L("pack_detail", PackDetail);
         L("reprise_programmee", RepriseProgrammee);
+        L("tout_lancer", ToutLancer);
         L("acceptee_par", AccepteePar);
         L("acceptee_le", AccepteeLe);
         L("raison_acceptation", RaisonAcceptation);
@@ -97,6 +101,7 @@ public sealed record EtatPreparation
             PackReussi = B("pack_reussi"),
             PackDetail = S("pack_detail"),
             RepriseProgrammee = B("reprise_programmee") == true,
+            ToutLancer = B("tout_lancer") == true,
             AccepteePar = S("acceptee_par"),
             AccepteeLe = D("acceptee_le"),
             RaisonAcceptation = S("raison_acceptation"),
