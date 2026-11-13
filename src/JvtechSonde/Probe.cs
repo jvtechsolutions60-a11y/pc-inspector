@@ -150,10 +150,15 @@ internal static class Probe
             .GroupBy(d => d.Str("DeviceId")!)
             .ToDictionary(g => g.Key, g => g.First().Str("FriendlyName"));
 
+        // Deux disques du même modèle portent le même nom : le numéro Windows du disque les distingue.
+        var duplicates = names.Values.Where(v => !string.IsNullOrWhiteSpace(v)).GroupBy(v => v).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+
         var list = new List<Point>();
         foreach (var pair in DiskHealth.ReadAll().OrderBy(p => p.Key))
         {
-            var name = names.TryGetValue(pair.Key, out var n) && !string.IsNullOrWhiteSpace(n) ? n! : $"n° {pair.Key}";
+            var name = names.TryGetValue(pair.Key, out var n) && !string.IsNullOrWhiteSpace(n)
+                ? duplicates.Contains(n) ? $"{n} (n° {pair.Key})" : n!
+                : $"n° {pair.Key}";
             var result = pair.Value;
             var level = Rules.FromDiskHealth(result);
             var value = result.Problems.Count > 0
