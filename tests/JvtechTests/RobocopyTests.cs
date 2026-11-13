@@ -1,3 +1,4 @@
+extern alias maintenance;
 extern alias migration;
 using System;
 using System.Collections.Generic;
@@ -171,4 +172,48 @@ public class RobocopyTests
         var args = Tools.RobocopyArguments(@"C:\Users\Jean Dupont\", @"E:\Sauvegarde PC\", false);
         StringAssert.StartsWith(args, "\"C:\\Users\\Jean Dupont\" \"E:\\Sauvegarde PC\"");
     }
+}
+
+/// <summary>Contrôle après sauvegarde (audit I05) et nettoyage sans perte de documents (audit I04).</summary>
+[TestClass]
+public class CopyCheckTests
+{
+    [TestMethod]
+    public void Verify_DetectsMissingAndDifferentFiles()
+    {
+        var root = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "jvtech-verif-" + Guid.NewGuid().ToString("N"));
+        var source = System.IO.Path.Combine(root, "pc");
+        var copy = System.IO.Path.Combine(root, "sauvegarde");
+        try
+        {
+            System.IO.Directory.CreateDirectory(source);
+            System.IO.Directory.CreateDirectory(copy);
+            System.IO.File.WriteAllText(System.IO.Path.Combine(source, "a.txt"), "AAAA");
+            System.IO.File.WriteAllText(System.IO.Path.Combine(copy, "a.txt"), "AAAA");
+            System.IO.File.WriteAllText(System.IO.Path.Combine(source, "absent.txt"), "x");
+            System.IO.File.WriteAllText(System.IO.Path.Combine(source, "tronque.txt"), "123456");
+            System.IO.File.WriteAllText(System.IO.Path.Combine(copy, "tronque.txt"), "123");
+
+            var result = new CopyResult { ExitCode = 1 };
+            Tools.Verify(source, copy, result);
+
+            Assert.AreEqual(3, result.CheckedFiles);
+            CollectionAssert.AreEquivalent(new[] { "absent.txt", "tronque.txt" }, result.Mismatched);
+            Assert.IsFalse(result.IsComplete);
+            StringAssert.Contains(result.Summary(), "CONTRÔLE ÉCHOUÉ");
+        }
+        finally
+        {
+            try { System.IO.Directory.Delete(root, true); } catch (System.IO.IOException) { }
+        }
+    }
+
+    [DataTestMethod]
+    [DataRow("brouillon devis.docx", true)]
+    [DataRow("photo.JPG", true)]
+    [DataRow("compta.xlsx", true)]
+    [DataRow("~DF1234.tmp", false)]
+    [DataRow("setup.log", false)]
+    public void Cleanup_DocumentsAreNeverDeleted(string name, bool document) =>
+        Assert.AreEqual(document, maintenance::PcMaintenance.Maintenance.Cleanup.IsDocument(name));
 }

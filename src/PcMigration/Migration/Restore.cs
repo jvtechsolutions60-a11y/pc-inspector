@@ -162,6 +162,13 @@ internal static class Restore
             }
         }
         ctx.Report.Detail("Mots de passe", done);
+        // Audit I07 : limite technique dite au technicien, pas cachée.
+        if (done.Count > 0) ctx.Report.Detail("Mots de passe : à savoir", new[]
+        {
+            "Le fichier des mots de passe en clair n'a existé que quelques secondes, dans un dossier réservé, puis a été écrasé et supprimé.",
+            "Sur un SSD, l'écrasement ne garantit pas l'effacement physique des données. Pour un PC revendu ou donné, effacer le disque entier (préparation revente).",
+            "Un antivirus ou une sauvegarde automatique (Historique des fichiers, OneDrive) a pu lire ce fichier pendant ces quelques secondes : le dossier AppData\\Local n'est pas synchronisé par OneDrive.",
+        });
         return done.Count == 0 ? "Aucun fichier de mots de passe" : string.Join(" ; ", done);
     }
 

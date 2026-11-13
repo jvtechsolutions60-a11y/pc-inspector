@@ -101,7 +101,12 @@ internal static class Cleanup
     private static ulong TempFiles(IProgress<string> log)
     {
         var windowsTemp = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Temp");
-        return CleanFolder(Path.GetTempPath(), DateTime.Now.AddDays(-1)) + CleanFolder(windowsTemp, DateTime.Now.AddDays(-1));
+        // Un document (brouillon d'un logiciel, pièce jointe ouverte…) n'est jamais supprimé : il est mis de côté.
+        var aside = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonDocuments), "JVTECH - mis de côté", "Temp " + DateTime.Now.ToString("yyyy-MM-dd"));
+        var freed = CleanFolder(Path.GetTempPath(), DateTime.Now.AddDays(-1), aside, out var movedUser)
+                    + CleanFolder(windowsTemp, DateTime.Now.AddDays(-1), aside, out var movedWindows);
+        if (movedUser + movedWindows > 0) log.Report($"    {movedUser + movedWindows} document(s) trouvé(s) dans Temp : mis de côté dans {aside}, pas supprimés.");
+        return freed;
     }
 
     /// <summary>Les mises à jour déjà installées que Windows Update garde en téléchargement ; il les reprend si besoin.</summary>
@@ -120,7 +125,7 @@ internal static class Cleanup
                 log.Report("    Service Windows Update impossible à arrêter : cache non vidé.");
                 return 0;
             }
-            return CleanFolder(download, DateTime.MaxValue);
+            return CleanFolder(download, DateTime.MaxValue, null, out _);
         }
         finally
         {
@@ -193,19 +198,19 @@ internal static class Cleanup
             if (IsRunning(process)) { log.Report($"    {name} est ouvert : son cache n'est pas vidé."); continue; }
             foreach (var profile in SubFolders(folder).Where(p => File.Exists(Path.Combine(p, "Preferences"))))
                 foreach (var cache in new[] { "Cache", "Code Cache", "GPUCache" })
-                    freed += CleanFolder(Path.Combine(profile, cache), DateTime.MaxValue);
+                    freed += CleanFolder(Path.Combine(profile, cache), DateTime.MaxValue, null, out _);
         }
 
         var opera = Path.Combine(local, @"Opera Software");
         if (Directory.Exists(opera) && !IsRunning("opera"))
             foreach (var profile in SubFolders(opera))
-                freed += CleanFolder(Path.Combine(profile, "Cache"), DateTime.MaxValue);
+                freed += CleanFolder(Path.Combine(profile, "Cache"), DateTime.MaxValue, null, out _);
 
         var firefox = Path.Combine(local, @"Mozilla\Firefox\Profiles");
         if (Directory.Exists(firefox))
         {
             if (IsRunning("firefox")) log.Report("    Firefox est ouvert : son cache n'est pas vidé.");
-            else foreach (var profile in SubFolders(firefox)) freed += CleanFolder(Path.Combine(profile, "cache2"), DateTime.MaxValue);
+            else foreach (var profile in SubFolders(firefox)) freed += CleanFolder(Path.Combine(profile, "cache2"), DateTime.MaxValue, null, out _);
         }
         return freed;
     }
@@ -330,9 +335,12 @@ internal static class Cleanup
     /// par dossier : la liste complète n'est jamais chargée en mémoire, et un dossier illisible, un chemin trop long ou
     /// un fichier ouvert est simplement sauté sans arrêter le reste. Les jonctions et liens symboliques ne sont jamais
     /// suivis : ils peuvent pointer vers les documents de l'utilisateur.
+    /// Jamais supprimés (audit I04) : les fichiers en lecture seule (laissés en place) et, si <paramref name="aside"/> est
+    /// donné, les documents (<see cref="IsDocument"/>), déplacés dans ce dossier au lieu d'être effacés.
     /// </summary>
-    private static ulong CleanFolder(string folder, DateTime olderThan)
+    private static ulong CleanFolder(string folder, DateTime olderThan, string? aside, out int moved)
     {
+        moved = 0;
         if (!Directory.Exists(folder)) return 0;
         ulong freed = 0;
         var visited = new List<string>();
@@ -350,8 +358,18 @@ internal static class Cleanup
                     if (entry is DirectoryInfo sub) { pending.Push(sub.FullName); continue; }
                     var file = (FileInfo)entry;
                     if (file.LastWriteTime >= olderThan) continue;
+                    if (file.IsReadOnly) continue;
+                    if (aside is not null && IsDocument(file.Name))
+                    {
+                        var relative = file.FullName.Substring(folder.TrimEnd('\\').Length + 1);
+                        var target = Path.Combine(aside, relative);
+                        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                        if (File.Exists(target)) target = Path.Combine(Path.GetDirectoryName(target)!, $"{Path.GetFileNameWithoutExtension(target)} ({Guid.NewGuid().ToString("N").Substring(0, 6)}){Path.GetExtension(target)}");
+                        file.MoveTo(target);
+                        moved++;
+                        continue;
+                    }
                     var size = (ulong)file.Length;
-                    if (file.IsReadOnly) file.IsReadOnly = false;
                     file.Delete();
                     freed += size;
                 }
@@ -368,6 +386,19 @@ internal static class Cleanup
         }
         return freed;
     }
+
+    private static readonly HashSet<string> DocumentExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".doc", ".docx", ".docm", ".dot", ".dotx", ".odt", ".ott", ".rtf",
+        ".xls", ".xlsx", ".xlsm", ".xlsb", ".ods", ".csv", ".ppt", ".pptx", ".odp", ".pdf",
+        ".jpg", ".jpeg", ".png", ".heic", ".gif", ".bmp", ".tif", ".tiff", ".psd", ".svg",
+        ".mp3", ".wav", ".m4a", ".mp4", ".mov", ".avi", ".mkv",
+        ".zip", ".7z", ".rar", ".pst", ".ost", ".eml", ".msg", ".vcf", ".ics",
+        ".dwg", ".dxf", ".skp", ".mdb", ".accdb",
+    };
+
+    /// <summary>Fichier qui peut être le travail de quelqu'un (document, photo, archive, base…) : jamais supprimé.</summary>
+    internal static bool IsDocument(string fileName) => DocumentExtensions.Contains(Path.GetExtension(fileName));
 
     /// <summary>Sous-dossiers (profils de navigateur) ; dossier illisible ou chemin trop long : aucun, sans erreur.</summary>
     private static string[] SubFolders(string folder)

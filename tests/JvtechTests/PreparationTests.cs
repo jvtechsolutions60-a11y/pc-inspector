@@ -131,3 +131,20 @@ public class PolicyBackupTests
     public void Snapshot_HasNoPipe_SoEtatIniKeepsIt() =>
         Assert.IsFalse(PolicyBackup.Encode(Microsoft.Win32.RegistryValueKind.String, "a|b").Contains("|"));
 }
+
+/// <summary>Seule la fenêtre Sysprep du mode audit est fermée (audit I03).</summary>
+[TestClass]
+public class SysprepWindowTests
+{
+    private const string Official = @"C:\Windows\System32\Sysprep\sysprep.exe";
+
+    [DataTestMethod]
+    [DataRow(@"C:\Windows\System32\Sysprep\sysprep.exe", @"""C:\Windows\System32\Sysprep\sysprep.exe""", true)]
+    [DataRow(@"C:\Windows\System32\Sysprep\sysprep.exe", @"C:\Windows\System32\Sysprep\sysprep.exe", true)]
+    [DataRow(@"C:\Windows\System32\Sysprep\sysprep.exe", @"""C:\Windows\System32\Sysprep\sysprep.exe"" /oobe /shutdown /quiet", false)]
+    [DataRow(@"C:\Windows\System32\Sysprep\sysprep.exe", @"C:\Windows\System32\Sysprep\sysprep.exe /generalize", false)]
+    [DataRow(@"C:\Users\x\Downloads\sysprep.exe", @"C:\Users\x\Downloads\sysprep.exe", false)]
+    [DataRow("", "", false)]
+    public void OnlyAuditWindow(string path, string commandLine, bool expected) =>
+        Assert.AreEqual(expected, maintenance::PcMaintenance.Preparation.PreparationRunner.IsAuditSysprepWindow(path, commandLine, Official));
+}

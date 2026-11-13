@@ -16,6 +16,7 @@ internal sealed class JobContext
     public JobContext(Layout layout, UserProfile profile, string? password, IProgress<string> log, Func<string, bool> ask, Func<bool> stop)
     {
         Layout = layout; Profile = profile; Password = password; Log = log; Ask = ask; Stop = stop;
+        Tools.FullLogFolder = Path.Combine(layout.Folder, "Journaux robocopy");
     }
 
     public Layout Layout { get; }
@@ -36,7 +37,11 @@ internal sealed class JobContext
     {
         if (result.IsComplete) return;
         lock (Problems) Problems.Add($"{title} : {result.Summary()}");
-        if (result.FailedFiles.Count > 0) Report.Detail($"Fichiers non copiés : {title}", result.FailedFiles);
+        var full = result.FullLog is null ? "" : $" (liste complète : {result.FullLog})";
+        if (result.FailedFiles.Count > 0)
+            Report.Detail($"Fichiers non copiés : {title}{full}", result.FailedFiles.Take(200).Concat(result.FailedFiles.Count > 200 ? new[] { $"… et {result.FailedFiles.Count - 200} autres" } : Array.Empty<string>()));
+        else if (result.Failed > 0) Report.Detail($"Fichiers non copiés : {title}", new[] { $"{result.Failed} fichier(s) en échec selon robocopy, chemins non relevés{full}" });
+        if (result.Mismatched.Count > 0) Report.Detail($"Contrôle échoué : {title}", result.Mismatched);
     }
 
     /// <summary>Lance une étape : une erreur imprévue la note « non faite » et on passe à la suivante.</summary>
@@ -92,7 +97,13 @@ internal static class Backup
         if (folder.Path.IndexOf("OneDrive", StringComparison.OrdinalIgnoreCase) >= 0)
             ctx.Log.Report("    Dossier synchronisé avec OneDrive : les fichiers « en ligne seulement » sont téléchargés pendant la copie.");
         ctx.Log.Report($"    {folder.Path} → {Path.Combine(ctx.Layout.Folders, folder.Key)}");
-        var result = Tools.Robocopy(folder.Path, Path.Combine(ctx.Layout.Folders, folder.Key), ctx.Log);
+        var target = Path.Combine(ctx.Layout.Folders, folder.Key);
+        var result = Tools.Robocopy(folder.Path, target, ctx.Log);
+        if (!result.Fatal)
+        {
+            ctx.Log.Report("    Contrôle de la copie…");
+            Tools.Verify(folder.Path, target, result);
+        }
         ctx.Check(folder.Label, result);
         return result.Summary();
     }
@@ -169,6 +180,13 @@ internal static class Backup
         if (Browser.InstalledFor(ctx.Profile).Any(b => b.Key == "Firefox"))
             done.Add("Mozilla Firefox : les mots de passe suivent le profil Firefox (élément Navigateurs)");
         ctx.Report.Detail("Mots de passe", done);
+        // Audit I07 : limite technique dite au technicien, pas cachée.
+        if (done.Count > 0) ctx.Report.Detail("Mots de passe : à savoir", new[]
+        {
+            "Le fichier des mots de passe en clair n'a existé que quelques secondes, dans un dossier réservé, puis a été écrasé et supprimé.",
+            "Sur un SSD, l'écrasement ne garantit pas l'effacement physique des données. Pour un PC revendu ou donné, effacer le disque entier (préparation revente).",
+            "Un antivirus ou une sauvegarde automatique (Historique des fichiers, OneDrive) a pu lire ce fichier pendant ces quelques secondes : le dossier AppData\\Local n'est pas synchronisé par OneDrive.",
+        });
         return done.Count == 0 ? "Aucun mot de passe enregistré dans les navigateurs" : string.Join(" ; ", done);
     }
 

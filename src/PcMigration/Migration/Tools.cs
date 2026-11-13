@@ -27,7 +27,7 @@ internal sealed class CopyResult
     /// <summary>Fichiers en échec selon robocopy (ouverts, refusés, chemin invalide…).</summary>
     public long Failed { get; set; }
     public int ExitCode { get; set; }
-    /// <summary>Chemins des fichiers en erreur relevés dans la sortie de robocopy (50 au plus).</summary>
+    /// <summary>Chemins des fichiers en erreur relevés dans la sortie de robocopy (5000 au plus ; tout est dans <see cref="FullLog"/>).</summary>
     public List<string> FailedFiles { get; } = new();
     /// <summary>Robocopy : 8 et plus = au moins un fichier non copié (ouvert, refusé, chemin invalide…).</summary>
     public bool HasFailures => ExitCode >= 8 || ExitCode < 0;
@@ -35,7 +35,15 @@ internal sealed class CopyResult
     public bool Fatal => ExitCode >= 16 || ExitCode < 0;
     public long Missing => Math.Max(Failed, Math.Max(0, Source.Files - Copied.Files));
     /// <summary>Tout est arrivé : aucun échec signalé et autant de fichiers à l'arrivée qu'au départ.</summary>
-    public bool IsComplete => !HasFailures && Missing == 0 && !Unverified;
+    public bool IsComplete => !HasFailures && Missing == 0 && !Unverified && Mismatched.Count == 0;
+    /// <summary>Contrôle après copie (audit I05) : fichiers vérifiés présents avec la même taille.</summary>
+    public long CheckedFiles { get; set; }
+    /// <summary>Fichiers dont l'empreinte SHA-256 a été comparée (échantillon).</summary>
+    public int HashedFiles { get; set; }
+    /// <summary>Sortie complète de robocopy enregistrée dans ce fichier (audit I17), null si impossible.</summary>
+    public string? FullLog { get; set; }
+    /// <summary>Fichiers absents, de taille différente ou d'empreinte différente à l'arrivée.</summary>
+    public List<string> Mismatched { get; } = new();
     /// <summary>Résumé de robocopy absent et recomptage impossible à interpréter (restauration dans un dossier déjà rempli).</summary>
     public bool Unverified { get; set; }
 
@@ -46,6 +54,8 @@ internal sealed class CopyResult
         if (Missing > 0) text += $", INCOMPLET : {Missing} non copiés (ouverts ou refusés, liste dans le rapport)";
         else if (HasFailures) text += ", INCOMPLET : des erreurs (voir le journal)";
         else if (Unverified) text += ", NON VÉRIFIÉ : robocopy s'est arrêté avant son résumé (relancer pour contrôler)";
+        if (Mismatched.Count > 0) text += $", CONTRÔLE ÉCHOUÉ : {Mismatched.Count} fichier(s) absent(s) ou différent(s) à l'arrivée (liste dans le rapport)";
+        else if (CheckedFiles > 0 && Missing == 0 && !HasFailures) text += $" ; VÉRIFIÉS : présence et taille des {CheckedFiles} fichiers, empreinte SHA-256 de {HashedFiles} fichier(s) tiré(s) au sort";
         return text;
     }
 }
@@ -78,7 +88,7 @@ internal static class Tools
     /// </summary>
     internal static List<string> FailedPaths(IEnumerable<string> output) =>
         output.Select(l => ErrorLine.Match(l.Trim())).Where(m => m.Success).Select(m => m.Groups["path"].Value.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase).Take(50).ToList();
+            .Distinct(StringComparer.OrdinalIgnoreCase).Take(5000).ToList();
 
     public static string Size(ulong bytes) => bytes >= 1UL << 30
         ? $"{bytes / (double)(1UL << 30):0.0} Go"
@@ -129,6 +139,18 @@ internal static class Tools
             log.Report("      " + line.Trim());
 
         result.FailedFiles.AddRange(FailedPaths(output));
+        // Sortie complète gardée à part : le rapport n'en reprend qu'un extrait.
+        if (FullLogFolder is { } logs)
+        {
+            try
+            {
+                Directory.CreateDirectory(logs);
+                var file = Path.Combine(logs, $"{DateTime.Now:yyyy-MM-dd HH-mm-ss} {SafeName(Path.GetFileName(source.TrimEnd('\\')))} {Guid.NewGuid().ToString("N").Substring(0, 4)}.log");
+                File.WriteAllLines(file, new[] { $"robocopy {RobocopyArguments(source, destination, neverOverwrite, excludeDirs, excludeFiles)}", $"Code de sortie : {result.ExitCode}", "" }.Concat(output));
+                result.FullLog = file;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
         if (!ReadSummary(output, result))
         {
             // Résumé introuvable (robocopy arrêté avant la fin) : on recompte, plus lent mais exact.
@@ -194,6 +216,69 @@ internal static class Tools
             foreach (var sub in subs)
                 if ((sub.Attributes & FileAttributes.ReparsePoint) == 0) stack.Push(sub.FullName);
         }
+    }
+
+    /// <summary>
+    /// Contrôle après la sauvegarde (audit I05) : chaque fichier de la source doit être à l'arrivée avec la même taille,
+    /// et l'empreinte SHA-256 d'un échantillon (1 fichier sur 20, 100 au plus, 50 Mo au plus chacun) doit être identique.
+    /// Un fichier en échec chez robocopy n'est pas compté deux fois. Remplit <see cref="CopyResult.Mismatched"/>.
+    /// </summary>
+    public static void Verify(string source, string destination, CopyResult result, IReadOnlyCollection<string>? excludeDirs = null)
+    {
+        var failed = new HashSet<string>(result.FailedFiles, StringComparer.OrdinalIgnoreCase);
+        var excluded = excludeDirs is null ? null : new HashSet<string>(excludeDirs, StringComparer.OrdinalIgnoreCase);
+        var stack = new Stack<string>();
+        stack.Push(source);
+        long index = 0;
+        while (stack.Count > 0)
+        {
+            var dir = stack.Pop();
+            FileInfo[] files;
+            DirectoryInfo[] subs;
+            try
+            {
+                var info = new DirectoryInfo(dir);
+                files = info.GetFiles();
+                subs = info.GetDirectories();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { continue; }
+            foreach (var file in files)
+            {
+                if (failed.Contains(file.FullName)) continue;
+                var relative = file.FullName.Substring(source.TrimEnd('\\').Length + 1);
+                var copy = new FileInfo(Path.Combine(destination, relative));
+                result.CheckedFiles++;
+                if (!copy.Exists || copy.Length != file.Length) { if (result.Mismatched.Count < 500) result.Mismatched.Add(relative); continue; }
+                if (index++ % 20 != 0 || result.HashedFiles >= 100 || file.Length > 50L * 1024 * 1024) continue;
+                var a = Sha256(file.FullName);
+                var b = Sha256(copy.FullName);
+                if (a is null || b is null) continue;
+                result.HashedFiles++;
+                if (a != b && result.Mismatched.Count < 500) result.Mismatched.Add(relative + " (contenu différent)");
+            }
+            foreach (var sub in subs)
+                if ((sub.Attributes & FileAttributes.ReparsePoint) == 0 && (excluded is null || !excluded.Contains(sub.Name))) stack.Push(sub.FullName);
+        }
+    }
+
+    internal static string? Sha256(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            return BitConverter.ToString(sha.ComputeHash(stream));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
+    }
+
+    /// <summary>Dossier où chaque copie enregistre la sortie complète de robocopy (choisi par la sauvegarde ou la restauration).</summary>
+    public static string? FullLogFolder { get; set; }
+
+    private static string SafeName(string name)
+    {
+        var clean = new string(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c).ToArray());
+        return clean.Length == 0 ? "copie" : clean.Length > 40 ? clean.Substring(0, 40) : clean;
     }
 
     /// <summary>Options qui suppriment ou déplacent des fichiers : jamais utilisées par PC Migration.</summary>

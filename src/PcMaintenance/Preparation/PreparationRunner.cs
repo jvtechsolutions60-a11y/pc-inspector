@@ -139,11 +139,10 @@ internal sealed class PreparationRunner
         _log.Report($"Préparation de {Model()} (n° de série {Serial()}).");
         _log.Report(_permission.Reason + (PreparationGuard.IsBuiltInAdministrator() ? " Session : Administrateur intégré." : ""));
 
-        // La fenêtre de Sysprep s'ouvre d'elle-même en mode audit : elle servira à la fin, pas maintenant.
-        foreach (var process in Process.GetProcessesByName("sysprep"))
-        {
-            try { process.Kill(); } catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { }
-        }
+        // La fenêtre de Sysprep s'ouvre d'elle-même en mode audit : elle servira à la fin, pas maintenant. Seule cette
+        // fenêtre est fermée (le vrai sysprep.exe de Windows, sans option) ; un Sysprep lancé avec des options est une
+        // opération en cours : il n'est jamais arrêté (audit I03).
+        CloseSysprepWindow();
 
         SetAutoStart();
         // Relevé des réglages d'origine, une seule fois (une reprise après plantage ne doit pas relever nos propres valeurs).
@@ -282,6 +281,50 @@ internal sealed class PreparationRunner
         RemoveAutoStart();
         _server.Status(Model(), Serial(), _state.Started, "Prêt pour la revente",
             _permission.ResealAllowed ? "Remise au premier démarrage : le PC s'éteint." : "Préparation terminée.", finished: true, toCheck: missing.Count > 0);
+    }
+
+    /// <summary>Ferme la fenêtre Sysprep ouverte par le mode audit ; laisse et signale tout Sysprep lancé avec des options.</summary>
+    private void CloseSysprepWindow()
+    {
+        var official = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"Sysprep\sysprep.exe");
+        try
+        {
+            using var searcher = new ManagementObjectSearcher("SELECT ProcessId, ExecutablePath, CommandLine FROM Win32_Process WHERE Name = 'sysprep.exe'");
+            foreach (ManagementObject process in searcher.Get())
+            {
+                var path = process["ExecutablePath"] as string ?? "";
+                var commandLine = process["CommandLine"] as string ?? "";
+                var id = Convert.ToInt32(process["ProcessId"]);
+                if (!IsAuditSysprepWindow(path, commandLine, official))
+                {
+                    _log.Report($"Sysprep déjà en cours ({commandLine}) : laissé tel quel, à vérifier avant la fin de la préparation.");
+                    continue;
+                }
+                try { Process.GetProcessById(id).Kill(); }
+                catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or System.ComponentModel.Win32Exception) { }
+            }
+        }
+        catch (ManagementException) { }
+    }
+
+    /// <summary>Le sysprep.exe de Windows lancé sans option (fenêtre du mode audit), et rien d'autre.</summary>
+    internal static bool IsAuditSysprepWindow(string executablePath, string commandLine, string officialPath)
+    {
+        if (string.IsNullOrWhiteSpace(executablePath)) return false;
+        if (!string.Equals(Path.GetFullPath(executablePath), Path.GetFullPath(officialPath), StringComparison.OrdinalIgnoreCase)) return false;
+        var line = commandLine.Trim();
+        // Retire le chemin du programme (entre guillemets ou non) : il ne doit rien rester.
+        if (line.StartsWith("\"", StringComparison.Ordinal))
+        {
+            var end = line.IndexOf('"', 1);
+            line = end < 0 ? "" : line.Substring(end + 1);
+        }
+        else
+        {
+            var space = line.IndexOf(' ');
+            line = space < 0 ? "" : line.Substring(space + 1);
+        }
+        return line.Trim().Length == 0;
     }
 
     private const string SavedDone = "Releve";
