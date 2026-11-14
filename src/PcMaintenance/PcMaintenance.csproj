@@ -12,6 +12,8 @@
     <Product>PC Maintenance</Product>
     <Company>JVTECH Solutions</Company>
     <Version>1.0.0</Version>
+    <!-- Même style d'icône pour tous les logiciels JVTECH, une couleur par logiciel -->
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
@@ -24,6 +26,12 @@
     <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
     <Page Include="..\PcInspector\Theme.xaml" Link="Theme.xaml" />
     <Compile Include="..\PcInspector\AppInfo.cs" Link="Shared\AppInfo.cs" />
+    <Compile Include="..\PcInspector\WindowsState.cs" Link="Shared\WindowsState.cs" />
+    <Compile Include="..\PcInspector\ProcessRunner.cs" Link="Shared\ProcessRunner.cs" />
+    <Compile Include="..\PcInspector\WingetShell.cs" Link="Shared\WingetShell.cs" />
+    <Compile Include="..\PcInspector\Authenticode.cs" Link="Shared\Authenticode.cs" />
+    <Compile Include="..\PcInspector\WindowsUpdateFailures.cs" Link="Shared\WindowsUpdateFailures.cs" />
+    <Compile Include="..\PcInspector\CrashGuard.cs" Link="Shared\CrashGuard.cs" />
     <Compile Include="..\PcInspector\Updater.cs" Link="Shared\Updater.cs" />
     <Compile Include="..\PcInspector\Models\InfoSection.cs" Link="Shared\InfoSection.cs" />
     <Compile Include="..\PcInspector\Report\ReportInfo.cs" Link="Shared\ReportInfo.cs" />
@@ -33,4 +41,13 @@
     <Compile Include="..\PcInspector\ExportWindow.xaml.cs" Link="ExportWindow.xaml.cs" DependentUpon="ExportWindow.xaml" />
   </ItemGroup>
 
+  <!-- Les tests automatisés (tests/JvtechTests) vérifient les règles internes sans rien exécuter sur le PC. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="JvtechTests" />
+  </ItemGroup>
+
+  <!-- Empreinte des scripts de Win11Debloat (audit I09), passée par la CI : -p:Win11DebloatSha256=... -->
+  <ItemGroup>
+    <AssemblyMetadata Include="Win11DebloatSha256" Value="$(Win11DebloatSha256)" />
+  </ItemGroup>
 </Project>

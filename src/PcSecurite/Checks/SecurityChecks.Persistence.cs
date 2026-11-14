@@ -13,23 +13,6 @@ namespace PcSecurite.Checks;
 /// <summary>Serveurs DNS détournés et tâches planifiées qui relancent un logiciel malveillant. Lecture seule.</summary>
 public static partial class SecurityChecks
 {
-    // Box des opérateurs français et DNS publics connus.
-    private static readonly Dictionary<string, string> KnownDns = new()
-    {
-        ["80.10.246.2"] = "Orange", ["80.10.246.129"] = "Orange", ["81.253.149.1"] = "Orange", ["81.253.149.2"] = "Orange",
-        ["212.27.40.240"] = "Free", ["212.27.40.241"] = "Free",
-        ["109.0.66.10"] = "SFR", ["109.0.66.20"] = "SFR", ["86.64.145.140"] = "SFR", ["86.64.145.146"] = "SFR",
-        ["194.158.122.10"] = "Bouygues Telecom", ["194.158.122.15"] = "Bouygues Telecom",
-        ["8.8.8.8"] = "Google", ["8.8.4.4"] = "Google",
-        ["1.1.1.1"] = "Cloudflare", ["1.0.0.1"] = "Cloudflare", ["1.1.1.2"] = "Cloudflare", ["1.0.0.2"] = "Cloudflare", ["1.1.1.3"] = "Cloudflare", ["1.0.0.3"] = "Cloudflare",
-        ["9.9.9.9"] = "Quad9", ["149.112.112.112"] = "Quad9", ["9.9.9.10"] = "Quad9", ["9.9.9.11"] = "Quad9",
-        ["208.67.222.222"] = "OpenDNS", ["208.67.220.220"] = "OpenDNS", ["208.67.222.123"] = "OpenDNS", ["208.67.220.123"] = "OpenDNS",
-        ["94.140.14.14"] = "AdGuard", ["94.140.15.15"] = "AdGuard", ["94.140.14.15"] = "AdGuard", ["94.140.15.16"] = "AdGuard",
-        ["80.67.169.12"] = "FDN", ["80.67.169.40"] = "FDN",
-        ["193.110.81.0"] = "DNS0.eu", ["185.253.5.0"] = "DNS0.eu",
-        ["76.76.2.0"] = "Control D", ["76.76.10.0"] = "Control D",
-    };
-
     private static SecurityCheck DnsServers()
     {
         const string name = "Serveurs DNS";
@@ -41,14 +24,16 @@ public static partial class SecurityChecks
             foreach (var server in servers.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()))
             {
                 if (IsLocal(server)) known.Add(server + " (box ou réseau local)");
-                else if (KnownDns.TryGetValue(server, out var owner) || IsNextDns(server, out owner)) known.Add($"{server} ({owner})");
+                else if (References.KnownDns.TryGetValue(server, out var owner) || IsNextDns(server, out owner)) known.Add($"{server} ({owner})");
                 else unknown.Add($"{server} sur {adapter.Str("Description") ?? "carte réseau"}");
             }
         }
 
         if (unknown.Count > 0)
-            return SecurityCheck.Danger(name, "DNS inconnu : " + string.Join(", ", unknown.Distinct()),
-                "Un DNS inconnu peut envoyer vers de faux sites (banque, mises à jour). Remettre les DNS en automatique si le client ne l'a pas choisi.");
+            // Avertissement et non danger : un DNS absent de la liste peut être celui d'une entreprise, d'un VPN ou d'un
+            // opérateur moins courant. Le technicien vérifie avec le client avant de toucher à quoi que ce soit.
+            return SecurityCheck.Warning(name, "DNS absent de la liste des DNS connus : " + string.Join(", ", unknown.Distinct()),
+                "Demander au client s'il a choisi ce DNS (VPN, entreprise, contrôle parental). Sinon, un DNS inconnu peut envoyer vers de faux sites (banque, mises à jour) : remettre les DNS en automatique.");
         if (known.Count == 0) return SecurityCheck.Info(name, "Aucun serveur DNS configuré (pas de connexion réseau ?)");
         return SecurityCheck.Ok(name, string.Join(", ", known.Distinct()));
     }
@@ -91,25 +76,70 @@ public static partial class SecurityChecks
     {
         const string name = "Tâches planifiées";
         var tasks = ReadTasks();
-        if (tasks is null) return SecurityCheck.Info(name, "Impossible de lire le Planificateur de tâches");
+        if (tasks is null) return SecurityCheck.Unknown(name, "Impossible de lire le Planificateur de tâches");
 
-        var thirdParty = tasks.Where(t => !t.Name.StartsWith(@"\Microsoft\", StringComparison.OrdinalIgnoreCase)).ToList();
         var flagged = new List<(string Text, bool Severe)>();
-        foreach (var (taskName, command) in thirdParty)
+        var signatures = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        int microsoft = 0, thirdParty = 0;
+        foreach (var (taskName, command) in tasks)
         {
             var expanded = Environment.ExpandEnvironmentVariables(command);
-            if (TrustedAppData.Any(t => expanded.IndexOf(t, StringComparison.OrdinalIgnoreCase) >= 0)) continue;
+            var isMicrosoft = taskName.StartsWith(@"\Microsoft\", StringComparison.OrdinalIgnoreCase);
+            if (isMicrosoft) microsoft++; else thirdParty++;
+
+            // Les règles s'appliquent à toutes les tâches : un malware se cache volontiers sous \Microsoft\Windows\.
             var rule = TaskRules.FirstOrDefault(r => r.Pattern.IsMatch(expanded));
-            if (rule.Pattern is null) continue;
-            flagged.Add(($"{taskName.TrimStart('\\')} : {rule.Why} ({Shorten(expanded)})", rule.Severe));
+            var trusted = !isMicrosoft && TrustedAppData.Any(t => expanded.IndexOf(t, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (rule.Pattern is not null && !trusted)
+            {
+                flagged.Add(($"{taskName.TrimStart('\\')} : {rule.Why} ({Shorten(expanded)})", rule.Severe));
+                continue;
+            }
+
+            // Une tâche rangée chez Microsoft doit lancer un programme signé par Microsoft (signature intégrée ou catalogue Windows).
+            if (!isMicrosoft || TaskProgram(expanded) is not { } program) continue;
+            if (!signatures.TryGetValue(program, out var signed)) signatures[program] = signed = PcInspector.Authenticode.IsMicrosoftSigned(program);
+            if (signed) continue;
+            // Signé par un autre éditeur reconnu (pilote, Office d'un OEM…) : à vérifier. Pas signé du tout : très suspect.
+            var other = PcInspector.Authenticode.IsSigned(program) ? PcInspector.Authenticode.Publisher(program) : null;
+            flagged.Add(other is not null
+                ? ($"{taskName.TrimStart('\\')} : rangée parmi les tâches de Microsoft mais lance un programme signé par {other} ({Shorten(program)})", false)
+                : ($"{taskName.TrimStart('\\')} : rangée parmi les tâches de Microsoft mais lance un programme non signé ({Shorten(program)})", true));
         }
 
-        if (flagged.Count == 0) return SecurityCheck.Ok(name, $"{thirdParty.Count} tâche(s) hors Microsoft, rien de suspect");
+        if (flagged.Count == 0) return SecurityCheck.Ok(name, $"{thirdParty} tâche(s) d'éditeurs tiers et {microsoft} de Microsoft (signatures vérifiées), rien de suspect");
         var detail = string.Join(" · ", flagged.Select(f => f.Text));
         const string advice = "Vérifier ces tâches dans le Planificateur : un logiciel malveillant s'en sert pour revenir à chaque démarrage. Désactiver celles que le client ne connaît pas, puis lancer une analyse antivirus et AdwCleaner (PC Maintenance).";
         return flagged.Any(f => f.Severe)
             ? SecurityCheck.Danger(name, detail, advice)
             : SecurityCheck.Warning(name, detail, advice);
+    }
+
+    /// <summary>
+    /// Chemin du programme lancé par la tâche (entre guillemets, ou jusqu'au premier .exe). Null si ce n'est pas un .exe
+    /// existant : gestionnaire COM, script, ou programme d'une fonction retirée de Windows (on ne signale pas l'absence).
+    /// </summary>
+    private static string? TaskProgram(string command)
+    {
+        var text = command.Trim();
+        string candidate;
+        if (text.StartsWith("\"", StringComparison.Ordinal))
+        {
+            var end = text.IndexOf('"', 1);
+            if (end < 0) return null;
+            candidate = text.Substring(1, end - 1);
+        }
+        else
+        {
+            var exe = text.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+            if (exe < 0) return null;
+            candidate = text.Substring(0, exe + 4);
+        }
+        if (!candidate.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return null;
+        // « rundll32.exe » sans chemin : c'est celui de System32.
+        if (candidate.IndexOf('\\') < 0) candidate = PcInspector.AppPaths.SystemTool(candidate);
+        try { return System.IO.File.Exists(candidate) ? System.IO.Path.GetFullPath(candidate) : null; }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or System.IO.PathTooLongException) { return null; }
     }
 
     private static string Shorten(string command) => command.Length <= 90 ? command : command.Substring(0, 87) + "…";
@@ -122,7 +152,7 @@ public static partial class SecurityChecks
     {
         try
         {
-            using var process = Process.Start(new ProcessStartInfo("schtasks.exe", "/query /fo csv /v /nh")
+            using var process = Process.Start(new ProcessStartInfo(PcInspector.AppPaths.SystemTool("schtasks.exe"), "/query /fo csv /v /nh")
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,

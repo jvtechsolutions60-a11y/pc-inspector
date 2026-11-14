@@ -7,7 +7,7 @@ using PcInspector;
 
 namespace JvtechOutils;
 
-/// <summary>Écran d'accueil : ouvre PC Inspector, PC Sécurité ou PC Maintenance, rangés dans le même dossier.</summary>
+/// <summary>Écran d'accueil : ouvre PC Inspector, PC Sécurité, PC Maintenance ou PC Migration, rangés dans le même dossier.</summary>
 public partial class MainWindow : Window
 {
     private string _updateUrl = Updater.ReleasesPage;
@@ -39,7 +39,7 @@ public partial class MainWindow : Window
         }
         try
         {
-            // Les trois logiciels demandent les droits administrateur : Windows affiche sa confirmation.
+            // PC Inspector, PC Sécurité et PC Maintenance demandent les droits administrateur : Windows affiche sa confirmation.
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true, WorkingDirectory = AppPaths.ExeFolder });
             StatusText.Text = "";
         }
@@ -50,8 +50,25 @@ public partial class MainWindow : Window
         }
     }
 
+    private void HistoryLink_Click(object sender, RoutedEventArgs e) => new HistoryWindow { Owner = this }.ShowDialog();
+
     private void ReportsLink_Click(object sender, RoutedEventArgs e) =>
         Open(AppPaths.EnsureFolder(AppPaths.ReportsRoot));
+
+    private void SupportLink_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var zip = SupportExport.ExportForSupport(AppPaths.EnsureFolder(AppPaths.ReportsRoot));
+            if (zip is null) { StatusText.Text = "Aucun journal des 14 derniers jours."; return; }
+            StatusText.Text = "Journaux réunis dans " + zip;
+            Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{zip}\"") { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Win32Exception or InvalidDataException)
+        {
+            StatusText.Text = "Export des journaux impossible : " + ex.Message;
+        }
+    }
 
     private void UpdateLink_Click(object sender, RoutedEventArgs e) => Open(_updateUrl);
 

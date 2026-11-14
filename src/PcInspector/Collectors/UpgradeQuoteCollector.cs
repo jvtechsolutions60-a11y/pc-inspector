@@ -14,9 +14,11 @@ namespace PcInspector.Collectors;
 public sealed class UpgradeQuoteCollector : ICollector
 {
     private const ulong Gb = 1024UL * 1024 * 1024;
+    // Une ligne « en option » est proposée au client mais ne compte pas dans le total.
+    private const string OptionPrefix = "En option : ";
 
     public string Title => "Devis d'upgrade";
-    public string Icon => "";
+    public string Icon => "\uE719";
 
     public InfoSection Collect()
     {
@@ -28,6 +30,8 @@ public sealed class UpgradeQuoteCollector : ICollector
         Disk(section, prices, lines);
 
         var summary = new InfoGroup("Total indicatif");
+        var options = lines.Where(l => l.Label.StartsWith(OptionPrefix)).ToList();
+        lines.RemoveAll(l => l.Label.StartsWith(OptionPrefix));
         if (lines.Count == 0)
         {
             summary.Add("Résultat", "✔ Rien à prévoir : la mémoire et le disque sont suffisants pour ce PC.");
@@ -41,6 +45,8 @@ public sealed class UpgradeQuoteCollector : ICollector
             if (prices.Labour is { } l2) known.Add(l2);
             if (known.Count > 0) summary.Add("Total", $"{known.Sum(p => p.Min)} à {known.Sum(p => p.Max)} € TTC environ");
         }
+        foreach (var (label, reference, price) in options)
+            summary.Add(label, reference + (price is { } p ? $" : {p.Min} à {p.Max} € (hors total)" : " (hors total)"));
         summary.Add("Prix", "Fourchettes indicatives, à vérifier avant de donner un prix ferme.")
             .AddLink("Mes prix", "Modifier les prix et la main d'œuvre", Prices.EditLink);
         section.Groups.Insert(0, summary);
@@ -72,9 +78,23 @@ public sealed class UpgradeQuoteCollector : ICollector
             group.Add("Conseil", "Mémoire LPDDR soudée à la carte mère : pas d'ajout possible.");
             return;
         }
+        var free = slots - modules.Count;
+        var form = formFactor == 12 ? "SO-DIMM" : "DIMM";
+        var speedText = speed is { } s ? $" {s} MHz" : "";
         if (total >= 15.5)
         {
             group.Add("Conseil", "✔ 16 Go ou plus : suffisant pour un usage courant.");
+            // Un emplacement libre : proposer quand même l'ajout d'une barrette identique (double canal, quantité doublée).
+            var existing = (int)Math.Round((modules.FirstOrDefault()?.ULong("Capacity") ?? 0) / (double)Gb);
+            if (free > 0 && typeName is not null && existing > 0 && (maxGb < 1 || total + existing <= maxGb))
+            {
+                var option = $"{typeName} {form}{speedText} {existing} Go";
+                var optionPrice = prices.Ram(typeName, existing);
+                group.Add("En option", $"Ajouter 1 barrette de {existing} Go dans l'emplacement libre pour passer à {total + existing:0} Go (montage, jeux, nombreux onglets).")
+                    .Add("Référence à commander", option)
+                    .AddLink("Comparer les prix", "Rechercher sur LDLC", "https://www.ldlc.com/recherche/" + Uri.EscapeDataString($"{typeName} {form}{speedText} {existing}Go") + "/");
+                lines.Add((OptionPrefix + "mémoire", option, optionPrice));
+            }
             return;
         }
         if (typeName is null)
@@ -85,9 +105,6 @@ public sealed class UpgradeQuoteCollector : ICollector
 
         var target = 16;
         if (maxGb >= 1 && target > maxGb) target = (int)maxGb;
-        var free = slots - modules.Count;
-        var form = formFactor == 12 ? "SO-DIMM" : "DIMM";
-        var speedText = speed is { } s ? $" {s} MHz" : "";
         int size;
         int count;
         string action;

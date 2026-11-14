@@ -58,6 +58,24 @@ public static class Tutorials
             "Si Windows Update bloque : vérifier l'espace libre sur C: (au moins 20 Go) et lancer l'utilitaire de résolution des problèmes.",
         }, "Ouvrir Windows Update", "ms-settings:windowsupdate"),
 
+        "Durcissement (références Microsoft et CIS)" => new(new[]
+        {
+            "Lire la liste « À renforcer » : chaque réglage est indiqué avec l'endroit où le modifier.",
+            "Sur Windows Pro : la plupart se règlent dans l'Éditeur de stratégie de groupe (gpedit.msc), sous Configuration ordinateur > Modèles d'administration.",
+            "Sécurité Windows > Protection contre les virus et menaces > Protection contre les rançongiciels : activer l'accès contrôlé aux dossiers, puis autoriser les logiciels légitimes bloqués.",
+            "Avant de durcir : vérifier que le client n'utilise ni vieux NAS (SMB, NTLM), ni macros Office indispensables, ni outil d'administration à distance.",
+            "Relancer PC Sécurité pour voir le nouveau score.",
+        }, "Ouvrir Sécurité Windows", "windowsdefender://threat", clientCanDo: false),
+
+        "Connexions réseau actives" => new(new[]
+        {
+            "Noter le nom et le dossier du programme signalé.",
+            "Ouvrir le Gestionnaire des tâches > Détails, clic droit sur le programme > Ouvrir l'emplacement du fichier.",
+            "Si le client ne le connaît pas : débrancher internet, terminer le processus, lancer une analyse Microsoft Defender hors ligne et AdwCleaner.",
+            "Vérifier le démarrage automatique et les tâches planifiées (PC Inspector, onglet Démarrage) pour qu'il ne revienne pas.",
+            "Après nettoyage, changer les mots de passe importants depuis un autre appareil.",
+        }, "Ouvrir la protection antivirus", "windowsdefender://threat", clientCanDo: false),
+
         "Antivirus" => new(new[]
         {
             "Ouvrir Sécurité Windows > Protection contre les virus et menaces.",
@@ -134,6 +152,15 @@ public static class Tutorials
             "Mettre UseLogonCredential à 0 (ou supprimer la valeur).",
             "Redémarrer, lancer une analyse antivirus complète et faire changer les mots de passe du client : ce réglage est souvent posé par un pirate.",
         }, "Ouvrir le Registre", "regedit.exe", clientCanDo: false),
+
+        "Mots de passe des navigateurs" => new(new[]
+        {
+            "Installer Bitwarden (gratuit) ou KeePass, et créer le coffre avec un mot de passe maître long que le client retiendra.",
+            "Dans le navigateur, exporter les mots de passe (Paramètres > Mots de passe > Exporter) puis les importer dans le gestionnaire.",
+            "Supprimer le fichier exporté (il contient tout en clair) et vider la corbeille.",
+            "Effacer les mots de passe du navigateur, puis désactiver « Proposer d'enregistrer les mots de passe ».",
+            "Installer l'extension du gestionnaire dans le navigateur pour le remplissage automatique.",
+        }, "Ouvrir la page Bitwarden", "https://bitwarden.com/fr-fr/download/"),
 
         "Sauvegarde des données" => new(new[]
         {

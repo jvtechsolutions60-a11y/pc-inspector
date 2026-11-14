@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Management;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Microsoft.Win32.SafeHandles;
 using PcInspector.Models;
 
@@ -22,6 +23,18 @@ public sealed class DiskHealthResult
 
     internal void Problem(Severity severity, string message) => Problems.Add((severity, message));
 
+    /// <summary>
+    /// Raison pour laquelle l'état de santé n'a pas pu être lu (délai dépassé, pilote incompatible), sinon null.
+    /// Ce n'est pas une panne : rien n'est ajouté aux problèmes ni retiré de la note.
+    /// </summary>
+    public string? Unavailable { get; private set; }
+
+    internal void Unchecked(string label, string reason)
+    {
+        Unavailable = reason;
+        Lines.Add((label, "? Contrôle impossible : " + reason));
+    }
+
     private static string Mark(Severity s) => s switch
     {
         Severity.Critical => "✘",
@@ -37,8 +50,25 @@ public sealed class DiskHealthResult
 /// </summary>
 internal static class DiskHealth
 {
-    /// <summary>Résultats indexés par numéro de disque (Win32_DiskDrive.Index = MSFT_PhysicalDisk.DeviceId).</summary>
+    private static readonly object CacheLock = new();
+    private static (DateTime When, Dictionary<string, DiskHealthResult> Results)? _cache;
+
+    /// <summary>
+    /// Résultats indexés par numéro de disque (Win32_DiskDrive.Index = MSFT_PhysicalDisk.DeviceId).
+    /// Gardés une minute : le bilan et l'onglet Stockage ne réinterrogent pas deux fois un disque lent.
+    /// </summary>
     public static Dictionary<string, DiskHealthResult> ReadAll()
+    {
+        lock (CacheLock)
+        {
+            if (_cache is { } cached && DateTime.Now - cached.When < TimeSpan.FromMinutes(1)) return cached.Results;
+            var results = ReadAllNow();
+            _cache = (DateTime.Now, results);
+            return results;
+        }
+    }
+
+    private static Dictionary<string, DiskHealthResult> ReadAllNow()
     {
         var results = new Dictionary<string, DiskHealthResult>();
         try { ReadAta(results); }
@@ -47,9 +77,37 @@ internal static class DiskHealth
         foreach (var disk in Wmi.QueryOptional("SELECT DeviceId, BusType FROM MSFT_PhysicalDisk", Wmi.StorageScope))
         {
             if (disk.ULong("BusType") != 17 || disk.Str("DeviceId") is not { } id || results.ContainsKey(id)) continue;
-            if (ReadNvmeLog(id) is { } log) results[id] = JudgeNvme(log);
+            results[id] = ReadNvme(id);
         }
         return results;
+    }
+
+    /// <summary>
+    /// Un délai dépassé ou un journal illisible n'est pas une panne prouvée : contrôleur RAID ou Intel RST, pilote du
+    /// constructeur, boîtier USB, ou disque occupé. Le résultat dit « contrôle impossible », sans pénalité dans la note.
+    /// Seuls les indicateurs lus dans le journal du SSD (alerte critique, réserve, erreurs média…) comptent comme problèmes.
+    /// </summary>
+    internal static DiskHealthResult ReadNvme(string id)
+    {
+        try
+        {
+            if (ReadNvmeLog(id) is { } log) return JudgeNvme(log);
+            var unread = new DiskHealthResult();
+            unread.Unchecked("Journal de santé NVMe", "Windows ne transmet pas le journal de ce SSD (pilote du constructeur, contrôleur RAID ou boîtier USB). Vérifier avec l'outil du fabricant.");
+            return unread;
+        }
+        catch (TimeoutException)
+        {
+            var slow = new DiskHealthResult();
+            slow.Unchecked("Journal de santé NVMe", $"pas de réponse en {NvmeTimeoutMs / 1000} secondes. Ce n'est pas à lui seul un signe de panne : relancer l'analyse, puis vérifier avec l'outil du fabricant si cela se répète.");
+            return slow;
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or System.ComponentModel.Win32Exception or ArgumentException)
+        {
+            var denied = new DiskHealthResult();
+            denied.Unchecked("Journal de santé NVMe", "accès refusé (lancer PC Inspector en administrateur).");
+            return denied;
+        }
     }
 
     // ---------- Disques SATA / ATA : attributs SMART via WMI ----------
@@ -57,7 +115,7 @@ internal static class DiskHealth
     private const byte Reallocated = 5, SpinRetry = 10, PowerOnHours = 9, ReportedUncorrectable = 187,
                         Temperature = 194, Pending = 197, Uncorrectable = 198, CrcErrors = 199;
 
-    private sealed record SmartAttribute(byte Id, byte Current, ulong Raw);
+    internal sealed record SmartAttribute(byte Id, byte Current, ulong Raw);
 
     private static void ReadAta(Dictionary<string, DiskHealthResult> results)
     {
@@ -93,7 +151,7 @@ internal static class DiskHealth
     }
 
     /// <summary>Table SMART ATA : 2 octets d'en-tête puis 30 entrées de 12 octets (id, drapeaux, valeur, pire, 6 octets bruts).</summary>
-    private static Dictionary<byte, SmartAttribute> ParseAttributes(byte[] raw)
+    internal static Dictionary<byte, SmartAttribute> ParseAttributes(byte[] raw)
     {
         var attributes = new Dictionary<byte, SmartAttribute>();
         for (int o = 2; o + 12 <= raw.Length && o < 2 + 30 * 12; o += 12)
@@ -107,7 +165,7 @@ internal static class DiskHealth
         return attributes;
     }
 
-    private static Dictionary<byte, byte> ParseThresholds(byte[]? raw)
+    internal static Dictionary<byte, byte> ParseThresholds(byte[]? raw)
     {
         var limits = new Dictionary<byte, byte>();
         if (raw is null) return limits;
@@ -116,7 +174,7 @@ internal static class DiskHealth
         return limits;
     }
 
-    private static DiskHealthResult JudgeAta(Dictionary<byte, SmartAttribute> attrs, Dictionary<byte, byte> limits, bool predictFailure)
+    internal static DiskHealthResult JudgeAta(Dictionary<byte, SmartAttribute> attrs, Dictionary<byte, byte> limits, bool predictFailure)
     {
         var r = new DiskHealthResult();
 
@@ -197,14 +255,36 @@ internal static class DiskHealth
     private const int StorageDeviceProtocolSpecificProperty = 50, ProtocolTypeNvme = 3, NvmeDataTypeLogPage = 2;
     private const int NvmeHealthLog = 2, LogSize = 512, SpecificDataSize = 40, HeaderSize = 8;
 
+    /// <summary>Délai maximal de réponse d'un SSD NVMe ; au-delà, on passe au disque suivant.</summary>
+    internal const int NvmeTimeoutMs = 3000;
+
+    private const uint FileFlagOverlapped = 0x40000000;
+    private const int ErrorIoPending = 997;
+
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern SafeFileHandle CreateFile(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool DeviceIoControl(SafeFileHandle device, uint code, byte[] input, int inputSize,
-                                               byte[] output, int outputSize, out int returned, IntPtr overlapped);
+    private static extern bool DeviceIoControl(SafeFileHandle device, uint code, IntPtr input, int inputSize,
+                                               IntPtr output, int outputSize, IntPtr returned, IntPtr overlapped);
 
-    /// <summary>Demande au SSD son journal de santé. Simple requête de lecture : rien n'est modifié.</summary>
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetOverlappedResult(SafeFileHandle device, IntPtr overlapped, out int transferred, bool wait);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CancelIoEx(SafeFileHandle device, IntPtr overlapped);
+
+    /// <summary>
+    /// Mémoire d'une requête qu'un disque bloqué n'a jamais rendue : Windows peut encore y écrire, elle n'est donc
+    /// jamais libérée (quelques centaines d'octets, seulement pour un disque mourant).
+    /// </summary>
+    private static readonly List<object> Abandoned = new();
+
+    /// <summary>
+    /// Demande au SSD son journal de santé. Simple requête de lecture : rien n'est modifié. La requête est asynchrone
+    /// (FILE_FLAG_OVERLAPPED) : si le disque ne répond pas dans <see cref="NvmeTimeoutMs"/>, elle est annulée et
+    /// <see cref="TimeoutException"/> est levée, sans bloquer l'analyse des autres disques.
+    /// </summary>
     private static byte[]? ReadNvmeLog(string diskNumber)
     {
         const uint GenericRead = 0x80000000, GenericWrite = 0x40000000, ShareReadWrite = 3, OpenExisting = 3;
@@ -213,12 +293,12 @@ internal static class DiskHealth
         // Certains pilotes exigent un accès lecture-écriture pour répondre à la requête, même si elle ne fait que lire.
         foreach (var access in new[] { GenericRead, GenericRead | GenericWrite })
         {
-            using var handle = CreateFile(path, access, ShareReadWrite, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+            using var handle = CreateFile(path, access, ShareReadWrite, IntPtr.Zero, OpenExisting, FileFlagOverlapped, IntPtr.Zero);
             if (handle.IsInvalid) continue;
 
             // STORAGE_PROPERTY_QUERY suivi de STORAGE_PROTOCOL_SPECIFIC_DATA puis de la place pour le journal.
-            var buffer = new byte[HeaderSize + SpecificDataSize + LogSize];
-            void Put(int offset, int value) => BitConverter.GetBytes(value).CopyTo(buffer, offset);
+            var request = new byte[HeaderSize + SpecificDataSize + LogSize];
+            void Put(int offset, int value) => BitConverter.GetBytes(value).CopyTo(request, offset);
             Put(0, StorageDeviceProtocolSpecificProperty);
             Put(4, 0);                       // PropertyStandardQuery
             Put(8, ProtocolTypeNvme);
@@ -228,8 +308,8 @@ internal static class DiskHealth
             Put(24, SpecificDataSize);       // ProtocolDataOffset
             Put(28, LogSize);                // ProtocolDataLength
 
-            if (!DeviceIoControl(handle, IoctlStorageQueryProperty, buffer, buffer.Length, buffer, buffer.Length, out _, IntPtr.Zero))
-                continue;
+            var buffer = Send(handle, request);
+            if (buffer is null) continue;
 
             // Réponse : STORAGE_PROTOCOL_DATA_DESCRIPTOR (Version, Size, puis les mêmes données de protocole).
             var offset = HeaderSize + BitConverter.ToInt32(buffer, HeaderSize + 16);
@@ -243,7 +323,55 @@ internal static class DiskHealth
         return null;
     }
 
-    private static DiskHealthResult JudgeNvme(byte[] log)
+    /// <summary>
+    /// IOCTL asynchrone avec délai maximal. La mémoire est hors du ramasse-miettes (le pilote y écrit pendant
+    /// l'attente) ; si le disque ne rend même pas la main après l'annulation, elle est abandonnée plutôt que libérée.
+    /// </summary>
+    private static byte[]? Send(SafeFileHandle handle, byte[] request)
+    {
+        var size = request.Length;
+        var buffer = Marshal.AllocHGlobal(size);
+        var overlapped = Marshal.AllocHGlobal(Marshal.SizeOf<NativeOverlapped>());
+        var done = new ManualResetEvent(false);
+        var release = true;
+        try
+        {
+            Marshal.Copy(request, 0, buffer, size);
+            Marshal.StructureToPtr(new NativeOverlapped { EventHandle = done.SafeWaitHandle.DangerousGetHandle() }, overlapped, false);
+
+            if (!DeviceIoControl(handle, IoctlStorageQueryProperty, buffer, size, buffer, size, IntPtr.Zero, overlapped))
+            {
+                if (Marshal.GetLastWin32Error() != ErrorIoPending) return null;
+                if (!done.WaitOne(NvmeTimeoutMs))
+                {
+                    CancelIoEx(handle, overlapped);
+                    // La requête annulée doit se terminer avant de libérer sa mémoire ; un pilote bloqué peut ne jamais le faire.
+                    if (!done.WaitOne(1000))
+                    {
+                        release = false;
+                        lock (Abandoned) Abandoned.Add(done);
+                    }
+                    throw new TimeoutException($"PhysicalDrive : pas de réponse en {NvmeTimeoutMs} ms");
+                }
+            }
+            if (!GetOverlappedResult(handle, overlapped, out _, false)) return null;
+
+            var result = new byte[size];
+            Marshal.Copy(buffer, result, 0, size);
+            return result;
+        }
+        finally
+        {
+            if (release)
+            {
+                Marshal.FreeHGlobal(buffer);
+                Marshal.FreeHGlobal(overlapped);
+                done.Dispose();
+            }
+        }
+    }
+
+    internal static DiskHealthResult JudgeNvme(byte[] log)
     {
         var r = new DiskHealthResult();
         ulong U64(int offset) => BitConverter.ToUInt64(log, offset);   // les compteurs font 16 octets, les 8 premiers suffisent

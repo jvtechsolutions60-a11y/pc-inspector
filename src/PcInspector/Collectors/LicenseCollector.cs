@@ -83,7 +83,21 @@ public sealed class LicenseCollector : ICollector
 
         var oemKey = Wmi.QueryOptional("SELECT OA3xOriginalProductKey FROM SoftwareLicensingService").FirstOrDefault()?.Str("OA3xOriginalProductKey");
         group.Add("Clé d'origine dans le BIOS", string.IsNullOrWhiteSpace(oemKey) ? "Aucune" : oemKey);
+        group.Add("BitLocker (disque système)", BitLocker());
         return group;
+    }
+
+    private static string? BitLocker()
+    {
+        var drive = Environment.GetEnvironmentVariable("SystemDrive") ?? "C:";
+        var volume = Wmi.QueryOptional($"SELECT ProtectionStatus FROM Win32_EncryptableVolume WHERE DriveLetter = '{drive}'",
+            @"root\CIMV2\Security\MicrosoftVolumeEncryption").FirstOrDefault();
+        return volume?.ULong("ProtectionStatus") switch
+        {
+            1 => "Activé : noter la clé de récupération avant toute intervention (BIOS, disque, réinstallation)",
+            0 => "Désactivé",
+            _ => null,
+        };
     }
 
     private static InfoGroup Office()

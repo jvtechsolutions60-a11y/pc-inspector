@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Tests automatisés de JVTECH Outils : uniquement des données simulées (journaux SMART/NVMe, sorties de robocopy,
+    de DISM et de SFC, valeurs de registre, remontées réseau). Aucun test ne lit ni ne modifie le PC qui les lance,
+    à part des fichiers dans le dossier temporaire du test, supprimés à la fin.
+    Chaque logiciel est référencé sous un alias : ils partagent des fichiers (AppInfo, CrashGuard…) et les mêmes noms
+    de classes existeraient sinon en plusieurs exemplaires.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <AssemblyName>JvtechTests</AssemblyName>
+    <RootNamespace>JvtechTests</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Paquets de test seulement : les logiciels livrés n'utilisent toujours aucun paquet NuGet. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="MSTest.TestAdapter" Version="3.6.4" />
+    <PackageReference Include="MSTest.TestFramework" Version="3.6.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PcInspector\PcInspector.csproj" Aliases="inspector" />
+    <ProjectReference Include="..\..\src\PcSecurite\PcSecurite.csproj" Aliases="securite" />
+    <ProjectReference Include="..\..\src\PcMaintenance\PcMaintenance.csproj" Aliases="maintenance" />
+    <ProjectReference Include="..\..\src\PcMigration\PcMigration.csproj" Aliases="migration" />
+    <ProjectReference Include="..\..\src\JvtechServeur\JvtechServeur.csproj" Aliases="serveur" />
+  </ItemGroup>
+
+</Project>

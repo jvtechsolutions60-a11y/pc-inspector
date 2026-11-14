@@ -40,13 +40,12 @@ public partial class MainWindow : Window
         ("DIAGNOSTIC", new ICollector[]
         {
             new DiagnosticCollector(),
+            new PerformanceCollector(),
             new MissingDriversCollector(),
             new BootPerformanceCollector(),
             new BatteryCollector(),
             new Windows11Collector(),
-            new SecurityCollector(),
             new LicenseCollector(),
-            new AdviceCollector(),
             new UpgradeQuoteCollector(),
         }),
         ("LOGICIEL", new ICollector[]
@@ -64,6 +63,15 @@ public partial class MainWindow : Window
 
     // Chaque onglet n'est collecté qu'une fois : WMI peut prendre plusieurs secondes.
     private readonly Dictionary<ICollector, InfoSection> _cache = new();
+
+    // Collectes lancées (ou finies) : un onglet déjà en cours de lecture en arrière-plan n'est pas relancé au clic.
+    private readonly Dictionary<ICollector, Task<InfoSection>> _tasks = new();
+
+    // Lecture des onglets en arrière-plan pendant que le technicien regarde le bilan : trois à la fois, pour ne pas
+    // saturer WMI ni ralentir le PC. Un onglet cliqué n'attend pas son tour.
+    private readonly System.Threading.SemaphoreSlim _prefetchGate = new(3);
+    private bool _prefetched;
+    private readonly HashSet<ICollector> _queued = new();
 
     /// <summary>Un onglet de la barre latérale, rangé dans sa catégorie.</summary>
     public sealed record SidebarItem(ICollector Collector, string Category)
@@ -109,20 +117,21 @@ public partial class MainWindow : Window
         if (isHealth)
         {
             // Après une intervention, tous les onglets sont relus, pas seulement le bilan.
-            if (refresh) _cache.Clear();
+            if (refresh) { _cache.Clear(); _tasks.Clear(); lock (_queued) _queued.Clear(); _prefetched = false; }
             await ShowHealth();
             return;
         }
 
         SectionTitle.Text = collector.Title;
         GroupList.ItemsSource = null;
+        BenchPanel.Visibility = collector is PerformanceCollector ? Visibility.Visible : Visibility.Collapsed;
 
         if (refresh || !_cache.TryGetValue(collector, out var section))
         {
             ShowStatus("Analyse en cours…");
             LoadingBar.Visibility = Visibility.Visible;
             RefreshButton.IsEnabled = false;
-            section = await Task.Run(() => CollectSafely(collector));
+            section = await SectionAsync(collector, refresh);
             _cache[collector] = section;
             LoadingBar.Visibility = Visibility.Collapsed;
             RefreshButton.IsEnabled = true;
@@ -131,6 +140,80 @@ public partial class MainWindow : Window
 
         ShowStatus(section.Error);
         ApplyFilter();
+    }
+
+    private bool _benchRunning;
+    private bool _gamingQueued;
+    private bool _officeStarted;
+
+    /// <summary>
+    /// Test bureautique automatique au lancement, une fois le bilan et les onglets lus (pour ne pas fausser les mesures) :
+    /// ses résultats sont prêts pour le rapport, la fiche et le Texte Leboncoin.
+    /// </summary>
+    private async void StartOfficeBenchAfterPrefetch()
+    {
+        if (_officeStarted) return;
+        _officeStarted = true;
+        try { await Task.WhenAll(_tasks.Values.ToList()); }
+        catch (Exception) { /* une lecture d'onglet en erreur ne bloque pas le test */ }
+        if (Benchmark.Last is null) await RunBenchmarkAsync(gaming: false);
+    }
+
+    private async void OfficeBench_Click(object sender, RoutedEventArgs e) => await RunBenchmarkAsync(gaming: false);
+
+    private async void GamingBench_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show(this, "Le test gaming dure environ 20 minutes et fait chauffer le PC au maximum (processeur puis carte graphique).\n\n" +
+                "Brancher le portable sur secteur et fermer les autres logiciels. Lancer le test ?",
+                "Test gaming complet", MessageBoxButton.OKCancel, MessageBoxImage.Information) != MessageBoxResult.OK) return;
+        if (_benchRunning)
+        {
+            // Le test bureautique tourne : le test gaming démarre juste après et reprend ses mesures.
+            _gamingQueued = true;
+            GamingBenchButton.IsEnabled = false;
+            BenchText.Text = "Test gaming en attente : il démarre dès la fin du test bureautique en cours (il reprend ses mesures).";
+            return;
+        }
+        await RunBenchmarkAsync(gaming: true);
+    }
+
+    /// <summary>Lance les tests en arrière-plan ; l'onglet affiche la progression puis les résultats.</summary>
+    private async Task RunBenchmarkAsync(bool gaming)
+    {
+        if (_benchRunning) return;
+        _benchRunning = true;
+        OfficeBenchButton.IsEnabled = false;
+        GamingBenchButton.IsEnabled = !gaming;
+        BenchProgress.Visibility = Visibility.Visible;
+        BenchText.Text = gaming ? "Test gaming complet en cours…" : "Test bureautique en cours…";
+        var perf = _collectors.OfType<PerformanceCollector>().First();
+        void Progress(string text) => Dispatcher.BeginInvoke(new Action(() =>
+        {
+            BenchText.Text = (_gamingQueued ? "Test gaming en attente. " : "") + text;
+        }));
+        try
+        {
+            var result = await Task.Run(() => Benchmark.Run(gaming, Progress));
+            _cache[perf] = result.Section;
+            _tasks[perf] = Task.FromResult(result.Section);
+            BenchText.Text = $"Tests terminés à {DateTime.Now:HH:mm} : résultats ci-dessous, repris dans le rapport, la fiche et le Texte Leboncoin.";
+        }
+        catch (Exception ex)
+        {
+            BenchText.Text = "Les tests se sont arrêtés : " + ex.Message;
+        }
+        finally
+        {
+            _benchRunning = false;
+            OfficeBenchButton.IsEnabled = GamingBenchButton.IsEnabled = true;
+            BenchProgress.Visibility = Visibility.Collapsed;
+        }
+        if (SelectedCollector == perf) ApplyFilter();
+        if (_gamingQueued && !gaming)
+        {
+            _gamingQueued = false;
+            await RunBenchmarkAsync(gaming: true);
+        }
     }
 
     /// <summary>Affiche les lignes de l'onglet qui contiennent le texte recherché (toutes si la recherche est vide).</summary>
@@ -214,9 +297,11 @@ public partial class MainWindow : Window
             CountsText.Text = "Vérification des disques, de la mémoire, de la batterie, des plantages, de la sécurité et des mises à jour.";
             FindingList.ItemsSource = null;
             HealthRefreshButton.IsEnabled = false;
-            section = await Task.Run(() => CollectSafely(_health));
+            section = await SectionAsync(_health, refresh: false);
             _cache[_health] = section;
             HealthRefreshButton.IsEnabled = true;
+            Prefetch();
+            StartOfficeBenchAfterPrefetch();
             if (SelectedCollector != _health) return;
         }
 
@@ -244,14 +329,39 @@ public partial class MainWindow : Window
     private void FindingDetail_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.Tag is not string tab) return;
+        if (tab == Finding.SecurityApp)
+        {
+            OpenSecurityApp();
+            return;
+        }
         var target = (SectionList.ItemsSource as ListCollectionView)?.Cast<SidebarItem>().FirstOrDefault(i => i.Title == tab);
         if (target is not null) SectionList.SelectedItem = target;
     }
 
+    /// <summary>Le détail de la sécurité est dans PC Sécurité, posé à côté de PC Inspector par le lanceur.</summary>
+    private void OpenSecurityApp()
+    {
+        var path = System.IO.Path.Combine(AppPaths.ExeFolder, "PcSecurite.exe");
+        if (!System.IO.File.Exists(path))
+        {
+            MessageBox.Show(this, "PcSecurite.exe est introuvable : le mettre dans le même dossier que PcInspector.exe (comme dans le dossier JVTECH Outils).",
+                "PC Sécurité", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true, WorkingDirectory = AppPaths.ExeFolder }); }
+        catch (System.ComponentModel.Win32Exception) { /* droits administrateur refusés */ }
+    }
+
     private async void ExportButton_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new ExportWindow { Owner = this };
-        if (dialog.ShowDialog() != true || dialog.Info is null || dialog.FilePath is null) return;
+        // Plus de fenêtre à remplir : société, technicien et logo mémorisés, client du jour s'il y en a un, sinon le PC.
+        var info = ReportInfo.LoadDefaults();
+        info.Date = DateTime.Now;
+        var pcName = $"{MachineIdentity.Model()} {MachineIdentity.Serial()}".Trim();
+        var folder = AppPaths.ClientFolder(string.IsNullOrWhiteSpace(info.Client) ? pcName : info.Client, info.Date);
+        var baseName = string.Join("_", new[] { "Rapport", info.JobNumber, pcName, info.Date.ToString("yyyy-MM-dd HH-mm") }
+            .Where(p => !string.IsNullOrWhiteSpace(p)));
+        foreach (var c in System.IO.Path.GetInvalidFileNameChars()) baseName = baseName.Replace(c, '-');
 
         ExportButton.IsEnabled = false;
         HealthExportButton.IsEnabled = false;
@@ -259,20 +369,19 @@ public partial class MainWindow : Window
         try
         {
             // Le rapport contient tous les onglets, y compris ceux pas encore ouverts.
-            var sections = new List<InfoSection>();
-            foreach (var collector in _collectors)
-            {
-                if (!_cache.TryGetValue(collector, out var section))
-                {
-                    section = await Task.Run(() => CollectSafely(collector));
-                    _cache[collector] = section;
-                }
-                sections.Add(section);
-            }
+            // Tous en même temps : ceux déjà lus en arrière-plan sont immédiats.
+            var sections = (await Task.WhenAll(_collectors.Select(c => _cache.TryGetValue(c, out var cached)
+                ? Task.FromResult(cached) : SectionAsync(c, refresh: false)))).ToList();
+            for (var i = 0; i < _collectors.Count; i++) _cache[_collectors[i]] = sections[i];
 
-            var info = dialog.Info;
-            var path = dialog.FilePath;
-            await Task.Run(() => ReportWriter.Write(path, info, sections));
+            // PDF d'abord ; sans Edge ni Chrome, la page web (même contenu, imprimable depuis le navigateur).
+            var path = System.IO.Path.Combine(folder, baseName + ".pdf");
+            try { await Task.Run(() => ReportWriter.Write(path, info, sections)); }
+            catch (System.IO.IOException)
+            {
+                path = System.IO.Path.Combine(folder, baseName + ".html");
+                await Task.Run(() => ReportWriter.Write(path, info, sections));
+            }
             ShowStatus(null);
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
         }
@@ -286,6 +395,46 @@ public partial class MainWindow : Window
         {
             ExportButton.IsEnabled = true;
             HealthExportButton.IsEnabled = true;
+        }
+    }
+
+    /// <summary>La collecte d'un onglet : reprise si elle est déjà lancée, relancée si on demande d'actualiser.</summary>
+    private Task<InfoSection> SectionAsync(ICollector collector, bool refresh)
+    {
+        bool waiting;
+        lock (_queued) waiting = _queued.Remove(collector);
+        // Encore en file d'attente derrière les autres onglets : on le lit tout de suite à part.
+        if (refresh || waiting || !_tasks.TryGetValue(collector, out var task))
+        {
+            task = Task.Run(() => CollectSafely(collector));
+            _tasks[collector] = task;
+        }
+        return task;
+    }
+
+    /// <summary>
+    /// Une fois le bilan affiché, les autres onglets sont lus en arrière-plan : au clic, ils s'affichent tout de suite.
+    /// Le test de débit (réseau) n'est lancé qu'à la demande.
+    /// </summary>
+    private void Prefetch()
+    {
+        if (_prefetched) return;
+        _prefetched = true;
+        foreach (var collector in _collectors.Where(c => c != _health && c is not SpeedTestCollector))
+        {
+            if (_tasks.ContainsKey(collector)) continue;
+            lock (_queued) _queued.Add(collector);
+            _tasks[collector] = Task.Run(async () =>
+            {
+                await _prefetchGate.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    // Déjà lu à part parce que le technicien a cliqué dessus : rien à faire.
+                    lock (_queued) if (!_queued.Remove(collector)) return new InfoSection(collector.Title);
+                    return CollectSafely(collector);
+                }
+                finally { _prefetchGate.Release(); }
+            });
         }
     }
 
@@ -305,25 +454,45 @@ public partial class MainWindow : Window
 
     private void LiveMonitor_Click(object sender, RoutedEventArgs e) => new LiveMonitorWindow { Owner = this }.Show();
 
-    private async void Label_Click(object sender, RoutedEventArgs e)
+    private void Listing_Click(object sender, RoutedEventArgs e) => new ListingWindow { Owner = this }.Show();
+
+    /// <summary>Impression directe sur l'étiqueteuse choisie dans la fenêtre d'impression de Windows.</summary>
+    private void Label_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new ExportWindow
+        var info = ReportInfo.LoadDefaults();
+        info.Date = DateTime.Now;
+        try { LabelPrinter.Print(this, info); }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Printing.PrintSystemException or System.IO.IOException)
         {
-            Owner = this,
-            FilePrefix = "Etiquette",
-            Filter = "Étiquette à imprimer (*.html)|*.html|PDF (*.pdf)|*.pdf",
-        };
-        if (dialog.ShowDialog() != true || dialog.Info is null || dialog.FilePath is null) return;
-        var info = dialog.Info;
-        var path = dialog.FilePath;
+            MessageBox.Show(this, "Impression impossible : " + ex.Message, "Étiquette PC", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async void TrackingSheet_Click(object sender, RoutedEventArgs e)
+    {
+        // Plus de fenêtre : la fiche part en PDF (HTML si le PDF échoue) dans le dossier du PC.
+        var info = ReportInfo.LoadDefaults();
+        info.Date = DateTime.Now;
+        var pcName = $"{MachineIdentity.Model()} {MachineIdentity.Serial()}".Trim();
+        var folder = AppPaths.ClientFolder(string.IsNullOrWhiteSpace(info.Client) ? pcName : info.Client, info.Date);
+        var baseName = $"Fiche-suivi_{pcName}_{info.Date:yyyy-MM-dd HH-mm}";
+        foreach (var c in System.IO.Path.GetInvalidFileNameChars()) baseName = baseName.Replace(c, '-');
+        var path = System.IO.Path.Combine(folder, baseName + ".pdf");
+        ShowStatus("Fiche de suivi : bilan du PC en cours…");
         try
         {
-            await Task.Run(() => LabelWriter.Write(path, info));
+            try { await Task.Run(() => TrackingSheetWriter.Write(path, info)); }
+            catch (System.IO.IOException)
+            {
+                path = System.IO.Path.Combine(folder, baseName + ".html");
+                await Task.Run(() => TrackingSheetWriter.Write(path, info));
+            }
+            ShowStatus("Fiche de suivi enregistrée.");
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
         }
         catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show(this, "Impossible d'enregistrer l'étiquette : " + ex.Message, "Étiquette PC", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(this, "Impossible d'enregistrer la fiche de suivi : " + ex.Message, "Fiche de suivi", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -338,7 +507,7 @@ public partial class MainWindow : Window
             try
             {
                 var file = Prices.EnsureFile();
-                Process.Start(new ProcessStartInfo("notepad.exe", $"\"{file}\"") { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo(AppPaths.SystemTool("notepad.exe"), $"\"{file}\"") { UseShellExecute = true });
                 ShowStatus("Après avoir enregistré les prix, actualiser l'onglet (F5).");
             }
             catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)

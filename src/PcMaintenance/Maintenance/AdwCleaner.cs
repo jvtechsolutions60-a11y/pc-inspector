@@ -26,14 +26,26 @@ internal static class AdwCleaner
         {
             log.Report("Téléchargement de la dernière version d'AdwCleaner…");
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+            // Téléchargement dans un fichier à part : une coupure ne laisse jamais un adwcleaner.exe à moitié écrit,
+            // et la copie précédente (déjà vérifiée) reste utilisable.
+            var part = exe + ".part";
+            TryDelete(part);
             using (var client = new WebClient())
             {
                 client.Headers[HttpRequestHeader.UserAgent] = "PC Maintenance";
-                await client.DownloadFileTaskAsync(DownloadUrl, exe);
+                await client.DownloadFileTaskAsync(DownloadUrl, part);
             }
+            if (!SignedByMalwarebytes(part))
+            {
+                TryDelete(part);
+                throw new WebException("le fichier reçu est incomplet ou n'est pas signé par Malwarebytes");
+            }
+            TryDelete(exe);
+            File.Move(part, exe);
         }
-        catch (WebException ex)
+        catch (Exception ex) when (ex is WebException or IOException or UnauthorizedAccessException)
         {
+            TryDelete(exe + ".part");
             if (!File.Exists(exe)) return new Result("Téléchargement impossible : " + ex.Message, 0, null);
             log.Report("Téléchargement impossible, utilisation de la copie déjà présente.");
         }
@@ -62,18 +74,8 @@ internal static class AdwCleaner
         return new Result(summary, removed, logPath);
     }
 
-    private static bool SignedByMalwarebytes(string path)
-    {
-        try
-        {
-            var certificate = X509Certificate.CreateFromSignedFile(path);
-            return certificate.Subject.IndexOf("Malwarebytes", StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-        catch (System.Security.Cryptography.CryptographicException)
-        {
-            return false;
-        }
-    }
+    /// <summary>Signature valide (fichier intact, certificat reconnu par Windows) et signataire Malwarebytes.</summary>
+    private static bool SignedByMalwarebytes(string path) => PcInspector.Authenticode.IsSignedBy(path, "Malwarebytes");
 
     private static string? LatestLog(DateTime since)
     {

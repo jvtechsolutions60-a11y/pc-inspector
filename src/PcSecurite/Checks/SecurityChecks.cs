@@ -17,6 +17,7 @@ public static partial class SecurityChecks
         ("Microsoft Defender", Defender),
         ("Pare-feu", Firewall),
         ("Dernière mise à jour", LastUpdate),
+        ("Mises à jour en échec", FailedUpdates),
         ("Activation de Windows", Activation),
         ("Contrôle de compte (UAC)", Uac),
         ("SmartScreen", SmartScreen),
@@ -34,11 +35,14 @@ public static partial class SecurityChecks
         ("PowerShell 2.0", PowerShell2),
         ("Bureau à distance", RemoteDesktop),
         ("Logiciels de prise en main à distance", RemoteAccessTools),
+        ("Connexions réseau actives", ActiveConnections),
+        ("Durcissement (références Microsoft et CIS)", Baseline),
         ("Redirections réseau (hosts, proxy)", NetworkRedirects),
         ("Serveurs DNS", DnsServers),
         ("Réseaux Wi-Fi enregistrés", WifiProfiles),
         ("Comptes utilisateurs", Accounts),
         ("Connexion automatique", AutoLogon),
+        ("Mots de passe des navigateurs", SavedPasswords),
         ("Navigateurs internet", Browsers),
         ("Logiciels avec failles connues", VulnerableSoftware),
         ("Logiciels abandonnés", ObsoleteSoftware),
@@ -51,29 +55,21 @@ public static partial class SecurityChecks
     public static SecurityCheck RunSafely(string name, Func<SecurityCheck> run)
     {
         try { return run(); }
-        catch (Exception ex) { return SecurityCheck.Info(name, "Impossible de vérifier : " + ex.Message); }
+        catch (Exception ex) { return SecurityCheck.Unknown(name, "Impossible de vérifier : " + ex.Message); }
     }
-
-    // Fin du support des versions de Windows (éditions Famille et Pro).
-    private static readonly (int Build, string Name, DateTime End)[] Support =
-    {
-        (26200, "Windows 11 25H2", new DateTime(2027, 10, 12)),
-        (26100, "Windows 11 24H2", new DateTime(2026, 10, 13)),
-        (22631, "Windows 11 23H2", new DateTime(2025, 11, 11)),
-        (22621, "Windows 11 22H2", new DateTime(2024, 10, 8)),
-        (22000, "Windows 11 21H2", new DateTime(2023, 10, 10)),
-        (0, "Windows 10", new DateTime(2025, 10, 14)),
-    };
 
     private static SecurityCheck WindowsSupport()
     {
         const string name = "Version de Windows";
         var os = Wmi.Query("SELECT Caption, BuildNumber FROM Win32_OperatingSystem").FirstOrDefault();
         if (!int.TryParse(os?.Str("BuildNumber"), out var build))
-            return SecurityCheck.Info(name, os?.Str("Caption") ?? "Version inconnue");
+            return SecurityCheck.Unknown(name, os?.Str("Caption") ?? "Version inconnue");
 
         var caption = os!.Str("Caption") ?? "Windows";
-        var (_, versionName, end) = Support.First(s => build >= s.Build);
+        // Version sortie après la dernière mise à jour des références : sa date de fin n'est pas connue.
+        if (build > References.WindowsSupport.Max(s => s.Build))
+            return SecurityCheck.Unknown(name, $"{caption} (build {build}) : version plus récente que les références de PC Sécurité, date de fin du support non vérifiée");
+        var (_, versionName, end) = References.WindowsSupport.First(s => build >= s.Build);
         var isBusiness = caption.IndexOf("Enterprise", StringComparison.OrdinalIgnoreCase) >= 0
                          || caption.IndexOf("Entreprise", StringComparison.OrdinalIgnoreCase) >= 0
                          || caption.IndexOf("Education", StringComparison.OrdinalIgnoreCase) >= 0;
@@ -89,6 +85,8 @@ public static partial class SecurityChecks
                 build >= 22000 ? CheckKind.Fix : CheckKind.Change);
         if (DateTime.Today > end.AddDays(-90))
             return SecurityCheck.Warning(name, $"{detail} : fin du support le {end:dd/MM/yyyy}", "Prévoir la mise à niveau vers la version suivante.");
+        if (References.IsStale(DateTime.Today))
+            return SecurityCheck.Unknown(name, $"{detail} : supporté jusqu'au {end:dd/MM/yyyy} d'après les {References.StaleNote}");
         return SecurityCheck.Ok(name, $"{detail} : supporté jusqu'au {end:dd/MM/yyyy}");
     }
 
@@ -126,12 +124,14 @@ public static partial class SecurityChecks
         if (thirdParty.Count > 0)
             return SecurityCheck.Ok(name, string.Join(", ", thirdParty) + " actif");
 
-        var off = new List<string>();
-        foreach (var (key, label) in new[] { ("DomainProfile", "domaine"), ("StandardProfile", "privé"), ("PublicProfile", "public") })
-        {
-            using var reg = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\{key}");
-            if (reg?.GetValue("EnableFirewall") is int enabled && enabled == 0) off.Add(label);
-        }
+        var off = PcInspector.WindowsState.DisabledFirewallProfiles();
+        // Désactivé par une stratégie : l'utilisateur ne peut pas le rallumer dans Sécurité Windows (trace fréquente d'un malware ou d'un « optimiseur »).
+        var forced = new[] { ("DomainProfile", "domaine"), ("StandardProfile", "privé"), ("PublicProfile", "public") }
+            .Where(p => PolicyDword(@"SOFTWARE\Policies\Microsoft\WindowsFirewall\" + p.Item1, "EnableFirewall") == 0)
+            .Select(p => p.Item2).ToList();
+        if (forced.Count > 0)
+            return SecurityCheck.Danger(name, "Pare-feu Windows coupé par une stratégie (GPO) pour le réseau " + string.Join(", ", forced),
+                "Hors entreprise, aucune stratégie ne devrait couper le pare-feu : chercher le logiciel qui l'a posée (optimiseur, malware), puis supprimer la clé HKLM\\SOFTWARE\\Policies\\Microsoft\\WindowsFirewall.");
         if (off.Count == 0) return SecurityCheck.Ok(name, "Pare-feu Windows activé sur tous les réseaux");
         var detail = "Pare-feu Windows désactivé pour le réseau " + string.Join(", ", off);
         return off.Contains("public")
@@ -139,11 +139,22 @@ public static partial class SecurityChecks
             : SecurityCheck.Warning(name, detail, "Réactiver le pare-feu sur tous les profils.");
     }
 
+    private static SecurityCheck FailedUpdates()
+    {
+        const string name = "Mises à jour en échec";
+        var failures = PcInspector.WindowsUpdateFailures.Read();
+        if (failures is null) return SecurityCheck.Unknown(name, "Historique de Windows Update illisible");
+        if (failures.Count == 0) return SecurityCheck.Ok(name, "Aucune mise à jour en échec ces 60 derniers jours");
+        var detail = string.Join(" · ", failures.Take(4).Select(f => $"{f.Title} : {f.Attempts} échec(s), {f.Code} ({f.Meaning})"));
+        return SecurityCheck.Warning(name, detail,
+            "Une mise à jour qui échoue en boucle laisse une faille ouverte : suivre la piste indiquée pour chaque code, puis relancer Windows Update.");
+    }
+
     private static SecurityCheck LastUpdate()
     {
         const string name = "Dernière mise à jour";
         var last = WindowsUpdateInfo.LastInstalled();
-        if (last is null) return SecurityCheck.Info(name, "Date inconnue");
+        if (last is null) return SecurityCheck.Unknown(name, "Date inconnue");
         var days = (int)(DateTime.Today - last.Value.Date).TotalDays;
         var detail = $"Dernière mise à jour installée le {last:dd/MM/yyyy} (il y a {days} jours)";
         if (days > 60) return SecurityCheck.Danger(name, detail, "Windows ne se met plus à jour : vérifier Windows Update et l'espace disque.");
@@ -157,7 +168,7 @@ public static partial class SecurityChecks
         var reboot = WindowsUpdateInfo.IsRebootPending();
         var pending = WindowsUpdateInfo.PendingUpdates();
         if (pending is null)
-            return SecurityCheck.Info(name, "Recherche impossible (Windows Update indisponible ou trop lent)" + (reboot ? " · redémarrage en attente" : ""));
+            return SecurityCheck.Unknown(name, "Recherche impossible (Windows Update indisponible ou trop lent)" + (reboot ? " · redémarrage en attente" : ""));
         if (pending.Count == 0 && !reboot) return SecurityCheck.Ok(name, "Aucune, Windows est à jour");
 
         var parts = new List<string>();
@@ -169,13 +180,10 @@ public static partial class SecurityChecks
     private static SecurityCheck Activation()
     {
         const string name = "Activation de Windows";
-        var product = Wmi.QueryOptional(
-                "SELECT LicenseStatus FROM SoftwareLicensingProduct WHERE ApplicationID = '55c92734-d682-4d71-983e-d6ec3f16059f' AND PartialProductKey IS NOT NULL")
-            .FirstOrDefault();
-        return product?.ULong("LicenseStatus") switch
+        return PcInspector.WindowsState.LicenseStatus() switch
         {
             1 => SecurityCheck.Ok(name, "Windows est activé"),
-            null => SecurityCheck.Info(name, "État inconnu"),
+            null => SecurityCheck.Unknown(name, "État inconnu"),
             _ => SecurityCheck.Warning(name, "Windows n'est pas activé", "Activer Windows avec une licence valide (clé OEM du BIOS visible dans PC Inspector)."),
         };
     }
@@ -209,7 +217,7 @@ public static partial class SecurityChecks
         var drive = Environment.GetEnvironmentVariable("SystemDrive") ?? "C:";
         var volume = Wmi.QueryOptional($"SELECT ProtectionStatus FROM Win32_EncryptableVolume WHERE DriveLetter = '{drive}'",
             @"root\CIMV2\Security\MicrosoftVolumeEncryption").FirstOrDefault();
-        if (volume is null) return SecurityCheck.Info(name, "Non disponible sur cette édition de Windows");
+        if (volume is null) return SecurityCheck.NotApplicable(name, "Non disponible sur cette édition de Windows");
         var isLaptop = Wmi.QueryOptional("SELECT Name FROM Win32_Battery").Count > 0;
         return volume.ULong("ProtectionStatus") switch
         {
@@ -273,11 +281,44 @@ public static partial class SecurityChecks
         var blank = accounts.Where(a => !a.Sid.EndsWith("-501") && HasBlankPassword(a.Name)).Select(a => a.Name).ToList();
         if (blank.Count > 0) problems.Add("sans mot de passe : " + string.Join(", ", blank));
 
-        if (problems.Count == 0) return SecurityCheck.Ok(name, $"{accounts.Count} compte(s) actif(s), tous protégés par un mot de passe ou un code PIN");
-        var detail = string.Join(" · ", problems);
+        // Comptes masqués de l'écran de connexion (SpecialAccounts\UserList = 0) : discret, souvent laissé par un intrus.
+        var admins = Administrators();
+        using (var hiddenKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\UserList"))
+        {
+            var hidden = (hiddenKey?.GetValueNames() ?? Array.Empty<string>())
+                .Where(n => hiddenKey!.GetValue(n) is int v && v == 0)
+                .Where(n => accounts.Any(a => a.Name.Equals(n, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            foreach (var account in hidden)
+            {
+                var isAdmin = admins.Contains(account, StringComparer.OrdinalIgnoreCase);
+                problems.Add($"compte {(isAdmin ? "administrateur " : "")}caché de l'écran de connexion : {account}");
+                danger |= isAdmin;
+            }
+        }
+
+        var adminText = admins.Count == 0 ? "" : $" · administrateurs : {string.Join(", ", admins)}";
+        if (problems.Count == 0) return SecurityCheck.Ok(name, $"{accounts.Count} compte(s) actif(s), tous protégés par un mot de passe ou un code PIN{adminText}");
+        var detail = string.Join(" · ", problems) + adminText;
         return danger
-            ? SecurityCheck.Danger(name, detail, "Désactiver le compte Invité et mettre un mot de passe sur chaque compte.")
+            ? SecurityCheck.Danger(name, detail, "Désactiver le compte Invité, demander au client s'il connaît chaque compte caché (sinon le désactiver et changer les mots de passe), et mettre un mot de passe sur chaque compte.")
             : SecurityCheck.Warning(name, detail, "Mettre un mot de passe (ou un code PIN Windows Hello) sur chaque compte.");
+    }
+
+    /// <summary>Membres actifs du groupe Administrateurs (SID S-1-5-32-544, quel que soit son nom dans la langue de Windows).</summary>
+    private static List<string> Administrators()
+    {
+        var group = Wmi.QueryOptional("SELECT Name, Domain FROM Win32_Group WHERE SID = 'S-1-5-32-544'").FirstOrDefault();
+        if (group?.Str("Name") is not { } groupName || group.Str("Domain") is not { } domain) return new List<string>();
+        return Wmi.QueryOptional($"ASSOCIATORS OF {{Win32_Group.Domain='{domain}',Name='{groupName}'}} WHERE AssocClass=Win32_GroupUser ResultClass=Win32_UserAccount")
+            .Where(u => u.Bool("Disabled") != true)
+            .Select(u => u.Str("Name") ?? "").Where(n => n.Length > 0).ToList();
+    }
+
+    internal static int? PolicyDword(string path, string value)
+    {
+        using var key = Registry.LocalMachine.OpenSubKey(path);
+        return key?.GetValue(value) is int v ? v : null;
     }
 
     private static SecurityCheck AutoLogon()

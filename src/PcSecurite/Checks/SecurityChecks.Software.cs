@@ -85,7 +85,7 @@ public static partial class SecurityChecks
         Directory.CreateDirectory(folder);
         try
         {
-            var start = new ProcessStartInfo("netsh", $"wlan export profile folder=\"{folder}\"")
+            var start = new ProcessStartInfo(PcInspector.AppPaths.SystemTool("netsh.exe"), $"wlan export profile folder=\"{folder}\"")
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
@@ -111,7 +111,7 @@ public static partial class SecurityChecks
                 else if (auth.Equals("open", StringComparison.OrdinalIgnoreCase) && Value("connectionMode") == "auto") risky.Add(ssid + " (ouvert)");
             }
 
-            if (count == 0) return SecurityCheck.Info(name, "Aucun réseau Wi-Fi enregistré");
+            if (count == 0) return SecurityCheck.NotApplicable(name, "Aucun réseau Wi-Fi enregistré");
             if (risky.Count == 0) return SecurityCheck.Ok(name, $"{count} réseau(x), tous protégés par un mot de passe");
             return SecurityCheck.Warning(name, "Connexion automatique à des réseaux non protégés : " + string.Join(", ", risky),
                 "Les oublier (Paramètres > Wi-Fi > Gérer les réseaux connus) : n'importe qui peut créer un faux réseau du même nom.");
@@ -142,7 +142,7 @@ public static partial class SecurityChecks
             if (days > 45) stale.Add($"{text} (pas mis à jour depuis {days} jours)");
         }
 
-        if (found.Count == 0) return SecurityCheck.Info(name, "Aucun navigateur courant trouvé");
+        if (found.Count == 0) return SecurityCheck.NotApplicable(name, "Aucun navigateur courant trouvé");
         if (stale.Count == 0) return SecurityCheck.Ok(name, string.Join(", ", found) + " : à jour");
         return SecurityCheck.Warning(name, string.Join(", ", stale),
             "Ouvrir le navigateur > Aide > À propos pour lancer la mise à jour, puis le redémarrer. Les navigateurs sont la première porte d'entrée des attaques.");
@@ -158,16 +158,6 @@ public static partial class SecurityChecks
         return null;
     }
 
-    // Logiciels avec des failles exploitées par les pirates, et la première version corrigée.
-    private static readonly (Regex Name, Version Fixed, string Why, bool Danger)[] Vulnerable =
-    {
-        (new Regex(@"^WinRAR", RegexOptions.IgnoreCase), new Version(7, 13), "faille exploitée par des pirates (CVE-2025-8088)", true),
-        (new Regex(@"^7-Zip", RegexOptions.IgnoreCase), new Version(25, 1), "failles corrigées en 2025 (CVE-2025-0411, CVE-2025-55188)", false),
-        (new Regex(@"^Notepad\+\+", RegexOptions.IgnoreCase), new Version(8, 8, 9), "mise à jour détournée par des pirates, corrigée en 8.8.9", false),
-        (new Regex(@"^PuTTY", RegexOptions.IgnoreCase), new Version(0, 81), "clé privée récupérable (CVE-2024-31497)", false),
-        (new Regex(@"^VLC media player", RegexOptions.IgnoreCase), new Version(3, 0, 21), "faille corrigée en 3.0.21", false),
-    };
-
     private static readonly Regex VersionPattern = new(@"\d+(\.\d+)+");
 
     private static SecurityCheck VulnerableSoftware()
@@ -177,7 +167,7 @@ public static partial class SecurityChecks
         var danger = false;
         foreach (var program in InstalledPrograms())
         {
-            var rule = Vulnerable.FirstOrDefault(r => r.Name.IsMatch(program.Name));
+            var rule = References.VulnerableSoftware.FirstOrDefault(r => r.Name.IsMatch(program.Name));
             if (rule.Name is null) continue;
             var match = VersionPattern.Match(program.Version ?? "");
             if (!match.Success) match = VersionPattern.Match(program.Name);
@@ -186,27 +176,13 @@ public static partial class SecurityChecks
             danger |= rule.Danger;
         }
 
-        if (found.Count == 0) return SecurityCheck.Ok(name, "Aucun logiciel connu pour être vulnérable");
+        if (found.Count == 0) return References.IsStale(DateTime.Today)
+                ? SecurityCheck.Unknown(name, "Aucun logiciel vulnérable trouvé, mais " + References.StaleNote)
+                : SecurityCheck.Ok(name, "Aucun logiciel connu pour être vulnérable");
         const string advice = "Mettre à jour ces logiciels depuis leur site officiel (ou winget upgrade --all).";
         var detail = string.Join(" · ", found.Distinct());
         return danger ? SecurityCheck.Danger(name, detail, advice) : SecurityCheck.Warning(name, detail, advice);
     }
-
-    // Logiciels qui ne reçoivent plus aucun correctif : seule solution, les désinstaller ou les remplacer.
-    private static readonly (Regex Name, string Why, bool Danger)[] Obsolete =
-    {
-        (new Regex(@"Adobe Flash Player", RegexOptions.IgnoreCase), "abandonné depuis 2020", true),
-        (new Regex(@"Adobe Shockwave", RegexOptions.IgnoreCase), "abandonné depuis 2019", true),
-        (new Regex(@"Microsoft Silverlight", RegexOptions.IgnoreCase), "abandonné depuis 2021", false),
-        (new Regex(@"^QuickTime", RegexOptions.IgnoreCase), "abandonné sur Windows depuis 2016", false),
-        (new Regex(@"^Java(\(TM\))? ?[67]\b|^J2SE Runtime", RegexOptions.IgnoreCase), "plus de correctifs", false),
-        (new Regex(@"^Adobe Reader (8|9|X|XI)\b|^Adobe Acrobat (Reader )?(X|XI|2015|2017|2020)\b", RegexOptions.IgnoreCase), "plus de correctifs", false),
-        (new Regex(@"^Microsoft Office (?!.*(Click-to-Run|Proof|MUI|Language|Langue|Shared|Component|Viewer|Validation|Live Meeting)).*\b(2003|2007|2010|2013)\b", RegexOptions.IgnoreCase), "plus de correctifs depuis des années", false),
-        (new Regex(@"^Microsoft Office (?!.*(Click-to-Run|Proof|MUI|Language|Langue|Shared|Component|Viewer|Validation)).*\b(2016|2019)\b", RegexOptions.IgnoreCase), "plus de correctifs depuis le 14/10/2025", false),
-        (new Regex(@"^Microsoft Office (?!.*(Click-to-Run|Proof|MUI|Language|Langue|Shared|Component|Viewer|Validation)).*\b2021\b", RegexOptions.IgnoreCase), "plus de correctifs depuis le 13/10/2026", false),
-        (new Regex(@"^Windows Live (Essentials|Mail|Messenger)", RegexOptions.IgnoreCase), "abandonné depuis 2017", false),
-        (new Regex(@"^Skype\b(?!.*(Entreprise|Business))", RegexOptions.IgnoreCase), "service fermé en mai 2025", false),
-    };
 
     private static SecurityCheck ObsoleteSoftware()
     {
@@ -215,13 +191,15 @@ public static partial class SecurityChecks
         var danger = false;
         foreach (var program in InstalledPrograms())
         {
-            var rule = Obsolete.FirstOrDefault(r => r.Name.IsMatch(program.Name));
+            var rule = References.ObsoleteSoftware.FirstOrDefault(r => r.Name.IsMatch(program.Name));
             if (rule.Name is null) continue;
             found.Add($"{program.Name} ({rule.Why})");
             danger |= rule.Danger;
         }
 
-        if (found.Count == 0) return SecurityCheck.Ok(name, "Aucun logiciel abandonné");
+        if (found.Count == 0) return References.IsStale(DateTime.Today)
+                ? SecurityCheck.Unknown(name, "Aucun logiciel abandonné trouvé, mais " + References.StaleNote)
+                : SecurityCheck.Ok(name, "Aucun logiciel abandonné");
         const string advice = "Désinstaller ces logiciels, ou les remplacer par une version suivie (Microsoft 365 ou Office 2024, Acrobat Reader à jour, LibreOffice…).";
         var detail = string.Join(" · ", found.Distinct());
         return danger
@@ -230,10 +208,14 @@ public static partial class SecurityChecks
     }
 
     private static List<(string Name, string? Version)>? _programs;
+    private static readonly object ProgramsLock = new();
 
     /// <summary>Logiciels installés (mêmes clés que « Applications et fonctionnalités »), lus une seule fois par analyse.</summary>
     private static List<(string Name, string? Version)> InstalledPrograms()
     {
+        // Plusieurs contrôles tournent en même temps : la liste n'est lue qu'une fois.
+        lock (ProgramsLock)
+        {
         if (_programs is not null) return _programs;
         var list = new List<(string, string?)>();
         foreach (var (hive, view) in new[]
@@ -255,8 +237,32 @@ public static partial class SecurityChecks
             }
         }
         return _programs = list.Distinct().ToList();
+        }
     }
 
     /// <summary>À appeler avant chaque analyse pour relire la liste des logiciels (le technicien a pu en désinstaller).</summary>
-    public static void ResetCache() => _programs = null;
+    public static void ResetCache()
+    {
+        lock (ProgramsLock) _programs = null;
+        PurgeLeftovers(Path.GetTempPath());
+    }
+
+    /// <summary>
+    /// Audit M02 : supprime les copies temporaires laissées par une analyse interrompue (fermeture forcée, plantage) :
+    /// copies de bases de mots de passe « jvtech-logins-*.db » et exports Wi-Fi « PcSecurite-wifi-* ». Chaque analyse
+    /// les efface déjà à la fin ; ceci rattrape les restes avant d'en créer de nouveaux. Renvoie le nombre supprimé.
+    /// </summary>
+    internal static int PurgeLeftovers(string tempFolder)
+    {
+        var removed = 0;
+        try
+        {
+            foreach (var file in Directory.GetFiles(tempFolder, "jvtech-logins-*"))
+                try { File.Delete(file); removed++; } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            foreach (var dir in Directory.GetDirectories(tempFolder, "PcSecurite-wifi-*"))
+                try { Directory.Delete(dir, true); removed++; } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        return removed;
+    }
 }

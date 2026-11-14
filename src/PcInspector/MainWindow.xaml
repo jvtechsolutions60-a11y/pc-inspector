@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:PcInspector"
-        Title="PC Inspector" Height="760" Width="1060" MinHeight="460" MinWidth="760"
+        Title="PC Inspector" Height="820" Width="1140" MinHeight="560" MinWidth="860"
         WindowStartupLocation="CenterScreen" Background="{StaticResource ContentBrush}"
         FontFamily="Segoe UI" PreviewKeyDown="Window_PreviewKeyDown">
     <Window.Resources>
@@ -38,8 +38,12 @@
                         ToolTip="Écran, clavier, haut-parleurs, micro, webcam"/>
                 <Button Style="{StaticResource DarkButton}" Content="Suivi en direct" Margin="0,0,0,6" Click="LiveMonitor_Click"
                         ToolTip="Charge et températures en courbes, pendant un test"/>
-                <Button Style="{StaticResource DarkButton}" Content="Étiquette PC" Click="Label_Click"
+                <Button Style="{StaticResource DarkButton}" Content="Imprimer l'étiquette" Margin="0,0,0,6" Click="Label_Click"
                         ToolTip="Petite fiche à coller sous le PC : config, date, coordonnées"/>
+                <Button Style="{StaticResource DarkButton}" Content="Texte Leboncoin" Margin="0,0,0,6" Click="Listing_Click"
+                        ToolTip="Titre et descriptif des composants, prêts à coller dans Leboncoin ou Shopify"/>
+                <Button Style="{StaticResource DarkButton}" Content="Fiche de suivi (PDF)" Click="TrackingSheet_Click"
+                        ToolTip="Fiche de suivi JVDESTOCK pré-remplie : identification, configuration, contrôles du bilan"/>
             </StackPanel>
             <ListBox x:Name="SectionList" Background="Transparent" BorderThickness="0"
                      SelectionChanged="SectionList_SelectionChanged"
@@ -149,7 +153,7 @@
                                         <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="0,2,0,0"
                                                    Foreground="{StaticResource TextBrush}"/>
                                     </StackPanel>
-                                    <Button Grid.Column="3" Style="{StaticResource LinkButton}" Content="Voir le détail"
+                                    <Button Grid.Column="3" Style="{StaticResource LinkButton}" Content="{Binding DetailText}"
                                             Tag="{Binding Tab}" Click="FindingDetail_Click" Margin="12,0" VerticalAlignment="Center"/>
                                 </Grid>
                             </Border>
@@ -199,6 +203,24 @@
             <ProgressBar x:Name="LoadingBar" DockPanel.Dock="Top" Height="3" IsIndeterminate="True" BorderThickness="0"
                          Background="Transparent" Foreground="{StaticResource AccentBrush}" Visibility="Collapsed"/>
 
+            <!-- Onglet Performances : test bureautique (par défaut) et test gaming complet -->
+            <Border x:Name="BenchPanel" DockPanel.Dock="Top" Visibility="Collapsed" Background="White"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="28,12">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="OfficeBenchButton" Style="{StaticResource PrimaryButton}" Content="Refaire le test bureautique"
+                                Click="OfficeBench_Click" Margin="0,0,8,0" Padding="14,6"
+                                ToolTip="Notes Windows (WinSAT), processeur (7-Zip) et vitesses du disque"/>
+                        <Button x:Name="GamingBenchButton" Content="Test gaming complet (≈ 20 min)" Click="GamingBench_Click" Padding="14,6"
+                                ToolTip="En plus : Cinebench, Blender Benchmark et 10 minutes de charge avec les températures"/>
+                    </StackPanel>
+                    <ProgressBar x:Name="BenchProgress" Height="3" IsIndeterminate="True" BorderThickness="0" Margin="0,10,0,0"
+                                 Background="Transparent" Foreground="{StaticResource AccentBrush}" Visibility="Collapsed"/>
+                    <TextBlock x:Name="BenchText" Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,0" TextWrapping="Wrap"
+                               Text="Le test bureautique se lance tout seul après le bilan. Mesures seulement : rien n'est modifié sur le PC."/>
+                </StackPanel>
+            </Border>
+
             <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="28,18,28,8">
                 <ItemsControl x:Name="GroupList">
                     <ItemsControl.ItemTemplate>
@@ -217,6 +239,42 @@
                                                             <ColumnDefinition Width="200"/>
                                                             <ColumnDefinition Width="*"/>
                                                         </Grid.ColumnDefinitions>
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="Auto"/>
+                                                            <RowDefinition Height="Auto"/>
+                                                        </Grid.RowDefinitions>
+                                                        <!-- Graphique : une barre sous la valeur (temps de démarrage…) -->
+                                                        <ProgressBar Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding Bar, Mode=OneWay}"
+                                                                     Height="12" Margin="0,4,0,2" Background="#EEF2F7" BorderThickness="0"
+                                                                     Foreground="{StaticResource OkBrush}">
+                                                            <ProgressBar.Template>
+                                                                <ControlTemplate TargetType="ProgressBar">
+                                                                    <Grid>
+                                                                        <Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="3"/>
+                                                                        <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" CornerRadius="3" HorizontalAlignment="Left"/>
+                                                                    </Grid>
+                                                                </ControlTemplate>
+                                                            </ProgressBar.Template>
+                                                            <ProgressBar.Style>
+                                                                <Style TargetType="ProgressBar">
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding Bar}" Value="{x:Null}">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding BarLevel}" Value="warning">
+                                                                            <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding BarLevel}" Value="critical">
+                                                                            <Setter Property="Foreground" Value="{StaticResource CriticalBrush}"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding BarLevel}" Value="accent">
+                                                                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                                            <Setter Property="Height" Value="16"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </ProgressBar.Style>
+                                                        </ProgressBar>
                                                         <TextBlock Text="{Binding Label}" Foreground="{StaticResource MutedTextBrush}"
                                                                    TextWrapping="Wrap" Margin="0,0,12,0"/>
                                                         <TextBox Grid.Column="1" Text="{Binding Value, Mode=OneWay}" IsReadOnly="True"

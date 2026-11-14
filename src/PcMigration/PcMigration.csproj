@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- Comme les autres logiciels : .NET Framework 4.8, déjà présent sur Windows 10 et 11 -->
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <AssemblyName>PcMigration</AssemblyName>
+    <RootNamespace>PcMigration</RootNamespace>
+    <Product>PC Migration</Product>
+    <Company>JVTECH Solutions</Company>
+    <Version>1.0.0</Version>
+    <!-- Même style d'icône pour tous les logiciels JVTECH, une couleur par logiciel -->
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <!-- Administrateur : profils des autres comptes, clés Wi-Fi, ajout des profils Wi-Fi pour tous les utilisateurs -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Management" />
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
+  <!-- Code partagé : version, dossiers (mode clé USB), filet de sécurité, mises à jour, rapport client et fenêtre d'export -->
+  <ItemGroup>
+    <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
+    <Page Include="..\PcInspector\Theme.xaml" Link="Theme.xaml" />
+    <Compile Include="..\PcInspector\AppInfo.cs" Link="Shared\AppInfo.cs" />
+    <Compile Include="..\PcInspector\ProcessRunner.cs" Link="Shared\ProcessRunner.cs" />
+    <Compile Include="..\PcInspector\WingetShell.cs" Link="Shared\WingetShell.cs" />
+    <Compile Include="..\PcInspector\CrashGuard.cs" Link="Shared\CrashGuard.cs" />
+    <Compile Include="..\PcInspector\Updater.cs" Link="Shared\Updater.cs" />
+    <Compile Include="..\PcInspector\Models\InfoSection.cs" Link="Shared\InfoSection.cs" />
+    <Compile Include="..\PcInspector\Report\ReportInfo.cs" Link="Shared\ReportInfo.cs" />
+    <Compile Include="..\PcInspector\Report\ReportWriter.cs" Link="Shared\ReportWriter.cs" />
+    <Compile Include="..\PcInspector\Report\PdfPrinter.cs" Link="Shared\PdfPrinter.cs" />
+    <Page Include="..\PcInspector\ExportWindow.xaml" Link="ExportWindow.xaml" />
+    <Compile Include="..\PcInspector\ExportWindow.xaml.cs" Link="ExportWindow.xaml.cs" DependentUpon="ExportWindow.xaml" />
+  </ItemGroup>
+
+  <!-- Les tests automatisés (tests/JvtechTests) vérifient les règles internes sans rien exécuter sur le PC. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="JvtechTests" />
+  </ItemGroup>
+
+</Project>
