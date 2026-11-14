@@ -101,6 +101,16 @@ Le bouton « Exporter le rapport » produit le même rapport client que PC Inspe
 
 Il partage le code WMI, le rapport et la fenêtre d'export avec PC Inspector (fichiers liés dans le `.csproj`).
 
+## JVTECH Sonde
+
+Pour les PC sous contrat de maintenance : un petit programme sans fenêtre (`src/JvtechSonde`, `JvtechSonde.exe`), lancé
+chaque jour par une tâche planifiée. Il contrôle la mémoire, les températures, le remplissage et la santé des disques,
+la batterie, Windows Update (sans rien installer), l'antivirus, le pare-feu et les plantages, puis envoie le résultat à
+un moniteur « Push » d'Uptime Kuma. Lecture seule. Les mesures sont celles de PC Inspector et de PC Sécurité (fichiers
+liés dans le `.csproj`). Module optionnel `src/JvtechSonde.Capteurs` : température précise du processeur avec
+LibreHardwareMonitor, utilisé seulement si le pilote PawnIO est déjà installé. Mise en place et recette :
+[docs/sonde.md](docs/sonde.md). Livré à part dans `JVTECH-Sonde-v1.0.N.zip`.
+
 ## Communs à tous les logiciels
 
 - **Lanceur JVTECH Outils** (`src/JvtechOutils`, `JvtechOutils.exe`) : un écran d'accueil qui ouvre PC Inspector, PC Sécurité

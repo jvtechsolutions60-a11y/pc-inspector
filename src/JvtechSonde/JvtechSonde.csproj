@@ -1,0 +1,67 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    JVTECH Sonde : petit programme sans fenêtre, lancé chaque jour par une tâche planifiée sur les PC sous contrat.
+    Il mesure l'état du PC (lecture seule), l'écrit dans C:\ProgramData\JVTECH\Sonde et l'envoie à Uptime Kuma.
+    Les mesures reprennent le code de PC Inspector et de PC Sécurité (fichiers liés plus bas) : une seule règle,
+    les mêmes résultats dans les trois logiciels.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Même choix que les autres logiciels JVTECH : .NET Framework 4.8, déjà présent sur Windows 10 et 11 -->
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>JvtechSonde</AssemblyName>
+    <RootNamespace>JvtechSonde</RootNamespace>
+    <Product>JVTECH Sonde</Product>
+    <Company>JVTECH Solutions</Company>
+    <Version>1.0.0</Version>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- 64 bits sur un Windows 64 bits : nécessaire pour le module « capteurs » et pour lire le registre sans redirection -->
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Management" />
+  </ItemGroup>
+
+  <!-- Fichier de réglages d'exemple, livré à côté du .exe -->
+  <ItemGroup>
+    <None Include="sonde.ini" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Code partagé avec PC Inspector -->
+  <ItemGroup>
+    <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
+    <Compile Include="..\PcInspector\AppInfo.cs" Link="Shared\AppInfo.cs" />
+    <Compile Include="..\PcInspector\WindowsState.cs" Link="Shared\WindowsState.cs" />
+    <Compile Include="..\PcInspector\ProcessRunner.cs" Link="Shared\ProcessRunner.cs" />
+    <Compile Include="..\PcInspector\Authenticode.cs" Link="Shared\Authenticode.cs" />
+    <Compile Include="..\PcInspector\WindowsUpdateFailures.cs" Link="Shared\WindowsUpdateFailures.cs" />
+    <Compile Include="..\PcInspector\Models\Health.cs" Link="Shared\Health.cs" />
+    <Compile Include="..\PcInspector\Models\InfoSection.cs" Link="Shared\InfoSection.cs" />
+    <Compile Include="..\PcInspector\Collectors\ICollector.cs" Link="Shared\ICollector.cs" />
+    <Compile Include="..\PcInspector\Collectors\Wmi.cs" Link="Shared\Wmi.cs" />
+    <Compile Include="..\PcInspector\Collectors\Firmware.cs" Link="Shared\Firmware.cs" />
+    <Compile Include="..\PcInspector\Collectors\GpuSensors.cs" Link="Shared\GpuSensors.cs" />
+    <Compile Include="..\PcInspector\Collectors\DiskHealth.cs" Link="Shared\DiskHealth.cs" />
+    <Compile Include="..\PcInspector\Collectors\BatteryCollector.cs" Link="Shared\BatteryCollector.cs" />
+  </ItemGroup>
+
+  <!-- Code partagé avec PC Sécurité : version de Windows, antivirus, Defender, pare-feu, mises à jour -->
+  <ItemGroup>
+    <Compile Include="..\PcSecurite\Checks\SecurityCheck.cs" Link="Shared\Securite\SecurityCheck.cs" />
+    <Compile Include="..\PcSecurite\Checks\SecurityChecks*.cs" Link="Shared\Securite\%(Filename)%(Extension)" />
+    <Compile Include="..\PcSecurite\Checks\References.cs" Link="Shared\Securite\References.cs" />
+    <Compile Include="..\PcSecurite\Checks\Tutorials.cs" Link="Shared\Securite\Tutorials.cs" />
+    <Compile Include="..\PcSecurite\Checks\WindowsUpdateInfo.cs" Link="Shared\Securite\WindowsUpdateInfo.cs" />
+  </ItemGroup>
+
+  <!-- Les tests automatisés (tests/JvtechTests) vérifient les seuils et l'envoi sans rien exécuter sur le PC. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="JvtechTests" />
+  </ItemGroup>
+
+</Project>
