@@ -316,6 +316,29 @@ public class V2AuditTests
         StringAssert.Contains(SupportWindows.Trouver(19045, "Core")!.Remarque, "ESU");
     }
 
+    // Trouvé par la recette automatique (machine GitHub sous Windows Server 2025, build 26100) : annoncé à tort
+    // « Windows 11 24H2 (Famille/Pro) hors support ».
+    [TestMethod]
+    public void WindowsServer_PasPrisPourWindows11_DateJamaisDevinee()
+    {
+        Assert.IsNull(SupportWindows.Trouver(26100, "ServerDatacenter")!.Fin);
+        Assert.IsTrue(SupportWindows.EstServeur("ServerStandard"));
+        Assert.IsFalse(SupportWindows.EstServeur("ServerRdsh"));
+        var r = Evaluer(Maquette with { Build = 26100, EditionId = "ServerDatacenter", Windows11 = Maquette.Windows11! with { BuildWindows = 26100 } });
+        var w = Bloc(r, "windows");
+        Assert.AreEqual("Windows Server Datacenter", w.Valeur);
+        Assert.IsFalse(w.Points.Any(p => p.Statut == Statut.Anomalie && p.Texte.Contains("hors support")), string.Join(" | ", w.Points.Select(p => p.Texte)));
+        Assert.IsFalse(r.Alertes.Any(a => a.Titre.Contains("hors support")));
+        StringAssert.StartsWith(Bloc(r, "windows11").Valeur, "Windows Server installé");
+    }
+
+    [TestMethod]
+    public void BureauADistance_JamaisConforme_MemeSurPosteAdministre()
+    {
+        var r = Evaluer(Maquette with { Mdm = true, FournisseurMdm = "Microsoft Intune", BureauADistanceOuvert = true });
+        Assert.AreEqual(Statut.AVerifier, Bloc(r, "securite").Points.Single(p => p.Texte.StartsWith("Bureau à distance")).Statut);
+    }
+
     [TestMethod]
     public void Windows11_24H2Famille_HorsSupport_MiseAJourDeVersion()
     {

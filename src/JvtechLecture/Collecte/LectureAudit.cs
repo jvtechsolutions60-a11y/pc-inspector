@@ -72,7 +72,7 @@ public static class LectureAudit
             nonLus.Add("Santé SMART : un ou plusieurs disques non lus" + (admin ? "." : " (souvent faute de droits administrateur)."));
         if (securite.BitLocker is null) nonLus.Add("BitLocker : état du disque système non lu.");
         if (admins is null) nonLus.Add("Comptes administrateurs : liste non lue" + (admin ? "." : " (droits insuffisants)."));
-        if (restauration is null) nonLus.Add("Points de restauration : non lus" + (admin ? "." : " (droits administrateur nécessaires)."));
+        if (restauration is null && !nonLus.Any(x => x.StartsWith("Points de restauration", StringComparison.Ordinal))) nonLus.Add("Points de restauration : non lus" + (admin ? "." : " (droits administrateur nécessaires)."));
         if (activation is null) nonLus.Add("Activation de Windows : non lue.");
 
         progression?.Invoke("Terminé");

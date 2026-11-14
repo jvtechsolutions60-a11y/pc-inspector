@@ -163,7 +163,8 @@ public static class RegleAudit
     {
         const string id = "windows";
         var edition = SupportWindows.Edition(d.EditionId);
-        var famille = d.Build is >= 22000 ? "Windows 11" : d.Build is > 0 ? "Windows 10" : null;
+        var famille = SupportWindows.EstServeur(d.EditionId) && d.Build is > 0 ? "Windows Server"
+            : d.Build is >= 22000 ? "Windows 11" : d.Build is > 0 ? "Windows 10" : null;
         var valeur = famille is null ? (d.WindowsNom ?? "Version non lue") : $"{famille} {edition ?? ""}".Trim();
         var activation = d.Active switch { true => "activé", false => "non activé", _ => "activation non lue" };
         var detail = string.Join(" · ", new[] { d.VersionAffichee, d.Build is { } b ? $"build {b}" : null, activation }.Where(x => x is not null));
@@ -255,7 +256,8 @@ public static class RegleAudit
             NaturePoint.Incompatible => Statut.Anomalie,
             _ => Statut.AVerifier,
         }, $"{p.Nom} : {p.Detail}")).ToList();
-        var dejaW11 = d.Build is >= 22000;
+        var serveur = SupportWindows.EstServeur(d.EditionId);
+        var dejaW11 = d.Build is >= 22000 || serveur;
         var statut = b.Verdict switch
         {
             VerdictWindows11.Compatible => Statut.Conforme,
@@ -265,7 +267,7 @@ public static class RegleAudit
         var valeur = b.Verdict == VerdictWindows11.ReglageUefi ? "Configuration à vérifier" : b.Libelle;
         if (dejaW11)
         {
-            valeur = "Windows 11 installé · matériel " + b.Verdict switch
+            valeur = (serveur ? "Windows Server installé" : "Windows 11 installé") + " · matériel " + b.Verdict switch
             {
                 VerdictWindows11.Compatible => "compatible",
                 VerdictWindows11.ReglageUefi => "compatible, réglage UEFI à vérifier",
@@ -541,7 +543,7 @@ public static class RegleAudit
         else if (d.SmartScreenActif == true) p.Add(new(Statut.Conforme, "SmartScreen actif"));
 
         if (d.BureauADistanceOuvert == true)
-            p.Add(new(gere ? Statut.Conforme : Statut.AVerifier, "Bureau à distance ouvert" + (gere ? " (poste administré)" : " : vérifier que c'est voulu")));
+            p.Add(new(Statut.AVerifier, "Bureau à distance ouvert" + (gere ? " : poste administré, à voir avec son administrateur" : " : vérifier que c'est voulu")));
         if (d.PriseEnMainADistance.Count > 0)
             p.Add(new(Statut.AVerifier, "Prise en main à distance installée : " + string.Join(", ", d.PriseEnMainADistance) + " (vérifier avec le client qu'elle est connue)"));
 

@@ -52,9 +52,18 @@ public static class SupportWindows
         (editionId.Equals("EnterpriseS", StringComparison.OrdinalIgnoreCase) || editionId.Equals("EnterpriseSN", StringComparison.OrdinalIgnoreCase)
          || editionId.Equals("IoTEnterpriseS", StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>Windows Server (ServerStandard, ServerDatacenter…), hors ServerRdsh (Windows Entreprise multisession).</summary>
+    public static bool EstServeur(string? editionId) => editionId is not null
+        && editionId.StartsWith("Server", StringComparison.OrdinalIgnoreCase)
+        && !editionId.StartsWith("ServerRdsh", StringComparison.OrdinalIgnoreCase);
+
     public static SupportWindowsInfo? Trouver(int? build, string? editionId)
     {
         if (build is not { } b || b <= 0) return null;
+        // Windows Server : cycle de vie différent, absent de ces tables (relevé pour les postes) : jamais de date devinée.
+        if (EstServeur(editionId))
+            return new SupportWindowsInfo($"Windows Server (build {b})", null, "Windows Server",
+                "cycle de support de Windows Server non couvert par cet audit (conçu pour les postes) : date de fin à vérifier");
         if (EstLtsc(editionId))
         {
             var iot = editionId!.StartsWith("IoT", StringComparison.OrdinalIgnoreCase);
@@ -86,6 +95,8 @@ public static class SupportWindows
         "IoTEnterprise" => "IoT Entreprise",
         "IoTEnterpriseS" => "IoT Entreprise LTSC",
         "Education" or "EducationN" => "Éducation",
+        "ServerStandard" or "ServerStandardEval" => "Standard",
+        "ServerDatacenter" or "ServerDatacenterEval" => "Datacenter",
         _ => editionId,
     };
 }
