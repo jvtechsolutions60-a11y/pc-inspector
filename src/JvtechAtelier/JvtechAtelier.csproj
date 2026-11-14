@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    JVTECH Atelier : préparation des PC d'achat-revente, après une installation de Windows 11 par clé USB.
+    Un seul .exe : la bibliothèque commune (JvtechLecture) et les actions (JvtechAtelier.Actions) sont compilées dedans.
+    Seul logiciel v2 à inclure JvtechAtelier.Actions, le seul code autorisé à modifier Windows.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <AssemblyName>JvtechAtelier</AssemblyName>
+    <RootNamespace>JvtechAtelier</RootNamespace>
+    <Product>JVTECH Atelier</Product>
+    <Company>JVTECH Solutions</Company>
+    <Version>2.0.0</Version>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <!-- Droits administrateur au lancement : santé des disques (SMART), Windows Update, logiciels, diagnostic mémoire.
+         Atelier ne tourne que sur les PC de l'atelier ; en mode audit, Windows ouvre déjà la session administrateur. -->
+    <ApplicationManifest>..\PcInspector\app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Management" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
+    <Compile Include="..\PcInspector\Collectors\Wmi.cs" Link="Shared\Wmi.cs" />
+    <Compile Include="..\PcInspector\Collectors\DiskHealth.cs" Link="Shared\DiskHealth.cs" />
+    <Compile Include="..\PcInspector\Models\Health.cs" Link="Shared\Health.cs" />
+    <Page Include="..\PcInspector\Theme.xaml" Link="Theme.xaml" />
+    <Compile Include="..\PcInspector\AppInfo.cs" Link="Shared\AppInfo.cs" />
+    <Compile Include="..\PcInspector\CrashGuard.cs" Link="Shared\CrashGuard.cs" />
+    <!-- Fenêtre de test de PC Inspector, reprise telle quelle : écran, clavier, haut-parleurs, micro, webcam -->
+    <Page Include="..\PcInspector\PeripheralTestWindow.xaml" Link="PeripheralTestWindow.xaml" />
+    <Compile Include="..\PcInspector\PeripheralTestWindow.xaml.cs" Link="PeripheralTestWindow.xaml.cs" DependentUpon="PeripheralTestWindow.xaml" />
+    <!-- Repris de PC Inspector et PC Maintenance, tels quels : Windows Update (agent COM) et winget -->
+    <Compile Include="..\PcInspector\WindowsState.cs" Link="Shared\WindowsState.cs" />
+    <Compile Include="..\PcInspector\WingetShell.cs" Link="Shared\WingetShell.cs" />
+    <Compile Include="..\PcMaintenance\Maintenance\WindowsUpdate.cs" Link="Shared\WindowsUpdate.cs" />
+    <Compile Include="..\PcMaintenance\Maintenance\Winget.cs" Link="Shared\Winget.cs" />
+    <Compile Include="..\JvtechLecture\**\*.cs" Exclude="..\JvtechLecture\obj\**;..\JvtechLecture\bin\**" LinkBase="Lecture" />
+    <Compile Include="..\JvtechAtelier.Actions\**\*.cs" Exclude="..\JvtechAtelier.Actions\obj\**;..\JvtechAtelier.Actions\bin\**" LinkBase="Actions" />
+  </ItemGroup>
+
+</Project>

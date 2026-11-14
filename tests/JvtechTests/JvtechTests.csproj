@@ -36,6 +36,9 @@
     <ProjectReference Include="..\..\src\PcMaintenance\PcMaintenance.csproj" Aliases="maintenance" />
     <ProjectReference Include="..\..\src\PcMigration\PcMigration.csproj" Aliases="migration" />
     <ProjectReference Include="..\..\src\JvtechServeur\JvtechServeur.csproj" Aliases="serveur" />
+    <!-- JVTECH v2 : espaces de noms propres (Jvtech.*), pas besoin d'alias. -->
+    <ProjectReference Include="..\..\src\JvtechLecture\JvtechLecture.csproj" />
+    <ProjectReference Include="..\..\src\JvtechAtelier.Actions\JvtechAtelier.Actions.csproj" />
   </ItemGroup>
 
 </Project>

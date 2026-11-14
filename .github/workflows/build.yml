@@ -18,6 +18,8 @@ jobs:
     env:
       # Le numéro de run sert de version commune aux .exe : v1.0.N, affichée dans les logiciels et les rapports.
       VERSION: 1.0.${{ github.run_number }}
+      # JVTECH v2 (Atelier et Audit) : v2.0.N, même N que les logiciels v1. Aperçu tant que la v2.0 n'est pas recettée.
+      VERSION_V2: 2.0.${{ github.run_number }}
       WIN11DEBLOAT: 2026.08.24
       # Empreinte des scripts de cette version (calcul : étape « Préparer le serveur PXE »). Contrôlée au téléchargement
       # et inscrite dans PC Maintenance, qui refuse de lancer des scripts différents. À changer avec WIN11DEBLOAT.
@@ -104,6 +106,33 @@ jobs:
           Set-Content -Path publish/SHA256SUMS.txt -Value $lines -Encoding utf8NoBOM
           Copy-Item publish/SHA256SUMS.txt publish/outils/
           Get-Content publish/SHA256SUMS.txt
+
+      # JVTECH v2 : deux .exe autonomes (bibliothèque commune compilée dedans). Publiés à part, jamais dans la
+      # version v1 ni dans la publication sur main tant que la recette v2.0 n'est pas faite (décision D3).
+      - name: Compiler JVTECH Atelier (v2)
+        run: dotnet build src/JvtechAtelier/JvtechAtelier.csproj -c Release -o publish/atelier -p:Version=${{ env.VERSION_V2 }}
+
+      - name: Compiler JVTECH Audit (v2)
+        run: dotnet build src/JvtechAudit/JvtechAudit.csproj -c Release -o publish/audit -p:Version=${{ env.VERSION_V2 }}
+
+      - name: Réunir les .exe v2
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force publish/v2 | Out-Null
+          Copy-Item publish/atelier/JvtechAtelier.exe, publish/audit/JvtechAudit.exe publish/v2/
+          # Un seul .exe chacun : aucune DLL ne doit être nécessaire à côté.
+          foreach ($dir in 'publish/atelier', 'publish/audit') {
+            $dlls = @(Get-ChildItem $dir -Filter *.dll)
+            if ($dlls.Count -gt 0) { throw "$dir : DLL inattendue(s) $($dlls.Name -join ', ') : les .exe v2 doivent être autonomes" }
+          }
+          $lines = Get-ChildItem publish/v2/*.exe | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name }
+          Set-Content -Path publish/v2/SHA256SUMS.txt -Value $lines -Encoding utf8NoBOM
+          Get-Content publish/v2/SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: JVTECH-v2-apercu-v${{ env.VERSION_V2 }}
+          path: publish/v2/
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Bibliothèque commune de JVTECH v2, en LECTURE SEULE : collecte, règles, statuts, valeurs détectées.
+    Elle ne modifie jamais Windows (registre, services, réglages) : tests/JvtechTests/SeparationTests le vérifie.
+    JVTECH Atelier et JVTECH Audit compilent ses fichiers dans leur propre .exe : rien à poser à côté.
+    Ce projet sert à la compiler seule et aux tests automatisés.
+  -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>JvtechLecture</AssemblyName>
+    <RootNamespace>Jvtech.Lecture</RootNamespace>
+    <Product>JVTECH v2, bibliothèque commune</Product>
+    <Company>JVTECH Solutions</Company>
+    <Version>2.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Management" />
+  </ItemGroup>
+
+  <!-- Code v1 repris tel quel (lecture seule) -->
+  <ItemGroup>
+    <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
+    <Compile Include="..\PcInspector\Collectors\Wmi.cs" Link="Shared\Wmi.cs" />
+    <Compile Include="..\PcInspector\Collectors\DiskHealth.cs" Link="Shared\DiskHealth.cs" />
+    <Compile Include="..\PcInspector\Models\Health.cs" Link="Shared\Health.cs" />
+  </ItemGroup>
+
+</Project>

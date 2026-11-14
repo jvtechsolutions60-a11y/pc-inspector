@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    JVTECH Audit : diagnostic du PC d'un client, en LECTURE SEULE STRICTE.
+    Un seul .exe : le code de la bibliothèque commune (JvtechLecture) est compilé dedans.
+    N'inclut JAMAIS JvtechAtelier.Actions ni le code de PC Maintenance, PC Migration ou du serveur PXE.
+    Pas de journal ni de réglage écrit sur le PC du client (pas de CrashGuard ni d'AppPaths ici).
+    tests/JvtechTests/SeparationTests vérifie ces règles à chaque compilation.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <AssemblyName>JvtechAudit</AssemblyName>
+    <RootNamespace>JvtechAudit</RootNamespace>
+    <Product>JVTECH Audit</Product>
+    <Company>JVTECH Solutions</Company>
+    <Version>2.0.0</Version>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Management" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
+    <Compile Include="..\PcInspector\Collectors\Wmi.cs" Link="Shared\Wmi.cs" />
+    <Compile Include="..\PcInspector\Collectors\DiskHealth.cs" Link="Shared\DiskHealth.cs" />
+    <Compile Include="..\PcInspector\Models\Health.cs" Link="Shared\Health.cs" />
+    <Page Include="..\PcInspector\Theme.xaml" Link="Theme.xaml" />
+    <Compile Include="..\JvtechLecture\**\*.cs" Exclude="..\JvtechLecture\obj\**;..\JvtechLecture\bin\**" LinkBase="Lecture" />
+  </ItemGroup>
+
+</Project>
