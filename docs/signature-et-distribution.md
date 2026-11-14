@@ -29,3 +29,33 @@ lancement, et certains antivirus sont plus méfiants envers un .exe non signé q
 
 Tarifs à revérifier au moment de la décision. La signature est une décision (coût, démarches) qui reste à prendre :
 rien n'a été mis en place.
+
+## Mise en place de la signature (Azure Artifact Signing)
+
+Décision du 13/11/2026 : Azure Artifact Signing, offre Basic (environ 10 €/mois, 5 000 signatures par mois). JVTECH
+est une SARL : elle entre dans la catégorie « organisation de l'Union européenne » de la confiance publique.
+La compilation GitHub est **déjà prête** : l'étape « Signer les .exe » s'active seule dès que les réglages ci-dessous
+existent, puis l'étape « Vérifier les signatures » arrête la compilation si un fichier n'est pas signé correctement.
+
+1. **Compte Azure** : sur https://portal.azure.com, créer un abonnement (paiement à l'usage) au nom de la SARL.
+2. **Compte de signature** : rechercher « Artifact Signing », créer un compte (offre Basic, région Europe
+   de l'Ouest ou Europe du Nord). Noter son nom et son **point de terminaison** (`https://weu.codesigning.azure.net/`
+   pour l'Europe de l'Ouest, `https://neu.codesigning.azure.net/` pour l'Europe du Nord : il est affiché sur la page du compte).
+3. **Validation d'identité** : dans le compte, « Identity validation » > « Public » > organisation, avec le nom
+   légal exact de la SARL (celui du Kbis, qui sera affiché dans la signature), le SIRET et le Kbis. Compter quelques
+   jours à quelques semaines.
+4. **Profil de certificat** : une fois l'identité validée, « Certificate profiles » > « Public Trust ». Noter son nom.
+5. **Application pour GitHub** : dans Microsoft Entra ID > « Inscriptions d'applications », créer « GitHub JVTECH
+   signature », puis un **secret client**. Noter l'ID d'annuaire (tenant), l'ID d'application (client) et le secret.
+6. **Droits** : sur le compte de signature, « Contrôle d'accès (IAM) » > ajouter le rôle
+   **Artifact Signing Certificate Profile Signer** à cette application.
+7. **Dans GitHub** (dépôt > Settings > Secrets and variables > Actions) :
+   - onglet *Secrets* : `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` ;
+   - onglet *Variables* : `AZURE_SIGNING_ENDPOINT` (point de terminaison de l'étape 2), `AZURE_SIGNING_ACCOUNT`
+     (nom du compte), `AZURE_SIGNING_PROFILE` (nom du profil).
+8. Relancer une compilation : les .exe JVTECH, JvtechSonde.exe et JvtechSonde.Capteurs.dll sortent signés
+   (horodatage Microsoft, la signature reste valide après l'expiration du certificat). Les DLL de
+   LibreHardwareMonitor ne sont pas signées par JVTECH : ce n'est pas notre code.
+
+Le secret client expire (24 mois au plus) : noter sa date et le renouveler avant, sinon la compilation s'arrête.
+SmartScreen peut encore avertir sur les toutes premières versions signées, le temps que la réputation s'établisse.

@@ -56,6 +56,48 @@ jobs:
       - name: Compiler JVTECH Serveur PXE
         run: dotnet build src/JvtechServeur/JvtechServeur.csproj -c Release -o publish/serveur-build -p:Version=${{ env.VERSION }}
 
+      # Signature Authenticode (Azure Artifact Signing) des .exe JVTECH, avant les .zip et les empreintes.
+      # Inactive tant que la variable du dépôt AZURE_SIGNING_ACCOUNT n'existe pas : voir docs/signature-et-distribution.md.
+      # Seuls les fichiers JVTECH sont signés, pas les DLL de LibreHardwareMonitor (code d'un autre éditeur).
+      - name: Signer les .exe (Azure Artifact Signing)
+        if: vars.AZURE_SIGNING_ACCOUNT != ''
+        uses: azure/artifact-signing-action@v2.0.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_SIGNING_PROFILE }}
+          files: |
+            ${{ github.workspace }}\publish\inspector\PcInspector.exe
+            ${{ github.workspace }}\publish\securite\PcSecurite.exe
+            ${{ github.workspace }}\publish\maintenance\PcMaintenance.exe
+            ${{ github.workspace }}\publish\migration\PcMigration.exe
+            ${{ github.workspace }}\publish\lanceur\JvtechOutils.exe
+            ${{ github.workspace }}\publish\serveur-build\JvtechServeur.exe
+            ${{ github.workspace }}\publish\sonde-build\JvtechSonde.exe
+            ${{ github.workspace }}\publish\sonde-capteurs\JvtechSonde.Capteurs.dll
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          description: JVTECH Solutions
+          description-url: https://github.com/jvtechsolutions60-a11y/pc-inspector
+
+      - name: Vérifier les signatures
+        if: vars.AZURE_SIGNING_ACCOUNT != ''
+        shell: pwsh
+        run: |
+          $files = 'inspector/PcInspector.exe','securite/PcSecurite.exe','maintenance/PcMaintenance.exe','migration/PcMigration.exe',
+                   'lanceur/JvtechOutils.exe','serveur-build/JvtechServeur.exe','sonde-build/JvtechSonde.exe','sonde-capteurs/JvtechSonde.Capteurs.dll'
+          $bad = @()
+          foreach ($f in $files) {
+            $sig = Get-AuthenticodeSignature "publish/$f"
+            "{0} : {1} ({2})" -f $f, $sig.Status, $sig.SignerCertificate.Subject
+            if ($sig.Status -ne 'Valid') { $bad += $f }
+          }
+          if ($bad.Count -gt 0) { throw "Signature invalide : $($bad -join ', ')" }
+
       - name: Réunir les .exe
         shell: pwsh
         run: |

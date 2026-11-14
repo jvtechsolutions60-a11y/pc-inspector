@@ -51,6 +51,44 @@ internal static class Rules
         return c >= warning ? Level.Warning : Level.Ok;
     }
 
+    /// <summary>
+    /// Écrans bleus et arrêts brutaux comptés à part : un arrêt brutal est souvent une coupure de courant ou un appui
+    /// long sur le bouton, pas une panne. Avec plantages_arrets_brutaux = non, seuls les écrans bleus comptent.
+    /// </summary>
+    public static Level Crashes(int? blueScreens, int? abrupt, bool countAbrupt, int warning, int critical)
+    {
+        if (blueScreens is null && (abrupt is null || !countAbrupt)) return Level.Unknown;
+        return Crashes((blueScreens ?? 0) + (countAbrupt ? abrupt ?? 0 : 0), warning, critical);
+    }
+
+    /// <summary>
+    /// Retire du contrôle Defender de PC Sécurité les exclusions connues (voulues) de ce PC. Le détail de PC Sécurité
+    /// est fait de parties séparées par « · », dont « exclusions : a, b ». S'il ne reste rien à signaler, le point passe
+    /// au vert ; un autre problème (protection désactivée…) garde son niveau.
+    /// </summary>
+    public static (Level Level, string Detail) DefenderWithKnownExclusions(CheckStatus status, string detail, IReadOnlyCollection<string> known)
+    {
+        const string prefix = "exclusions : ";
+        var level = FromSecurity(status);
+        if (known.Count == 0 || status is not (CheckStatus.Warning or CheckStatus.Danger)) return (level, detail);
+
+        static string Norm(string path) => path.Trim().TrimEnd('\\').ToLowerInvariant();
+        var knownSet = new HashSet<string>(known.Select(Norm));
+        var parts = new List<string>();
+        var ignored = new List<string>();
+        foreach (var part in detail.Split(new[] { " · " }, StringSplitOptions.None))
+        {
+            if (!part.StartsWith(prefix, StringComparison.Ordinal)) { parts.Add(part); continue; }
+            var items = part.Substring(prefix.Length).Split(new[] { ", " }, StringSplitOptions.RemoveEmptyEntries);
+            var unknown = items.Where(i => !knownSet.Contains(Norm(i))).ToList();
+            ignored.AddRange(items.Where(i => knownSet.Contains(Norm(i))));
+            if (unknown.Count > 0) parts.Add(prefix + string.Join(", ", unknown));
+        }
+        var note = ignored.Count > 0 ? $" (exclusions connues : {string.Join(", ", ignored)})" : "";
+        if (parts.Count == 0) return (Level.Ok, "Toutes les protections sont actives" + note);
+        return (level, string.Join(" · ", parts) + note);
+    }
+
     /// <summary>Même feu que dans PC Sécurité : danger = rouge, à améliorer = orange.</summary>
     public static Level FromSecurity(CheckStatus status) => status switch
     {

@@ -16,8 +16,8 @@ du PC et l'envoie à Uptime Kuma. **Lecture seule** : il n'installe, ne corrige 
 | Santé de chaque disque (SMART, NVMe) | PC Inspector | règles de PC Inspector |
 | Usure de la batterie (portables) | PC Inspector | orange ≥ 40 %, rouge ≥ 60 % |
 | Version de Windows et fin de support | PC Sécurité | règles de PC Sécurité |
-| Antivirus, Microsoft Defender, pare-feu | PC Sécurité | règles de PC Sécurité |
-| Plantages (écrans bleus, arrêts brutaux) sur 30 jours | journal Système | orange ≥ 1, rouge ≥ 3 |
+| Antivirus, Microsoft Defender, pare-feu | PC Sécurité | règles de PC Sécurité ; les exclusions listées dans `exclusions_connues` ne sont plus signalées |
+| Plantages (écrans bleus, arrêts brutaux) sur 30 jours, comptés à part | journal Système | orange ≥ 1, rouge ≥ 3 ; `plantages_arrets_brutaux = non` ne compte que les écrans bleus |
 | Redémarrage en attente | registre | orange |
 | Windows Update : dernière recherche réussie | agent Windows Update | orange > 7 jours, rouge > 21 jours |
 | Windows Update : dernière installation | PC Sécurité | règles de PC Sécurité |
@@ -47,6 +47,8 @@ Un point « non mesurable » (pas de sonde de température, accès refusé) n'es
    (compte SYSTEM, chaque jour vers 12 h et 5 minutes après chaque démarrage, arrêtée au bout de 5 minutes)
    et un premier passage est lancé. Le moniteur doit passer au vert dans Kuma dans les minutes qui suivent.
 4. Le dossier temporaire peut être supprimé.
+
+Le tableau de bord Uptime Kuma lui-même s'installe une seule fois : voir [uptime-kuma.md](uptime-kuma.md).
 
 Changer un réglage plus tard : modifier `C:\Program Files\JVTECH\Sonde\sonde.ini` (en administrateur).
 

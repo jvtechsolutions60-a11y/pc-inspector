@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 
 namespace JvtechSonde;
 
@@ -38,6 +39,15 @@ public sealed class Settings
 
     /// <summary>Durée de mesure de l'utilisation du processeur (moyenne), en secondes.</summary>
     public int CpuSampleSeconds { get; private set; } = 30;
+
+    /// <summary>
+    /// Exclusions de Microsoft Defender voulues sur ce PC (logiciel métier, gestionnaire de mods…), séparées par « ; ».
+    /// Elles ne sont plus signalées ; une exclusion qui n'est pas dans la liste reste orange.
+    /// </summary>
+    public List<string> KnownExclusions { get; } = new();
+
+    /// <summary>Si non, seuls les écrans bleus comptent pour l'alerte ; les arrêts brutaux (coupure, bouton) sont seulement affichés.</summary>
+    public bool CountAbruptShutdowns { get; private set; } = true;
 
     /// <summary>Réglages lus, et les lignes ignorées (pour le signaler dans le journal).</summary>
     public List<string> Ignored { get; } = new();
@@ -83,6 +93,11 @@ public sealed class Settings
             case "recherche_maj_jours": return Number(value, v => UpdateSearchDays = (int)v);
             case "plantages_orange": return Number(value, v => CrashWarning = (int)v);
             case "plantages_rouge": return Number(value, v => CrashCritical = (int)v);
+            case "exclusions_connues":
+                KnownExclusions.Clear();
+                KnownExclusions.AddRange(value.Split(';').Select(e => e.Trim()).Where(e => e.Length > 0));
+                return true;
+            case "plantages_arrets_brutaux": return Bool(value, v => CountAbruptShutdowns = v);
             case "cpu_mesure_secondes": return Number(value, v => CpuSampleSeconds = (int)Math.Max(1, Math.Min(120, v)));
             default: return false;
         }

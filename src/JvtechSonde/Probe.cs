@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Eventing.Reader;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -37,7 +38,7 @@ internal static class Probe
         progress?.Invoke("Windows, sécurité et plantages…");
         Add(points, "Windows", "version", () => Security("Version de Windows", "Windows", "version"));
         Add(points, "Antivirus", "", () => Security("Antivirus", "Antivirus", ""));
-        Add(points, "Microsoft Defender", "", () => Security("Microsoft Defender", "Microsoft Defender", ""));
+        Add(points, "Microsoft Defender", "", () => Defender(settings));
         Add(points, "Pare-feu", "", () => Security("Pare-feu", "Pare-feu", ""));
         Add(points, "Plantages", "30 jours", () => Crashes(settings));
         Add(points, "Redémarrage", "en attente", RebootPending);
@@ -193,16 +194,53 @@ internal static class Probe
         return new Point(area, name, Rules.FromSecurity(result.Status), result.Detail);
     }
 
+    /// <summary>Contrôle Defender de PC Sécurité, sans les exclusions déclarées voulues dans sonde.ini.</summary>
+    private static Point Defender(Settings settings)
+    {
+        var check = SecurityChecks.All.FirstOrDefault(c => c.Name == "Microsoft Defender");
+        if (check.Run is null) return new Point("Microsoft Defender", "", Level.Unknown, "contrôle introuvable");
+        var result = SecurityChecks.RunSafely(check.Name, check.Run);
+        var (level, detail) = Rules.DefenderWithKnownExclusions(result.Status, result.Detail, settings.KnownExclusions);
+        return new Point("Microsoft Defender", "", level, detail);
+    }
+
+    private const string BlueScreenXPath = "Provider[@Name='Microsoft-Windows-WER-SystemErrorReporting'] and EventID=1001";
+    private const string AbruptXPath = "Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=41";
+
     private static Point Crashes(Settings settings)
     {
-        var count = DiagnosticCollector.RecentCrashCount(TimeSpan.FromDays(30));
-        return new Point("Plantages", "30 jours", Rules.Crashes(count, settings.CrashWarning, settings.CrashCritical),
-            count switch
+        var within = TimeSpan.FromDays(30);
+        var blue = CountEvents(BlueScreenXPath, within);
+        var abrupt = CountEvents(AbruptXPath, within);
+        var level = Rules.Crashes(blue, abrupt, settings.CountAbruptShutdowns, settings.CrashWarning, settings.CrashCritical);
+        string value;
+        if (blue is null && abrupt is null) value = "journal Système illisible";
+        else if ((blue ?? 0) == 0 && (abrupt ?? 0) == 0) value = "aucun écran bleu ni arrêt brutal";
+        else
+        {
+            value = $"{blue ?? 0} écran(s) bleu(s), {abrupt ?? 0} arrêt(s) brutal(aux) (coupure de courant, bouton ou blocage)";
+            if (!settings.CountAbruptShutdowns && (abrupt ?? 0) > 0) value += " ; les arrêts brutaux ne comptent pas pour l'alerte";
+        }
+        return new Point("Plantages", "30 jours", level, value);
+    }
+
+    /// <summary>Nombre d'événements du journal Système sur la période, null si le journal est illisible.</summary>
+    private static int? CountEvents(string condition, TimeSpan within)
+    {
+        var xpath = $"*[System[({condition}) and TimeCreated[timediff(@SystemTime) <= {(long)within.TotalMilliseconds}]]]";
+        try
+        {
+            using var reader = new EventLogReader(new EventLogQuery("System", PathType.LogName, xpath));
+            var count = 0;
+            for (var record = reader.ReadEvent(); record is not null; record = reader.ReadEvent())
             {
-                null => "journal Système illisible",
-                0 => "aucun écran bleu ni arrêt brutal",
-                var c => $"{c} écran(s) bleu(s) ou arrêt(s) brutal(aux)",
-            });
+                record.Dispose();
+                count++;
+            }
+            return count;
+        }
+        catch (EventLogException) { return null; }
+        catch (UnauthorizedAccessException) { return null; }
     }
 
     private static Point RebootPending() =>

@@ -217,4 +217,54 @@ public class SondeTests
         Assert.AreEqual("PT5M", doc.Descendants(ns + "ExecutionTimeLimit").Single().Value);
         Assert.AreEqual("true", doc.Descendants(ns + "StartWhenAvailable").Single().Value, "rattrapage si le PC était éteint");
     }
+
+    // ---------- Plantages et exclusions Defender (réglages ajoutés après le premier essai) ----------
+
+    [TestMethod]
+    public void Crashes_AbruptShutdowns_CanBeLeftOut()
+    {
+        Assert.AreEqual(Level.Critical, Rules.Crashes(0, 3, countAbrupt: true, 1, 3), "par défaut, les arrêts brutaux comptent");
+        Assert.AreEqual(Level.Ok, Rules.Crashes(0, 3, countAbrupt: false, 1, 3));
+        Assert.AreEqual(Level.Warning, Rules.Crashes(1, 3, countAbrupt: false, 1, 3), "un écran bleu compte toujours");
+        Assert.AreEqual(Level.Unknown, Rules.Crashes(null, 2, countAbrupt: false, 1, 3));
+        Assert.AreEqual(Level.Critical, Rules.Crashes(null, 3, countAbrupt: true, 1, 3));
+    }
+
+    [TestMethod]
+    public void Settings_KnownExclusions_AndAbruptShutdowns()
+    {
+        var s = Settings.Parse("exclusions_connues = C:\\Program Files\\Vortex ; D:\\Métier\\ ;\nplantages_arrets_brutaux = non");
+        CollectionAssert.AreEqual(new[] { @"C:\Program Files\Vortex", @"D:\Métier\" }, s.KnownExclusions);
+        Assert.IsFalse(s.CountAbruptShutdowns);
+        Assert.IsTrue(Settings.Parse("").CountAbruptShutdowns);
+    }
+
+    [TestMethod]
+    public void Defender_KnownExclusion_TurnsGreen()
+    {
+        var (level, detail) = Rules.DefenderWithKnownExclusions(SondeChecks.CheckStatus.Warning,
+            @"exclusions : C:\Program Files\Vortex", new[] { @"c:\program files\vortex\" });
+        Assert.AreEqual(Level.Ok, level);
+        StringAssert.Contains(detail, "exclusions connues");
+    }
+
+    [TestMethod]
+    public void Defender_UnknownExclusion_StaysOrange()
+    {
+        var (level, detail) = Rules.DefenderWithKnownExclusions(SondeChecks.CheckStatus.Warning,
+            @"exclusions : C:\Program Files\Vortex, C:\Users\Public\x.exe", new[] { @"C:\Program Files\Vortex" });
+        Assert.AreEqual(Level.Warning, level);
+        StringAssert.StartsWith(detail, @"exclusions : C:\Users\Public\x.exe");
+    }
+
+    [TestMethod]
+    public void Defender_OtherProblems_KeepTheirLevel()
+    {
+        var (level, detail) = Rules.DefenderWithKnownExclusions(SondeChecks.CheckStatus.Danger,
+            @"protection en temps réel désactivée · exclusions : C:\Program Files\Vortex", new[] { @"C:\Program Files\Vortex" });
+        Assert.AreEqual(Level.Critical, level);
+        StringAssert.StartsWith(detail, "protection en temps réel désactivée");
+        Assert.AreEqual((Level.Warning, "exclusions : X"),
+            Rules.DefenderWithKnownExclusions(SondeChecks.CheckStatus.Warning, "exclusions : X", Array.Empty<string>()));
+    }
 }

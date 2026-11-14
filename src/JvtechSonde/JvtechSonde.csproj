@@ -48,7 +48,6 @@
     <Compile Include="..\PcInspector\Collectors\GpuSensors.cs" Link="Shared\GpuSensors.cs" />
     <Compile Include="..\PcInspector\Collectors\DiskHealth.cs" Link="Shared\DiskHealth.cs" />
     <Compile Include="..\PcInspector\Collectors\BatteryCollector.cs" Link="Shared\BatteryCollector.cs" />
-    <Compile Include="..\PcInspector\Collectors\DiagnosticCollector.cs" Link="Shared\DiagnosticCollector.cs" />
   </ItemGroup>
 
   <!-- Code partagé avec PC Sécurité : version de Windows, antivirus, Defender, pare-feu, mises à jour -->
