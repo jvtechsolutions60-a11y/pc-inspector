@@ -30,3 +30,9 @@ Anomalies trouvées et corrigées :
 
 À surveiller sur PC réel : l'inscription MDM « Deploy Authority » vue sur cette machine Azure a fait passer le
 poste en « Poste administré ». Vérifier sur des PC de particuliers qu'aucune inscription de ce type n'apparaît (T05).
+
+## Deuxième passage : 14/11/2026, run 43581445341 (après corrections)
+
+Windows lu « Windows Server Datacenter », fin de support « à vérifier » ; bureau à distance « À vérifier » ; limite
+des points de restauration écrite une seule fois. Toujours aucun réglage modifié (mêmes traces de Windows ;
+services : TrustedInstaller démarré par Windows Update de la machine, modes de démarrage inchangés). CI : 430 tests réussis.
