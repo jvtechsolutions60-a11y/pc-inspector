@@ -1,0 +1,79 @@
+name: Recette Windows (machine jetable)
+
+# Essais automatiques sur une machine Windows jetable de GitHub (Windows Server, compte administrateur, sans batterie
+# ni TPM physique). Ce n'est PAS la recette sur PC réel : voir docs/v2/recette-automatique.md pour ce que cela prouve.
+# 1) photo du registre, des services et de %TEMP% deux fois de suite (bruit normal de Windows),
+# 2) lectures réelles d'Audit et d'Atelier (outil tools/JvtechRecette) + JVTECH Audit.exe ouvert 60 s,
+# 3) nouvelle photo et comparaison : toute différence absente du bruit est signalée.
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/jvtech-v2]
+
+permissions:
+  contents: read
+
+jobs:
+  recette:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 8.0.x
+
+      # Compilé AVANT les photos : la compilation écrit beaucoup dans %TEMP% et le profil.
+      - name: Compiler l'outil de recette et JVTECH Audit
+        run: |
+          dotnet build tools/JvtechRecette/JvtechRecette.csproj -c Release -o recette-bin
+          dotnet build src/JvtechAudit/JvtechAudit.csproj -c Release -o audit-bin -p:Version=2.0.${{ github.run_number }}
+
+      - name: Photos avant (référence puis bruit)
+        shell: pwsh
+        run: |
+          . ./tools/JvtechRecette/photo.ps1
+          New-Item -ItemType Directory -Force resultats | Out-Null
+          Prendre-Photo 'p1'
+          Start-Sleep -Seconds 60
+          Prendre-Photo 'p2'
+
+      - name: Lectures réelles (Audit + Atelier, lecture seule)
+        shell: pwsh
+        run: |
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          & ./recette-bin/JvtechRecette.exe resultats
+          $code = $LASTEXITCODE
+          "Code de sortie : $code ; durée : $([int]$sw.Elapsed.TotalSeconds) s" | Tee-Object resultats/lectures-code.txt
+          if ($code -ne 0) { Get-ChildItem resultats/*erreur*.txt | Get-Content }
+
+      - name: JVTECH Audit.exe ouvert 60 s (tableau de bord)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $p = Start-Process -FilePath ./audit-bin/JvtechAudit.exe -PassThru
+          Start-Sleep -Seconds 60
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $img = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($img).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $img.Save("$PWD/resultats/audit-ecran.png")
+          "Toujours ouvert après 60 s : $(-not $p.HasExited)" | Tee-Object resultats/audit-exe.txt
+          if (-not $p.HasExited) { $p.CloseMainWindow() | Out-Null; Start-Sleep 5; if (-not $p.HasExited) { $p.Kill() } }
+          else { "Code de sortie : $($p.ExitCode)" | Tee-Object -Append resultats/audit-exe.txt }
+
+      - name: Photo après et comparaison
+        shell: pwsh
+        run: |
+          . ./tools/JvtechRecette/photo.ps1
+          Prendre-Photo 'p3'
+          Comparer-Photos 'p1' 'p2' 'p3' | Tee-Object resultats/comparaison.txt
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: Recette-Windows-${{ github.run_number }}
+          path: resultats/
+          retention-days: 30

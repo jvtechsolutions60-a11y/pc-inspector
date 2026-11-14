@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Outil de recette automatique (GitHub Actions, machine Windows jetable) : lance les lectures réelles de JVTECH Audit
+    et d'Atelier (inventaire, contrôles) et écrit les résultats dans le dossier donné en argument.
+    Aucune action d'Atelier (mises à jour, installations, Sysprep). Ne fait pas partie des logiciels livrés.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\JvtechLecture\JvtechLecture.csproj" />
+  </ItemGroup>
+
+</Project>
