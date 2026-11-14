@@ -232,7 +232,9 @@ public sealed class ListingSpecs
         Line("Refroidissement", extras.Cooler);
         Line("Connectivité", string.Join(", ", Connectivity));
         Line("Système", Windows);
+#if !PCMAINTENANCE
         Line("Performances testées", Benchmark.Last?.Summary);
+#endif
         return lines;
     }
 

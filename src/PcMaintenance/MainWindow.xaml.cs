@@ -530,6 +530,20 @@ public partial class MainWindow : Window
         }, TaskScheduler.FromCurrentSynchronizationContext());
     }
 
+    private void Listing_Click(object sender, RoutedEventArgs e) => new ListingWindow { Owner = this }.Show();
+
+    /// <summary>Impression directe sur l'étiqueteuse choisie dans la fenêtre d'impression de Windows (comme PC Inspector).</summary>
+    private void Label_Click(object sender, RoutedEventArgs e)
+    {
+        var info = ReportInfo.LoadDefaults();
+        info.Date = DateTime.Now;
+        try { LabelPrinter.Print(this, info); }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Printing.PrintSystemException or System.IO.IOException)
+        {
+            MessageBox.Show(this, "Impression impossible : " + ex.Message, "Étiquette PC", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void OpenWindowsUpdate_Click(object sender, RoutedEventArgs e) =>
         Process.Start(new ProcessStartInfo("ms-settings:windowsupdate") { UseShellExecute = true });
 

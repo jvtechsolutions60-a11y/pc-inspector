@@ -19,7 +19,14 @@
 
   <ItemGroup>
     <Reference Include="System.Management" />
+    <Reference Include="System.Printing" />
+    <Reference Include="ReachFramework" />
   </ItemGroup>
+
+  <!-- PCMAINTENANCE : retire du texte d'annonce la ligne des performances (tests de PC Inspector, absents ici). -->
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);PCMAINTENANCE</DefineConstants>
+  </PropertyGroup>
 
   <!-- Code partagé avec PC Inspector : version, dossiers (mode clé USB), mises à jour, rapport client et fenêtre d'export -->
   <ItemGroup>
@@ -39,6 +46,22 @@
     <Compile Include="..\PcInspector\Report\PdfPrinter.cs" Link="Shared\PdfPrinter.cs" />
     <Page Include="..\PcInspector\ExportWindow.xaml" Link="ExportWindow.xaml" />
     <Compile Include="..\PcInspector\ExportWindow.xaml.cs" Link="ExportWindow.xaml.cs" DependentUpon="ExportWindow.xaml" />
+  </ItemGroup>
+
+  <!-- Étiquette à imprimer et texte Leboncoin, repris de PC Inspector (lecture seule des composants) -->
+  <ItemGroup>
+    <Compile Include="..\PcInspector\Collectors\Wmi.cs" Link="Shared\Wmi.cs" />
+    <Compile Include="..\PcInspector\Collectors\MachineIdentity.cs" Link="Shared\MachineIdentity.cs" />
+    <Compile Include="..\PcInspector\Collectors\ICollector.cs" Link="Shared\ICollector.cs" />
+    <Compile Include="..\PcInspector\Collectors\GpuCollector.cs" Link="Shared\GpuCollector.cs" />
+    <Compile Include="..\PcInspector\Collectors\GpuDriver.cs" Link="Shared\GpuDriver.cs" />
+    <Compile Include="..\PcInspector\Collectors\BatteryCollector.cs" Link="Shared\BatteryCollector.cs" />
+    <Compile Include="..\PcInspector\Models\Health.cs" Link="Shared\Health.cs" />
+    <Compile Include="..\PcInspector\Report\LabelWriter.cs" Link="Shared\LabelWriter.cs" />
+    <Compile Include="..\PcInspector\Report\LabelPrinter.cs" Link="Shared\LabelPrinter.cs" />
+    <Compile Include="..\PcInspector\Report\ListingWriter.cs" Link="Shared\ListingWriter.cs" />
+    <Page Include="..\PcInspector\ListingWindow.xaml" Link="ListingWindow.xaml" />
+    <Compile Include="..\PcInspector\ListingWindow.xaml.cs" Link="ListingWindow.xaml.cs" DependentUpon="ListingWindow.xaml" />
   </ItemGroup>
 
   <!-- Les tests automatisés (tests/JvtechTests) vérifient les règles internes sans rien exécuter sur le PC. -->
