@@ -189,6 +189,7 @@ jobs:
           path: |
             publish/JVTECH-Outils-v${{ env.VERSION }}.zip
             publish/JVTECH-Serveur-PXE-v${{ env.VERSION }}.zip
+            publish/JVTECH-Sonde-v${{ env.VERSION }}.zip
             publish/outils/*.exe
             publish/SHA256SUMS.txt
 
@@ -215,6 +216,7 @@ jobs:
           subject-path: |
             publish/JVTECH-Outils-v${{ env.VERSION }}.zip
             publish/JVTECH-Serveur-PXE-v${{ env.VERSION }}.zip
+            publish/JVTECH-Sonde-v${{ env.VERSION }}.zip
             publish/outils/*.exe
 
       # Une version publiée par compilation, que les logiciels consultent pour signaler une mise à jour.
