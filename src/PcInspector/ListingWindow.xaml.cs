@@ -19,6 +19,7 @@ public partial class ListingWindow : Window
     public ListingWindow()
     {
         InitializeComponent();
+        AppTitle.Text = AppInfo.Product.ToUpperInvariant() + " · OUTILS";
         try { if (File.Exists(NotesPath)) NotesBox.Text = File.ReadAllText(NotesPath); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }

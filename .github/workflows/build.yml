@@ -61,6 +61,10 @@ jobs:
       - name: Compiler le module capteurs de JVTECH Sonde
         run: dotnet build src/JvtechSonde.Capteurs/JvtechSonde.Capteurs.csproj -c Release -o publish/sonde-capteurs -p:Version=${{ env.VERSION }}
 
+      # JVTECH Entretien : maintenance mensuelle automatique des PC sous contrat (.exe + entretien.ini).
+      - name: Compiler JVTECH Entretien
+        run: dotnet build src/JvtechEntretien/JvtechEntretien.csproj -c Release -o publish/entretien-build -p:Version=${{ env.VERSION }}
+
       - name: Compiler JVTECH Serveur PXE
         run: dotnet build src/JvtechServeur/JvtechServeur.csproj -c Release -o publish/serveur-build -p:Version=${{ env.VERSION }}
 
@@ -86,6 +90,7 @@ jobs:
             ${{ github.workspace }}\publish\serveur-build\JvtechServeur.exe
             ${{ github.workspace }}\publish\sonde-build\JvtechSonde.exe
             ${{ github.workspace }}\publish\sonde-capteurs\JvtechSonde.Capteurs.dll
+            ${{ github.workspace }}\publish\entretien-build\JvtechEntretien.exe
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
@@ -97,7 +102,7 @@ jobs:
         shell: pwsh
         run: |
           $files = 'inspector/PcInspector.exe','securite/PcSecurite.exe','maintenance/PcMaintenance.exe','migration/PcMigration.exe',
-                   'lanceur/JvtechOutils.exe','serveur-build/JvtechServeur.exe','sonde-build/JvtechSonde.exe','sonde-capteurs/JvtechSonde.Capteurs.dll'
+                   'lanceur/JvtechOutils.exe','serveur-build/JvtechServeur.exe','sonde-build/JvtechSonde.exe','sonde-capteurs/JvtechSonde.Capteurs.dll','entretien-build/JvtechEntretien.exe'
           $bad = @()
           foreach ($f in $files) {
             $sig = Get-AuthenticodeSignature "publish/$f"
@@ -122,6 +127,14 @@ jobs:
           Copy-Item publish/sonde-capteurs/*.dll -Destination publish/sonde/capteurs/
           if (-not (Test-Path publish/sonde/capteurs/LibreHardwareMonitorLib.dll)) { throw 'LibreHardwareMonitorLib.dll introuvable' }
           Compress-Archive -Path publish/sonde/* -DestinationPath publish/JVTECH-Sonde-v${{ env.VERSION }}.zip
+
+      # Entretien mensuel à installer sur les PC sous contrat : JvtechEntretien.exe + entretien.ini + mode d'emploi.
+      - name: Préparer JVTECH Entretien
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path publish/entretien | Out-Null
+          Copy-Item publish/entretien-build/JvtechEntretien.exe, publish/entretien-build/entretien.ini, docs/entretien.md -Destination publish/entretien/
+          Compress-Archive -Path publish/entretien/* -DestinationPath publish/JVTECH-Entretien-v${{ env.VERSION }}.zip
 
       # Serveur PXE du mini PC de l'atelier : le serveur, et à côté le kit qu'il ajoute à l'installation de Windows
       # (autounattend.xml, PC Maintenance et ses réglages, recopiés par Windows dans C:\JVTECH).
@@ -158,7 +171,7 @@ jobs:
       - name: Empreintes SHA-256
         shell: pwsh
         run: |
-          $files = @(Get-ChildItem publish/*.zip) + @(Get-ChildItem publish/outils/*.exe) + @(Get-Item publish/sonde/JvtechSonde.exe)
+          $files = @(Get-ChildItem publish/*.zip) + @(Get-ChildItem publish/outils/*.exe) + @(Get-Item publish/sonde/JvtechSonde.exe) + @(Get-Item publish/entretien/JvtechEntretien.exe)
           $lines = $files | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name }
           Set-Content -Path publish/SHA256SUMS.txt -Value $lines -Encoding utf8NoBOM
           Copy-Item publish/SHA256SUMS.txt publish/outils/
@@ -176,6 +189,11 @@ jobs:
           name: JVTECH-Sonde-v${{ env.VERSION }}
           path: publish/sonde/
 
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: JVTECH-Entretien-v${{ env.VERSION }}
+          path: publish/entretien/
+
       - uses: actions/upload-artifact@v4
         with:
           name: JVTECH-Serveur-PXE-v${{ env.VERSION }}
@@ -190,6 +208,7 @@ jobs:
             publish/JVTECH-Outils-v${{ env.VERSION }}.zip
             publish/JVTECH-Serveur-PXE-v${{ env.VERSION }}.zip
             publish/JVTECH-Sonde-v${{ env.VERSION }}.zip
+            publish/JVTECH-Entretien-v${{ env.VERSION }}.zip
             publish/outils/*.exe
             publish/SHA256SUMS.txt
 
@@ -217,6 +236,7 @@ jobs:
             publish/JVTECH-Outils-v${{ env.VERSION }}.zip
             publish/JVTECH-Serveur-PXE-v${{ env.VERSION }}.zip
             publish/JVTECH-Sonde-v${{ env.VERSION }}.zip
+            publish/JVTECH-Entretien-v${{ env.VERSION }}.zip
             publish/outils/*.exe
 
       # Une version publiée par compilation, que les logiciels consultent pour signaler une mise à jour.
@@ -230,11 +250,13 @@ jobs:
             PC Inspector, PC Sécurité, PC Maintenance, PC Migration et le lanceur JVTECH Outils, version v${{ env.VERSION }}.
             Télécharger le .zip, le décompresser (sur une clé USB pour le mode clé USB) et lancer JvtechOutils.exe.
             Contrôle quotidien des PC sous contrat : JVTECH-Sonde (voir sonde.md dans le .zip).
+            Maintenance mensuelle automatique des PC sous contrat : JVTECH-Entretien (voir entretien.md dans le .zip).
             Préparation revente par le réseau (PXE) : JVTECH-Serveur-PXE, à installer sur le mini PC de l'atelier (voir LISEZMOI.txt).
             Vérifier les fichiers avec SHA256SUMS.txt (voir docs/verification-telechargement.md).
           files: |
             publish/JVTECH-Outils-v${{ env.VERSION }}.zip
             publish/JVTECH-Serveur-PXE-v${{ env.VERSION }}.zip
             publish/JVTECH-Sonde-v${{ env.VERSION }}.zip
+            publish/JVTECH-Entretien-v${{ env.VERSION }}.zip
             publish/outils/*.exe
             publish/SHA256SUMS.txt

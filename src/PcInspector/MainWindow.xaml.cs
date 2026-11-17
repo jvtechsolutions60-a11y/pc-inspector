@@ -369,25 +369,39 @@ public partial class MainWindow : Window
         try
         {
             // Le rapport contient tous les onglets, y compris ceux pas encore ouverts.
-            // Tous en même temps : ceux déjà lus en arrière-plan sont immédiats.
-            var sections = (await Task.WhenAll(_collectors.Select(c => _cache.TryGetValue(c, out var cached)
-                ? Task.FromResult(cached) : SectionAsync(c, refresh: false)))).ToList();
-            for (var i = 0; i < _collectors.Count; i++) _cache[_collectors[i]] = sections[i];
+            // Tous en même temps : ceux déjà lus en arrière-plan sont immédiats. Une partie qui ne répond pas
+            // ne bloque plus le rapport : elle y est notée « non lue ».
+            var tasks = _collectors.Select(c => _cache.TryGetValue(c, out var cached)
+                ? Task.FromResult(cached) : SectionAsync(c, refresh: false)).ToList();
+            var sections = await InspectorReport.Finish(_collectors, tasks, InspectorReport.DefaultBudget);
+            for (var i = 0; i < _collectors.Count; i++)
+                if (tasks[i].Status == TaskStatus.RanToCompletion) _cache[_collectors[i]] = sections[i];
 
-            // PDF d'abord ; sans Edge ni Chrome, la page web (même contenu, imprimable depuis le navigateur).
-            var path = System.IO.Path.Combine(folder, baseName + ".pdf");
-            try { await Task.Run(() => ReportWriter.Write(path, info, sections)); }
-            catch (System.IO.IOException)
-            {
-                path = System.IO.Path.Combine(folder, baseName + ".html");
-                await Task.Run(() => ReportWriter.Write(path, info, sections));
-            }
+            // Page web toujours enregistrée ; PDF à côté si Edge ou Chrome y arrive ; autre dossier si Documents est refusé.
+            ShowStatus("Enregistrement du rapport…");
+            var saved = await Task.Run(() => InspectorReport.Save(info, sections, baseName, folder, pdf: true));
             ShowStatus(null);
-            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            if (saved.Path is null)
+            {
+                MessageBox.Show(this, "Impossible d'enregistrer le rapport :\n\n" + string.Join("\n", saved.Problems.Take(8)) +
+                    $"\n\nDétail : {InspectorReport.LogPath}", "Exporter le rapport", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            if (!saved.Path.StartsWith(folder, StringComparison.OrdinalIgnoreCase))
+                MessageBox.Show(this, $"Le dossier prévu est refusé par Windows : rapport enregistré dans\n{System.IO.Path.GetDirectoryName(saved.Path)}",
+                    "Exporter le rapport", MessageBoxButton.OK, MessageBoxImage.Information);
+            try { Process.Start(new ProcessStartInfo(saved.Path) { UseShellExecute = true }); }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or System.IO.IOException)
+            {
+                // Aucun programme pour ouvrir le fichier : on montre le dossier.
+                try { Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{saved.Path}\"") { UseShellExecute = true }); }
+                catch (Exception) { }
+            }
         }
-        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        catch (Exception ex)
         {
             ShowStatus(null);
+            InspectorReport.Log("ÉCHEC inattendu : " + ex);
             MessageBox.Show(this, "Impossible d'enregistrer le rapport : " + ex.Message, "Exporter le rapport",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -438,17 +452,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private static InfoSection CollectSafely(ICollector collector)
-    {
-        try
-        {
-            return collector.Collect();
-        }
-        catch (Exception ex)
-        {
-            return new InfoSection(collector.Title) { Error = $"Impossible de lire ces informations : {ex.Message}" };
-        }
-    }
+    private static InfoSection CollectSafely(ICollector collector) => InspectorReport.CollectSafely(collector);
 
     private void PeripheralTest_Click(object sender, RoutedEventArgs e) => new PeripheralTestWindow { Owner = this }.Show();
 

@@ -124,7 +124,11 @@ internal static class CommandLine
                 info.Date = DateTime.Now;
                 var path = Path.GetFullPath(options.Report);
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                ReportWriter.Write(path, info, report.ToSections(options.DryRun ? "Maintenance du PC (simulation)" : "Maintenance du PC"));
+                // Comme dans la fenêtre : rapport complet de PC Inspector après les étapes de la maintenance.
+                Log("Rapport PC Inspector : analyse du PC…");
+                var sections = report.ToSections(options.DryRun ? "Maintenance du PC (simulation)" : "Maintenance du PC");
+                sections.AddRange(await PcInspector.Report.InspectorReport.CollectAsync(PcInspector.Report.InspectorReport.Collectors()));
+                ReportWriter.Write(path, info, sections);
                 Log("Rapport : " + path);
             }
         }

@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    JVTECH Entretien : petit programme sans fenêtre pour l'entretien des PC sous contrat.
+    Lancé par une tâche planifiée à l'ouverture de session (compte SYSTEM, invisible), à chaque fois :
+    état avant, mises à jour Windows, mises à jour des logiciels de la liste sûre (winget), état après, rapport
+    gardé sur le PC et envoyé par e-mail à JVTECH. Ne redémarre jamais le PC et n'affiche rien à l'utilisateur.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>JvtechEntretien</AssemblyName>
+    <RootNamespace>JvtechEntretien</RootNamespace>
+    <Product>JVTECH Entretien</Product>
+    <Company>JVTECH Solutions</Company>
+    <Version>1.0.0</Version>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Management" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="entretien.ini" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Code partagé : agent Windows Update de PC Maintenance, lecture de winget et état de Windows de PC Inspector -->
+  <ItemGroup>
+    <Compile Include="..\PcInspector\Polyfills.cs" Link="Shared\Polyfills.cs" />
+    <Compile Include="..\PcInspector\AppInfo.cs" Link="Shared\AppInfo.cs" />
+    <Compile Include="..\PcInspector\WindowsState.cs" Link="Shared\WindowsState.cs" />
+    <Compile Include="..\PcInspector\ProcessRunner.cs" Link="Shared\ProcessRunner.cs" />
+    <Compile Include="..\PcInspector\WingetShell.cs" Link="Shared\WingetShell.cs" />
+    <Compile Include="..\PcInspector\Collectors\Wmi.cs" Link="Shared\Wmi.cs" />
+    <Compile Include="..\PcMaintenance\Maintenance\WindowsUpdate.cs" Link="Shared\WindowsUpdate.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="JvtechTests" />
+  </ItemGroup>
+
+</Project>

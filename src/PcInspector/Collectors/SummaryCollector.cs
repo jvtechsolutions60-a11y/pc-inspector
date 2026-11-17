@@ -22,6 +22,14 @@ public sealed class SummaryCollector : ICollector
         pc.Add("Système", os is null ? null : $"{os.Str("Caption")?.Replace("Microsoft ", "")} {os.Str("OSArchitecture")} ({os.Str("Version")})");
         section.Groups.Add(pc);
 
+        // Utilisateur du PC : nom et e-mail pour l'en-tête du rapport (lecture seule).
+        var identity = UserIdentity.Read();
+        var user = new InfoGroup("Utilisateur du PC");
+        foreach (var nom in identity.Names) user.Add("Nom", $"{nom.Value} ({nom.Source})");
+        foreach (var mail in identity.Emails) user.Add("E-mail", $"{mail.Value} ({mail.Source})");
+        if (identity.Names.Count == 0 && identity.Emails.Count == 0) user.Add("Nom", "non trouvé (compte local sans nom complet, pas de compte Microsoft ni Outlook)");
+        section.Groups.Add(user);
+
         // Processeur
         foreach (var cpu in Wmi.Query("SELECT Name, NumberOfCores, NumberOfLogicalProcessors, MaxClockSpeed FROM Win32_Processor"))
         {
