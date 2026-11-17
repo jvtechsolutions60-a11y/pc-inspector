@@ -21,6 +21,8 @@
     <Reference Include="System.Management" />
     <Reference Include="System.Printing" />
     <Reference Include="ReachFramework" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
   </ItemGroup>
 
   <!-- PCMAINTENANCE : retire du texte d'annonce la ligne des performances (tests de PC Inspector, absents ici). -->
@@ -40,9 +42,12 @@
     <Compile Include="..\PcInspector\WindowsUpdateFailures.cs" Link="Shared\WindowsUpdateFailures.cs" />
     <Compile Include="..\PcInspector\CrashGuard.cs" Link="Shared\CrashGuard.cs" />
     <Compile Include="..\PcInspector\Updater.cs" Link="Shared\Updater.cs" />
-    <Compile Include="..\PcInspector\Models\InfoSection.cs" Link="Shared\InfoSection.cs" />
     <Compile Include="..\PcInspector\Report\ReportInfo.cs" Link="Shared\ReportInfo.cs" />
     <Compile Include="..\PcInspector\Report\ReportWriter.cs" Link="Shared\ReportWriter.cs" />
+    <!-- Rapport complet de PC Inspector (toutes ses parties, sans sa fenêtre), fait automatiquement -->
+    <Compile Include="..\PcInspector\Report\InspectorReport.cs" Link="Shared\InspectorReport.cs" />
+    <Compile Include="..\PcInspector\Collectors\*.cs" Link="Shared\Collectors\%(Filename)%(Extension)" />
+    <Compile Include="..\PcInspector\Models\*.cs" Link="Shared\Models\%(Filename)%(Extension)" />
     <Compile Include="..\PcInspector\Report\PdfPrinter.cs" Link="Shared\PdfPrinter.cs" />
     <Page Include="..\PcInspector\ExportWindow.xaml" Link="ExportWindow.xaml" />
     <Compile Include="..\PcInspector\ExportWindow.xaml.cs" Link="ExportWindow.xaml.cs" DependentUpon="ExportWindow.xaml" />
@@ -50,13 +55,6 @@
 
   <!-- Étiquette à imprimer et texte Leboncoin, repris de PC Inspector (lecture seule des composants) -->
   <ItemGroup>
-    <Compile Include="..\PcInspector\Collectors\Wmi.cs" Link="Shared\Wmi.cs" />
-    <Compile Include="..\PcInspector\Collectors\MachineIdentity.cs" Link="Shared\MachineIdentity.cs" />
-    <Compile Include="..\PcInspector\Collectors\ICollector.cs" Link="Shared\ICollector.cs" />
-    <Compile Include="..\PcInspector\Collectors\GpuCollector.cs" Link="Shared\GpuCollector.cs" />
-    <Compile Include="..\PcInspector\Collectors\GpuDriver.cs" Link="Shared\GpuDriver.cs" />
-    <Compile Include="..\PcInspector\Collectors\BatteryCollector.cs" Link="Shared\BatteryCollector.cs" />
-    <Compile Include="..\PcInspector\Models\Health.cs" Link="Shared\Health.cs" />
     <Compile Include="..\PcInspector\Report\LabelWriter.cs" Link="Shared\LabelWriter.cs" />
     <Compile Include="..\PcInspector\Report\LabelPrinter.cs" Link="Shared\LabelPrinter.cs" />
     <Compile Include="..\PcInspector\Report\ListingWriter.cs" Link="Shared\ListingWriter.cs" />

@@ -40,6 +40,49 @@ public partial class MainWindow : Window
         LoadPack();
         _ = AnalyzeAsync();
         _ = CheckUpdateAsync();
+        // Lancé depuis la clé USB : rapport de PC Inspector tout de suite, état du PC à l'arrivée.
+        if (AppPaths.IsPortable) _ = AutoReportAsync("lancement depuis la clé", null);
+    }
+
+    /// <summary>
+    /// Rapport complet de PC Inspector (toutes ses parties), enregistré sans rien demander dans le dossier du client
+    /// (sur la clé en mode clé USB), avec en tête les étapes de la maintenance si elle vient d'avoir lieu.
+    /// Ne bloque jamais : une partie qui ne répond pas est notée « non lue », un dossier refusé est remplacé par un autre.
+    /// </summary>
+    private async Task AutoReportAsync(string moment, IReadOnlyList<PcInspector.Models.InfoSection>? maintenance)
+    {
+        Log($"Rapport PC Inspector ({moment}) : analyse du PC…");
+        try
+        {
+            var info = ReportInfo.LoadDefaults();
+            info.Date = DateTime.Now;
+            info.Notes = $"Rapport PC Inspector fait automatiquement par PC Maintenance ({moment}).";
+            string pcName;
+            try { pcName = $"{PcInspector.Collectors.MachineIdentity.Model()} {PcInspector.Collectors.MachineIdentity.Serial()}".Trim(); }
+            catch (Exception) { pcName = Environment.MachineName; }
+            if (pcName.Length == 0) pcName = Environment.MachineName;
+
+            var sections = await PcInspector.Report.InspectorReport.CollectAsync(PcInspector.Report.InspectorReport.Collectors());
+            if (maintenance is not null) sections.InsertRange(0, maintenance);
+
+            var folder = AppPaths.ClientFolder(string.IsNullOrWhiteSpace(info.Client) ? pcName : info.Client, info.Date);
+            var what = maintenance is null ? "Rapport PC" : "Rapport PC apres maintenance";
+            var baseName = string.Join("_", new[] { what, info.JobNumber, pcName, info.Date.ToString("yyyy-MM-dd HH-mm") }
+                .Where(p => !string.IsNullOrWhiteSpace(p)));
+            var saved = await Task.Run(() => PcInspector.Report.InspectorReport.Save(info, sections, baseName, folder, pdf: false));
+            if (saved.Path is null)
+                Log("Rapport PC Inspector NON enregistré : " + string.Join(" ; ", saved.Problems) + $" (détail : {PcInspector.Report.InspectorReport.LogPath})");
+            else
+            {
+                Log("Rapport PC Inspector enregistré : " + saved.Path);
+                if (saved.Problems.Count > 0) Log("    dossier prévu refusé, enregistré ailleurs : " + string.Join(" ; ", saved.Problems));
+            }
+        }
+        catch (Exception ex)
+        {
+            PcInspector.Report.InspectorReport.Log("ÉCHEC inattendu du rapport automatique : " + ex);
+            Log("Rapport PC Inspector impossible : " + ex.Message);
+        }
     }
 
     private async Task CheckUpdateAsync()
@@ -207,7 +250,11 @@ public partial class MainWindow : Window
             SetRunning(false);
         }
 
-        _ = RecordAfterAsync();
+        // État « après », puis rapport complet de PC Inspector enregistré tout seul (trace de l'intervention sur ce PC),
+        // avant de proposer le redémarrage.
+        try { await RecordAfterAsync(); }
+        catch (Exception ex) { Log("Relecture de l'état après la maintenance impossible : " + ex.Message); }
+        await AutoReportAsync("fin de maintenance", _report.ToSections());
 
         if (_rebootRequired || WindowsUpdate.IsRebootPending())
         {
