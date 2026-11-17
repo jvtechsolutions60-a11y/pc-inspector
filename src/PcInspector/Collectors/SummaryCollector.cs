@@ -25,8 +25,8 @@ public sealed class SummaryCollector : ICollector
         // Utilisateur du PC : nom et e-mail pour l'en-tête du rapport (lecture seule).
         var identity = UserIdentity.Read();
         var user = new InfoGroup("Utilisateur du PC");
-        foreach (var n in identity.Names) user.Add("Nom", $"{n.Value} ({n.Source})");
-        foreach (var m in identity.Emails) user.Add("E-mail", $"{m.Value} ({m.Source})");
+        foreach (var nom in identity.Names) user.Add("Nom", $"{nom.Value} ({nom.Source})");
+        foreach (var mail in identity.Emails) user.Add("E-mail", $"{mail.Value} ({mail.Source})");
         if (identity.Names.Count == 0 && identity.Emails.Count == 0) user.Add("Nom", "non trouvé (compte local sans nom complet, pas de compte Microsoft ni Outlook)");
         section.Groups.Add(user);
 
